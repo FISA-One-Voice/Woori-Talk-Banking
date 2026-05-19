@@ -1,8 +1,21 @@
+# Python
 .venv/
 .venv
-.env
-
-*.log
 __pycache__/
 *.pyc
+
+# 환경변수
+.env
+
+# 로그
+*.log
+
+# IDE
 .vscode/
+.idea/
+
+# Frontend
+frontend/node_modules/
+frontend/.expo/
+
+STRUCTURE.md

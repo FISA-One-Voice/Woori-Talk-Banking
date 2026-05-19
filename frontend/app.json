@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Woori-Talk-Banking",
+    "slug": "woori-talk-banking",
+    "version": "1.0.0",
+    "scheme": "wooritalk",
+    "platforms": ["ios", "android"],
+    "assetBundlePatterns": ["**/*"],
+    "plugins": ["expo-router"]
+  }
+}
