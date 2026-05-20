@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "charliermarsh.ruff",        // Python: formatting + import sorting
+    "ms-python.python",          // Python: language support
+    "esbenp.prettier-vscode",    // TypeScript: formatting
+    "dbaeumer.vscode-eslint"     // TypeScript: linting
+  ]
+}

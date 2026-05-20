@@ -11,7 +11,9 @@ __pycache__/
 *.log
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 
 # Frontend

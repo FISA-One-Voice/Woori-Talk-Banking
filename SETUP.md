@@ -131,3 +131,24 @@ py -3.11 -m venv .venv
 ```bash
 pip install -r requirements.txt
 ```
+
+---
+
+## VSCode Extension 세팅
+
+코드 포맷팅(저장 시 자동 정렬)이 작동하려면 아래 4개 Extension을 설치해야 합니다.
+
+### 설치 방법
+
+1. VSCode에서 `Cmd+Shift+P` (Windows: `Ctrl+Shift+P`) 입력
+2. `Extensions: Show Recommended Extensions` 선택
+3. 왼쪽 패널에 나타나는 extension을 각각 **Install** 클릭
+
+| Extension | 역할 |
+|-----------|------|
+| **Ruff** (`charliermarsh.ruff`) | Python 포맷팅 + import 정렬 |
+| **Python** (`ms-python.python`) | Python 언어 지원 |
+| **Prettier** (`esbenp.prettier-vscode`) | TypeScript 포맷팅 |
+| **ESLint** (`dbaeumer.vscode-eslint`) | TypeScript 린팅 |
+
+설치 완료 후 `.py`, `.ts`, `.tsx` 파일을 저장하면 자동으로 포맷팅됩니다.
