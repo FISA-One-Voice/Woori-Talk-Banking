@@ -1,7 +1,8 @@
-import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
-import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
+import React from "react";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { COLORS, FONT_SIZES, LAYOUT } from "@/constants/theme";
 
-type ErrorType = 'already' | 'server' | 'network';
+type ErrorType = "already" | "server" | "network";
 
 type ErrorModalProps = {
   visible: boolean;
@@ -11,20 +12,24 @@ type ErrorModalProps = {
 
 const ERROR_MESSAGES: Record<ErrorType, { title: string; message: string }> = {
   already: {
-    title: '이미 참여한 이벤트',
-    message: '이 이벤트는 이미 참여하셨습니다.',
+    title: "이미 참여한 이벤트",
+    message: "이 이벤트는 이미 참여하셨습니다.",
   },
   server: {
-    title: '서버 오류',
-    message: '잠시 후 다시 시도해 주세요.',
+    title: "서버 오류",
+    message: "잠시 후 다시 시도해 주세요.",
   },
   network: {
-    title: '네트워크 오류',
-    message: '인터넷 연결을 확인해 주세요.',
+    title: "네트워크 오류",
+    message: "인터넷 연결을 확인해 주세요.",
   },
 };
 
-export default function ErrorModal({ visible, type, onClose }: ErrorModalProps) {
+export default function ErrorModal({
+  visible,
+  type,
+  onClose,
+}: ErrorModalProps) {
   const { title, message } = ERROR_MESSAGES[type];
 
   return (
@@ -52,9 +57,9 @@ export default function ErrorModal({ visible, type, onClose }: ErrorModalProps) 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 24,
   },
   modal: {
@@ -63,9 +68,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     padding: 24,
-    width: '100%',
+    width: "100%",
     maxWidth: 320,
-    alignItems: 'center',
+    alignItems: "center",
   },
   icon: {
     fontSize: 48,
@@ -73,14 +78,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: FONT_SIZES.caption,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.textMain,
     marginBottom: 8,
   },
   message: {
     fontSize: FONT_SIZES.caption,
     color: COLORS.grayMedium,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 24,
   },
   button: {
@@ -93,7 +98,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: COLORS.textMain,
     fontSize: FONT_SIZES.caption,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
   },
 });
