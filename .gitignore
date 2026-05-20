@@ -6,18 +6,36 @@ __pycache__/
 
 # 환경변수
 .env
+.env.local
+.env.*.local
 
 # 로그
 *.log
+npm-debug.log*
 
 # IDE
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
 .idea/
+.cursor/
 
-# Frontend
-frontend/node_modules/
-frontend/.expo/
+# Node.js
+node_modules/
+package-lock.json
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# iOS / Android (네이티브 빌드)
+ios/
+android/
+
+# OS
+.DS_Store
+Thumbs.db
 
 STRUCTURE.md
