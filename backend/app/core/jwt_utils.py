@@ -2,6 +2,7 @@
 # backend/app/core/security.py
 # =============================================================================
 from datetime import datetime, timedelta, timezone
+import bcrypt
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -9,6 +10,22 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 security = HTTPBearer()
 
 from app.core.config import settings
+
+def verify_pin(plain_pin: str, hashed_pin: str) -> bool:
+    """입력받은 평문 PIN 번호가 해시값과 일치하는지 검증합니다.
+    
+    bcrypt 알고리즘을 사용하여 단방향 암호화된 값끼리 안전하게 비교를 수행합니다.
+
+    Args:
+        plain_pin: 로그인 시 사용자가 입력한 평문 형태의 PIN 번호.
+        hashed_pin: DB(users 테이블)에 저장되어 있는 bcrypt 기반 해시 문자열.
+
+    Returns:
+        암호가 일치하면 True, 틀리면 False.
+    """
+    pwd_bytes = plain_pin.encode('utf-8')
+    hash_bytes = hashed_pin.encode('utf-8')
+    return bcrypt.checkpw(pwd_bytes, hash_bytes)
 
 def create_access_token(data: dict) -> str:
     """Access Token을 발급합니다.

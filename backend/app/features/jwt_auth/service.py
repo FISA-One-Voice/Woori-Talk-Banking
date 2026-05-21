@@ -1,27 +1,41 @@
 from fastapi import HTTPException
-from app.core.jwt_utils import create_access_token, create_refresh_token, decode_token
+from sqlalchemy.orm import Session
+from app.core.jwt_utils import create_access_token, create_refresh_token, decode_token, verify_pin
 from app.features.jwt_auth.schema import JwtTokenResponse, JwtLoginRequest
+from app.models.user import User
 
-def login(req: JwtLoginRequest) -> JwtTokenResponse:
-    """사용자 로그인을 목업(Mock) 처리하고 인증 토큰을 발급합니다.
+def login(db: Session, req: JwtLoginRequest) -> JwtTokenResponse:
+    """사용자 전화번호와 PIN을 검증하고 인증 토큰을 발급합니다.
     
-    데이터베이스 검증 없이, 요청받은 user_id를 그대로 사용하여 
-    접근 토큰(Access Token)과 갱신 토큰(Refresh Token)을 즉시 발급합니다.
+    실제 데이터베이스(users 테이블)를 조회하여 유효한 사용자인지 확인한 뒤,
+    접근 토큰(Access Token)과 갱신 토큰(Refresh Token)을 발급합니다.
 
     Args:
-        req: 테스트용 로그인 요청 데이터 (user_id).
+        db: 데이터베이스 세션.
+        req: 로그인 요청 데이터 (전화번호, PIN).
 
     Returns:
-        발급된 JWT 토큰 정보(access_token, refresh_token, user_id)를 포함한 응답 객체.
+        발급된 JWT 토큰 정보(accessToken, refreshToken, userId)를 포함한 응답 객체.
+
+    Raises:
+        HTTPException: 가입되지 않은 전화번호인 경우(USER_NOT_FOUND).
+        HTTPException: PIN 번호가 틀린 경우(INVALID_PIN).
     """
-    token_data = {"sub": req.user_id}
+    user = db.query(User).filter(User.phone == req.phone).first()
+    if not user:
+        raise HTTPException(status_code=404, detail={"error": "USER_NOT_FOUND"})
+        
+    if not verify_pin(req.pin, user.pin_hash):
+        raise HTTPException(status_code=401, detail={"error": "INVALID_PIN"})
+        
+    token_data = {"sub": str(user.user_id)}
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
 
     return JwtTokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        user_id=req.user_id
+        user_id=str(user.user_id)
     )
 
 def refresh_tokens(refresh_token_str: str) -> JwtTokenResponse:
