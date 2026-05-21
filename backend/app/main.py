@@ -162,6 +162,8 @@ seed_sample_events()
 # from app.features.{name}.router import router as {name}_router
 # app.include_router({name}_router)
 app.include_router(event_router)
+from app.features.jwt_auth.router import router as jwt_auth_router
+app.include_router(jwt_auth_router)
 
 
 # ── 헬스체크 ────────────────────────────────────────────────────────────────────

@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     # 실행 환경 구분 ("development" | "production")
     ENV: str = "development"
 
+    # JWT 인증 설정
+    JWT_SECRET_KEY: str = "supersecretkey-change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
     class Config:
         # 프로젝트 루트의 .env 파일을 자동으로 읽습니다.
         # .env 가 없어도 오류 없이 기본값을 사용합니다.
