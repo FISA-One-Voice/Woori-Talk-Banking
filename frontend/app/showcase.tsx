@@ -1,45 +1,52 @@
-import EmptyState from '@/components/EmptyState';
-import ErrorModal from '@/components/ErrorModal';
-import EventCard from '@/components/EventCard';
-import SuccessScreen from '@/components/SuccessScreen';
-import VoiceInputBar from '@/components/VoiceInputBar';
-import type { VoiceStatus } from '@/components/VoiceInputBar';
-import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from "react";
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { router } from "expo-router";
+import { COLORS, FONT_SIZES, LAYOUT } from "@/constants/theme";
+import { VoiceStatus } from "@/components/VoiceInputBar/VoiceInputBar";
+import VoiceInputBar from "@/components/VoiceInputBar";
+import SuccessScreen from "@/components/SuccessScreen";
+import EmptyState from "@/components/EmptyState";
+import ErrorModal from "@/components/ErrorModal";
+import EventCard from "@/components/EventCard";
 
-type Mode = 'list' | 'empty' | 'success' | 'already' | 'server';
+type Mode = "list" | "empty" | "success" | "already" | "server";
 
 const MODES: { key: Mode; label: string }[] = [
-  { key: 'list', label: '목록' },
-  { key: 'empty', label: '빈 화면' },
-  { key: 'success', label: '성공' },
-  { key: 'already', label: '이미 참여' },
-  { key: 'server', label: '서버 오류' },
+  { key: "list", label: "목록" },
+  { key: "empty", label: "빈 화면" },
+  { key: "success", label: "성공" },
+  { key: "already", label: "이미 참여" },
+  { key: "server", label: "서버 오류" },
 ];
 
-const VOICE_CYCLE: VoiceStatus[] = ['idle', 'recording', 'processing'];
+const VOICE_CYCLE: VoiceStatus[] = ["idle", "recording", "processing"];
 
 const SAMPLE_EVENTS = [
-  { title: '봄맞이 금리 우대 이벤트', date: '2026.04.01 ~ 05.31', location: '전국 영업점' },
-  { title: '모바일 이체 수수료 면제', date: '2026.05.01 ~ 05.31' },
-  { title: '우리톡 첫 가입 축하 쿠폰', date: '2026.05.20 ~ 06.20', location: '앱 전용' },
+  { title: "봄맞이 금리 우대 이벤트", date: "2026.04.01 ~ 05.31", location: "전국 영업점" },
+  { title: "모바일 이체 수수료 면제", date: "2026.05.01 ~ 05.31" },
+  { title: "우리톡 첫 가입 축하 쿠폰", date: "2026.05.20 ~ 06.20", location: "앱 전용" },
 ];
 
 export default function ShowcaseScreen() {
-  const [mode, setMode] = useState<Mode>('list');
-  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('idle');
+  const [mode, setMode] = useState<Mode>("list");
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
   const [errorVisible, setErrorVisible] = useState(true);
 
   function cycleVoice() {
-    setVoiceStatus((prev: VoiceStatus) => {
+    setVoiceStatus((prev) => {
       const idx = VOICE_CYCLE.indexOf(prev);
       return VOICE_CYCLE[(idx + 1) % VOICE_CYCLE.length];
     });
   }
 
-  const showModal = mode === 'already' || mode === 'server';
+  const showModal = mode === "already" || mode === "server";
 
   return (
     <SafeAreaView style={styles.root}>
@@ -68,14 +75,16 @@ export default function ShowcaseScreen() {
               setErrorVisible(true);
             }}
           >
-            <Text style={[styles.tabText, mode === key && styles.tabTextActive]}>{label}</Text>
+            <Text style={[styles.tabText, mode === key && styles.tabTextActive]}>
+              {label}
+            </Text>
           </Pressable>
         ))}
       </ScrollView>
 
       {/* 콘텐츠 영역 */}
       <View style={styles.content}>
-        {mode === 'list' && (
+        {mode === "list" && (
           <ScrollView contentContainerStyle={styles.listPadding}>
             <Text style={styles.sectionLabel}>EventCard × 3</Text>
             {SAMPLE_EVENTS.map((ev, i) => (
@@ -90,24 +99,30 @@ export default function ShowcaseScreen() {
           </ScrollView>
         )}
 
-        {mode === 'empty' && <EmptyState />}
+        {mode === "empty" && <EmptyState />}
 
-        {mode === 'success' && (
-          <SuccessScreen eventName="봄맞이 금리 우대 이벤트" onConfirm={() => setMode('list')} />
+        {mode === "success" && (
+          <SuccessScreen
+            eventName="봄맞이 금리 우대 이벤트"
+            onConfirm={() => setMode("list")}
+          />
         )}
 
         {showModal && (
           <View style={styles.modalBg}>
             <Text style={styles.sectionLabel}>
-              ErrorModal — {mode === 'already' ? 'already' : 'server'} 타입
+              ErrorModal — {mode === "already" ? "already" : "server"} 타입
             </Text>
             <ErrorModal
               visible={errorVisible}
-              type={mode === 'already' ? 'already' : 'server'}
+              type={mode === "already" ? "already" : "server"}
               onClose={() => setErrorVisible(false)}
             />
             {!errorVisible && (
-              <Pressable style={styles.reopenBtn} onPress={() => setErrorVisible(true)}>
+              <Pressable
+                style={styles.reopenBtn}
+                onPress={() => setErrorVisible(true)}
+              >
                 <Text style={styles.reopenText}>모달 다시 열기</Text>
               </Pressable>
             )}
@@ -118,9 +133,13 @@ export default function ShowcaseScreen() {
       {/* 하단 VoiceInputBar — 항상 표시 */}
       <View style={styles.voiceWrapper}>
         <Text style={styles.voiceLabel}>
-          VoiceInputBar · 현재 상태: <Text style={styles.voiceStatusText}>{voiceStatus}</Text>
+          VoiceInputBar · 현재 상태:{" "}
+          <Text style={styles.voiceStatusText}>{voiceStatus}</Text>
         </Text>
-        <VoiceInputBar status={voiceStatus} onPress={cycleVoice} />
+        <VoiceInputBar
+          status={voiceStatus}
+          onPress={cycleVoice}
+        />
       </View>
     </SafeAreaView>
   );
@@ -132,8 +151,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: LAYOUT.paddingMedium,
     paddingVertical: 12,
     borderBottomWidth: 0.5,
@@ -149,9 +168,9 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: FONT_SIZES.caption,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.textMain,
-    textAlign: 'center',
+    textAlign: "center",
   },
   headerSpacer: {
     width: 40,
@@ -184,7 +203,7 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: COLORS.background,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   content: {
     flex: 1,
@@ -205,7 +224,7 @@ const styles = StyleSheet.create({
   },
   reopenBtn: {
     marginTop: 24,
-    alignSelf: 'center',
+    alignSelf: "center",
     paddingVertical: 10,
     paddingHorizontal: 28,
     borderRadius: LAYOUT.borderRadius,
@@ -222,15 +241,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   voiceLabel: {
-    position: 'absolute',
+    position: "absolute",
     top: 14,
-    alignSelf: 'center',
+    alignSelf: "center",
     fontSize: FONT_SIZES.caption,
     color: COLORS.grayMedium,
     zIndex: 1,
   },
   voiceStatusText: {
     color: COLORS.highlightYellow,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });
