@@ -38,13 +38,16 @@ android/
 .DS_Store
 Thumbs.db
 
-# STRUCTURE.md
-
-
 # Personal
 .claude/
+
+report/
+.bkit/
 
 CLAUDE.md
 작업일지.md
 CODE_STYLE_4.md
 STYLE_GUIDE.md
+
+*.db
+*.dbml
