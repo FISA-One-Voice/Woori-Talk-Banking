@@ -47,9 +47,5 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#fff',
   },
-  cmd: {
-    fontSize: 24,
-    color: '#444',
-  },
 });
 

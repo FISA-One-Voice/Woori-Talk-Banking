@@ -34,7 +34,7 @@ export default function VoiceWaveAnimation({
     return () => loops.forEach((l) => l.stop());
   }, [isActive]);
 
-  const BASE_HEIGHTS = [10, 24, 36, 16, 28, 12, 32, 20];
+  const baseHeights = [10, 24, 36, 16, 28, 12, 32, 20];
 
   return (
     <View style={styles.wrap}>
@@ -44,7 +44,7 @@ export default function VoiceWaveAnimation({
           style={[
             styles.bar,
             {
-              height: BASE_HEIGHTS[i % BASE_HEIGHTS.length],
+              height: baseHeights[i % baseHeights.length],
               transform: [{ scaleY: anim }],
             },
           ]}

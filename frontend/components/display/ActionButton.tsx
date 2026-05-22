@@ -10,7 +10,7 @@ interface ActionButtonProps {
   flex?: number;
 }
 
-const VARIANT_STYLES = {
+const ACTION_BUTTON_VARIANT_STYLES = {
   primary: {
     container: { backgroundColor: '#FFD600', borderWidth: 0 },
     text: { color: '#111' },
@@ -32,13 +32,13 @@ export default function ActionButton({
   disabled = false,
   flex,
 }: ActionButtonProps) {
-  const v = VARIANT_STYLES[variant];
+  const variantStyles = ACTION_BUTTON_VARIANT_STYLES[variant];
 
   return (
     <TouchableOpacity
       style={[
         styles.base,
-        v.container,
+        variantStyles.container,
         flex !== undefined && { flex },
         disabled && styles.disabled,
       ]}
@@ -46,7 +46,7 @@ export default function ActionButton({
       disabled={disabled}
       activeOpacity={0.7}
     >
-      <Text style={[styles.label, v.text]}>{label}</Text>
+      <Text style={[styles.label, variantStyles.text]}>{label}</Text>
     </TouchableOpacity>
   );
 }

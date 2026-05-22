@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
@@ -12,7 +12,7 @@ interface TtsBubbleProps {
   textAlign?: 'left' | 'center';
 }
 
-const VARIANT_STYLES = {
+const TTS_BUBBLE_VARIANT_STYLES = {
   default: {
     container: {
       backgroundColor: '#191900',
@@ -77,16 +77,16 @@ export default function TtsBubble({
     return () => {
       Speech.stop();
     };
-  }, [message, autoPlay]);
+  }, [message, autoPlay, onEnd]);
 
-  const styles_variant = VARIANT_STYLES[variant];
+  const variantStyles = TTS_BUBBLE_VARIANT_STYLES[variant];
 
   return (
-    <View style={[styles.container, styles_variant.container]}>
-      <Text style={[styles.tag, styles_variant.tag, { textAlign }]}>
-        {styles_variant.tagText}
+    <View style={[styles.container, variantStyles.container]}>
+      <Text style={[styles.tag, variantStyles.tag, { textAlign }]}>
+        {variantStyles.tagText}
       </Text>
-      <Text style={[styles.message, styles_variant.message, { textAlign }]}>
+      <Text style={[styles.message, variantStyles.message, { textAlign }]}>
         {message}
       </Text>
     </View>
