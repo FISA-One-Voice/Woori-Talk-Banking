@@ -29,7 +29,7 @@ from app.core.database import Base, SessionLocal, engine
 from app.features.event.router import router as event_router
 from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
 from app.models.user import User
-from app.core.exceptions import AuthError
+from app.core.jwt_utils import AuthError
 
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
