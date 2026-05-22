@@ -13,30 +13,65 @@
 # 그 다음:       settings.DATABASE_URL  로 값을 읽습니다.
 # =============================================================================
 
-from pydantic_settings import BaseSettings  # 환경변수를 자동으로 읽어주는 라이브러리
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """
     앱 설정 클래스.
 
-    pydantic_settings 의 BaseSettings 를 상속받으면
-    .env 파일 또는 시스템 환경변수에서 값을 자동으로 읽어옵니다.
+    BaseSettings 가 .env 파일과 os.environ 을 자동으로 읽어
+    각 필드에 타입 변환 후 매핑합니다.
     """
 
     # 데이터베이스 연결 주소
-    # ─ 기본값(sqlite): PostgreSQL 없이도 바로 실행 가능한 로컬 파일 DB
-    # ─ 배포 시 교체:   DATABASE_URL=postgresql://user:pw@host/dbname
-    DATABASE_URL: str = "sqlite:///./woori_talk.db"
+    # ─ DATABASE_URL 이 직접 설정되어 있으면 그 값을 사용합니다.
+    # ─ 없으면 POSTGRES_* 개별 변수로 자동 조합합니다.
+    # ─ POSTGRES_* 도 없으면 SQLite 로컬 파일 DB 를 사용합니다.
+    DATABASE_URL: str = ""
+
+    POSTGRES_HOST: str = ""
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DATABASE: str = ""
+    POSTGRES_USER: str = ""
+    POSTGRES_PASSWORD: str = ""
+    POSTGRES_SSL_MODE: str = "require"
+    POSTGRES_SSL_ROOT_CERT: str = "certs/aiven-postgre.pem"  # Aiven CA 인증서 경로
 
     # 실행 환경 구분 ("development" | "production")
     ENV: str = "development"
 
-    class Config:
-        # 프로젝트 루트의 .env 파일을 자동으로 읽습니다.
-        # .env 가 없어도 오류 없이 기본값을 사용합니다.
-        env_file = ".env"
-        extra = "ignore"  # .env 에 정의되지 않은 변수가 있어도 오류 없이 무시
+    # AES-256-GCM 암호화 키 (base64url 인코딩된 32바이트)
+    # 생성: python -c "import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+    CRYPTO_KEY: str = ""
+
+    # True 로 설정하면 encrypt/decrypt 가 no-op (평문 그대로 반환) — 개발·테스트 전용
+    # CRYPTO_NOOP: bool = False
+    CRYPTO_NOOP: bool = True
+
+    @property
+    def database_url(self) -> str:
+        """실제 사용할 DATABASE_URL 을 반환합니다.
+
+        우선순위:
+          1. DATABASE_URL 환경변수가 직접 설정된 경우
+          2. POSTGRES_HOST 등 개별 변수로 URL 을 조합하는 경우
+          3. 둘 다 없으면 SQLite 로컬 파일 DB
+        """
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+        if self.POSTGRES_HOST:
+            url = (
+                f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+                f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DATABASE}"
+                f"?sslmode={self.POSTGRES_SSL_MODE}"
+            )
+            if self.POSTGRES_SSL_ROOT_CERT:
+                url += f"&sslrootcert={self.POSTGRES_SSL_ROOT_CERT}"
+            return url
+        return "sqlite:///./woori_talk.db"
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 # 싱글턴 패턴: 이 모듈을 import 하는 모든 파일이 같은 객체를 공유합니다.

@@ -3,9 +3,11 @@
 .venv
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # 환경변수
 .env
+
 .env.local
 .env.*.local
 
