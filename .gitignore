@@ -43,11 +43,11 @@ Thumbs.db
 
 report/
 .bkit/
+docs/
 
 CLAUDE.md
 작업일지.md
 CODE_STYLE_4.md
-STYLE_GUIDE.md
 
 *.db
 *.dbml
