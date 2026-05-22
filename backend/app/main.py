@@ -1,33 +1,15 @@
-# =============================================================================
-# backend/app/main.py
-#
-# [이 파일의 역할]
-# FastAPI 앱의 시작점(entry point)입니다.
-# - 앱 객체를 생성합니다.
-# - 각 feature 의 router 를 등록합니다.
-# - DB 테이블을 생성합니다.
-# - 전역 예외 핸들러를 등록합니다.
-# - 테스트용 샘플 데이터를 추가합니다.
-#
-# [서버 실행 방법]
-# cd backend
-# uvicorn app.main:app --reload
-#
-# 실행 후 브라우저에서 확인:
-# - API 문서: http://localhost:8000/docs  (Swagger UI, 직접 테스트 가능)
-# - 헬스체크: http://localhost:8000/health
-# =============================================================================
-
 import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.database import Base, SessionLocal, engine
 from app.features.event.router import router as event_router
-from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
+from app.shared.voice.voice_router import router as voice_router
+from app.models.event import Event
 
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
@@ -39,9 +21,6 @@ app = FastAPI(
 
 
 # ── CORS 설정 ───────────────────────────────────────────────────────────────────
-# CORS(Cross-Origin Resource Sharing): 프론트엔드(다른 주소)에서 이 서버로
-# API 요청을 보낼 수 있도록 허용하는 설정입니다.
-# 개발 중에는 모든 출처("*")를 허용합니다. 배포 시 실제 도메인으로 교체하세요.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -52,27 +31,25 @@ app.add_middleware(
 
 
 # ── 전역 예외 핸들러 ─────────────────────────────────────────────────────────────
-# service.py 에서 HTTPException 을 raise 하면 이 핸들러가 받아서
-# CLAUDE.md 표준 응답 형식(ApiResponse)으로 변환합니다.
-#
-# 이 핸들러가 없으면 FastAPI 기본 오류 형식이 반환됩니다:
-# {"detail": {"error": "ALREADY_PARTICIPATED"}}  ← 우리 표준이 아님
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_request: Request, exc: HTTPException):
     """HTTPException 을 표준 ApiResponse 형식으로 변환합니다."""
 
-    # detail 이 {"error": "ERROR_CODE"} 형태인지 확인합니다.
     if isinstance(exc.detail, dict) and "error" in exc.detail:
         error_code = exc.detail["error"]
     else:
         error_code = None
 
-    # 오류 코드 → 사용자 안내 메시지 변환표
-    # 프론트엔드는 message 가 아닌 error_code 로 분기해야 합니다.
     ERROR_MESSAGES: dict[str, str] = {
         "EVENT_NOT_FOUND": "이벤트를 찾을 수 없습니다.",
         "ALREADY_PARTICIPATED": "이미 참여한 이벤트입니다.",
         "EVENT_ENDED": "종료된 이벤트입니다.",
+        "STT_FAILED": "음성 변환에 실패했습니다.",
+        "VOICE_AUDIO_TOO_LONG": "음성은 60초를 초과할 수 없습니다.",
+        "VOICE_AUDIO_TOO_LARGE": "음성 파일 크기가 10 MB를 초과합니다.",
+        "VOICE_AUDIO_INVALID_FORMAT": "지원하지 않는 오디오 형식입니다.",
+        "TTS_SPEED_OUT_OF_RANGE": "TTS 속도는 0.25 ~ 4.0 범위여야 합니다.",
+        "SERVICE_UNAVAILABLE": "외부 서비스에 일시적인 문제가 발생했습니다.",
     }
 
     message = (
@@ -92,23 +69,37 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
     )
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_request: Request, exc: RequestValidationError):
+    """Pydantic 요청 검증 오류를 표준 ApiResponse 형식으로 변환합니다."""
+    first = exc.errors()[0] if exc.errors() else {}
+    field = ".".join(str(loc) for loc in first.get("loc", [])[1:])
+    detail = first.get("msg", "입력값이 올바르지 않습니다.")
+    message = f"{field}: {detail}" if field else detail
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "success": False,
+            "data": None,
+            "message": message,
+            "error_code": "INVALID_REQUEST",
+        },
+    )
+
+
 # ── DB 테이블 생성 ──────────────────────────────────────────────────────────────
-# import 된 모든 모델(Base 를 상속한 클래스)의 테이블을 DB 에 생성합니다.
-# 테이블이 이미 존재하면 건너뜁니다. (덮어쓰지 않습니다)
 Base.metadata.create_all(bind=engine)
 
 
 # ── 샘플 데이터 추가 ────────────────────────────────────────────────────────────
-# 팀원이 서버를 처음 실행했을 때 바로 테스트할 수 있도록
-# 이벤트 테이블이 비어 있으면 샘플 이벤트 3개를 자동으로 추가합니다.
 def seed_sample_events() -> None:
     """이벤트 테이블이 비어 있으면 샘플 데이터를 삽입합니다."""
     db = SessionLocal()
     try:
         if db.query(Event).count() > 0:
-            return  # 이미 데이터가 있으면 중복 삽입 방지
+            return
 
-        # DB 저장용 naive datetime (timezone 정보 제거)
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         sample_events = [
             Event(
@@ -148,7 +139,6 @@ def seed_sample_events() -> None:
 
         db.add_all(sample_events)
         db.commit()
-        print("✅ 샘플 이벤트 3개가 추가되었습니다.")
     finally:
         db.close()
 
@@ -157,11 +147,8 @@ seed_sample_events()
 
 
 # ── 라우터 등록 ─────────────────────────────────────────────────────────────────
-# 각 feature 의 router 를 앱에 등록합니다.
-# 새 화면(feature)을 추가할 때마다 이 파일에 두 줄씩 추가합니다:
-# from app.features.{name}.router import router as {name}_router
-# app.include_router({name}_router)
 app.include_router(event_router)
+app.include_router(voice_router)
 
 
 # ── 헬스체크 ────────────────────────────────────────────────────────────────────
