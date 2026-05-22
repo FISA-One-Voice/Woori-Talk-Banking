@@ -164,6 +164,7 @@ user_id = get_user_id()
 | `NLU_INTENT_UNRECOGNIZED` | 음성 발화 "의도 인식" 실패 → 재발화 안내 — `/nlu/parse` 422 | 
 
 
+
  
  
 ### 5.2. 계좌 에러 코드 목록
