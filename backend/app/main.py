@@ -29,6 +29,7 @@ from app.core.database import Base, SessionLocal, engine
 from app.features.event.router import router as event_router
 from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
 from app.models.user import User
+from app.core.exceptions import AuthError
 
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
@@ -89,6 +90,23 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
             "data": None,
             "message": message,
             "error_code": error_code,
+        },
+    )
+
+
+@app.exception_handler(AuthError)
+async def auth_error_handler(request: Request, exc: AuthError):
+    """AuthError 커스텀 예외를 표준 ApiResponse 형식으로 변환합니다."""
+    # 에러 코드별 HTTP 상태 코드 매핑 (기본값 401)
+    status_code = 404 if exc.code == "USER_NOT_FOUND" else 401
+    
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "success": False,
+            "data": None,
+            "message": exc.message,
+            "error_code": exc.code,
         },
     )
 

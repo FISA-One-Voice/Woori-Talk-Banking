@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.jwt_utils import create_access_token, create_refresh_token, decode_token, verify_pin
 from app.features.jwt_auth.schema import JwtTokenResponse, JwtLoginRequest
 from app.models.user import User
+from app.core.exceptions import AuthError
 
 def login(db: Session, req: JwtLoginRequest) -> JwtTokenResponse:
     """사용자 전화번호와 PIN을 검증하고 인증 토큰을 발급합니다.
@@ -23,10 +24,16 @@ def login(db: Session, req: JwtLoginRequest) -> JwtTokenResponse:
     """
     user = db.query(User).filter(User.phone == req.phone).first()
     if not user:
-        raise HTTPException(status_code=404, detail={"error": "USER_NOT_FOUND"})
+        raise AuthError(
+            code="USER_NOT_FOUND",
+            message="가입되지 않은 전화번호입니다."
+        )
         
     if not verify_pin(req.pin, user.pin_hash):
-        raise HTTPException(status_code=401, detail={"error": "INVALID_PIN"})
+        raise AuthError(
+            code="UNAUTHORIZED",
+            message="비밀번호가 일치하지 않습니다."
+        )
         
     token_data = {"sub": str(user.user_id)}
     access_token = create_access_token(token_data)
@@ -54,7 +61,10 @@ def refresh_tokens(refresh_token_str: str) -> JwtTokenResponse:
     """
     payload = decode_token(refresh_token_str)
     if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail={"error": "TOKEN_INVALID"})
+        raise AuthError(
+            code="TOKEN_INVALID",
+            message="토큰 위변조 또는 유효하지 않은 리프레시 토큰입니다."
+        )
     
     user_id = payload["sub"]
     new_access_token = create_access_token({"sub": user_id})

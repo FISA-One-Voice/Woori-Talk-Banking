@@ -51,3 +51,5 @@ STYLE_GUIDE.md
 
 *.db
 *.dbml
+# Documentation
+develop/

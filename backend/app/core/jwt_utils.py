@@ -6,6 +6,7 @@ import bcrypt
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.core.exceptions import AuthError
 
 security = HTTPBearer()
 
@@ -81,6 +82,9 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
     payload = decode_token(token)
     
     if not payload or "sub" not in payload:
-        raise HTTPException(status_code=401, detail={"error": "TOKEN_INVALID"})
+        raise AuthError(
+            code="TOKEN_INVALID",
+            message="토큰 위변조 또는 유효하지 않습니다."
+        )
         
     return payload["sub"]
