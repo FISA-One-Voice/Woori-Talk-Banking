@@ -7,7 +7,17 @@ TTS_SPEED_MAX = 4.0
 
 
 class TTSError(RuntimeError):
-    """Azure TTS API 호출 또는 응답 파싱 중 발생하는 예외."""
+    """Azure TTS API 호출 또는 응답 파싱 중 발생하는 예외.
+
+    Attributes:
+        code: 에러 코드 목록에 정의된 코드.
+        message: 사람이 읽는 에러 설명.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        self.message = message
+        super().__init__(message)
 
 
 async def synthesize_speech(
@@ -50,12 +60,21 @@ async def synthesize_speech(
                 },
             )
     except httpx.TimeoutException as exc:
-        raise TTSError("Azure TTS API 요청 시간이 초과됐습니다.") from exc
+        raise TTSError(
+            code="SERVICE_UNAVAILABLE",
+            message="Azure TTS API 요청 시간이 초과됐습니다.",
+        ) from exc
     except httpx.RequestError as exc:
-        raise TTSError("Azure TTS API에 연결할 수 없습니다.") from exc
+        raise TTSError(
+            code="SERVICE_UNAVAILABLE",
+            message="Azure TTS API에 연결할 수 없습니다.",
+        ) from exc
 
     if response.status_code != 200:
-        raise TTSError(f"Azure TTS API 오류: status={response.status_code}")
+        raise TTSError(
+            code="SERVICE_UNAVAILABLE",
+            message=f"Azure TTS API 오류: status={response.status_code}",
+        )
 
     return response.content
 

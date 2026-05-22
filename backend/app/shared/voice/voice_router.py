@@ -70,7 +70,7 @@ async def speech_to_text(file: UploadFile) -> ApiResponse:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
     except STTError as exc:
-        raise HTTPException(status_code=503, detail={"error": "STT_FAILED"}) from exc
+        raise HTTPException(status_code=503, detail={"error": exc.code}) from exc
 
     return ApiResponse(
         success=True,
@@ -103,7 +103,7 @@ async def text_to_speech(body: TTSRequest) -> ApiResponse:
     except TTSError as exc:
         raise HTTPException(
             status_code=503,
-            detail={"error": "SERVICE_UNAVAILABLE"},
+            detail={"error": exc.code},
         ) from exc
 
     return ApiResponse(
