@@ -1,23 +1,3 @@
-# =============================================================================
-# backend/app/main.py
-#
-# [이 파일의 역할]
-# FastAPI 앱의 시작점(entry point)입니다.
-# - 앱 객체를 생성합니다.
-# - 각 feature 의 router 를 등록합니다.
-# - DB 테이블을 생성합니다.
-# - 전역 예외 핸들러를 등록합니다.
-# - 테스트용 샘플 데이터를 추가합니다.
-#
-# [서버 실행 방법]
-# cd backend
-# uvicorn app.main:app --reload
-#
-# 실행 후 브라우저에서 확인:
-# - API 문서: http://localhost:8000/docs  (Swagger UI, 직접 테스트 가능)
-# - 헬스체크: http://localhost:8000/health
-# =============================================================================
-
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -27,21 +7,18 @@ from fastapi.responses import JSONResponse
 
 from app.core.database import Base, SessionLocal, engine
 from app.features.event.router import router as event_router
-from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
+from app.features.account.router import router as account_router
+from app.models.event import Event
+from app.models.account import Account
+from app.models.user import User
 
 
-# ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Woori-Talk-Banking API",
     description="시각장애인을 위한 음성 뱅킹 서비스 백엔드",
     version="1.0.0",
 )
 
-
-# ── CORS 설정 ───────────────────────────────────────────────────────────────────
-# CORS(Cross-Origin Resource Sharing): 프론트엔드(다른 주소)에서 이 서버로
-# API 요청을 보낼 수 있도록 허용하는 설정입니다.
-# 개발 중에는 모든 출처("*")를 허용합니다. 배포 시 실제 도메인으로 교체하세요.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -51,28 +28,18 @@ app.add_middleware(
 )
 
 
-# ── 전역 예외 핸들러 ─────────────────────────────────────────────────────────────
-# service.py 에서 HTTPException 을 raise 하면 이 핸들러가 받아서
-# CLAUDE.md 표준 응답 형식(ApiResponse)으로 변환합니다.
-#
-# 이 핸들러가 없으면 FastAPI 기본 오류 형식이 반환됩니다:
-# {"detail": {"error": "ALREADY_PARTICIPATED"}}  ← 우리 표준이 아님
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_request: Request, exc: HTTPException):
-    """HTTPException 을 표준 ApiResponse 형식으로 변환합니다."""
-
-    # detail 이 {"error": "ERROR_CODE"} 형태인지 확인합니다.
     if isinstance(exc.detail, dict) and "error" in exc.detail:
         error_code = exc.detail["error"]
     else:
         error_code = None
 
-    # 오류 코드 → 사용자 안내 메시지 변환표
-    # 프론트엔드는 message 가 아닌 error_code 로 분기해야 합니다.
     ERROR_MESSAGES: dict[str, str] = {
         "EVENT_NOT_FOUND": "이벤트를 찾을 수 없습니다.",
         "ALREADY_PARTICIPATED": "이미 참여한 이벤트입니다.",
         "EVENT_ENDED": "종료된 이벤트입니다.",
+        "ACCOUNT_NOT_FOUND": "계좌를 찾을 수 없습니다.",
     }
 
     message = (
@@ -92,23 +59,14 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
     )
 
 
-# ── DB 테이블 생성 ──────────────────────────────────────────────────────────────
-# import 된 모든 모델(Base 를 상속한 클래스)의 테이블을 DB 에 생성합니다.
-# 테이블이 이미 존재하면 건너뜁니다. (덮어쓰지 않습니다)
 Base.metadata.create_all(bind=engine)
 
 
-# ── 샘플 데이터 추가 ────────────────────────────────────────────────────────────
-# 팀원이 서버를 처음 실행했을 때 바로 테스트할 수 있도록
-# 이벤트 테이블이 비어 있으면 샘플 이벤트 3개를 자동으로 추가합니다.
 def seed_sample_events() -> None:
-    """이벤트 테이블이 비어 있으면 샘플 데이터를 삽입합니다."""
     db = SessionLocal()
     try:
         if db.query(Event).count() > 0:
-            return  # 이미 데이터가 있으면 중복 삽입 방지
-
-        # DB 저장용 naive datetime (timezone 정보 제거)
+            return
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         sample_events = [
             Event(
@@ -145,7 +103,6 @@ def seed_sample_events() -> None:
                 is_active=True,
             ),
         ]
-
         db.add_all(sample_events)
         db.commit()
         print("✅ 샘플 이벤트 3개가 추가되었습니다.")
@@ -153,19 +110,74 @@ def seed_sample_events() -> None:
         db.close()
 
 
+def seed_sample_users() -> None:
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(
+            User.user_id == "00000000-0000-0000-0000-000000000001"
+        ).first()
+        if existing:
+            return
+        sample_user = User(
+            user_id="00000000-0000-0000-0000-000000000001",
+            name="테스트유저",
+            phone="010-1234-5678",
+        )
+        db.add(sample_user)
+        db.commit()
+        print("✅ 샘플 유저 1명이 추가되었습니다.")
+    except Exception as e:
+        db.rollback()
+        print(f"⚠️ 유저 삽입 실패 (이미 존재할 수 있음): {e}")
+    finally:
+        db.close()
+
+
+def seed_sample_accounts() -> None:
+    db = SessionLocal()
+    try:
+        if db.query(Account).count() > 0:
+            return
+        import uuid as uuid_lib
+        # DB에 실제 존재하는 user_id 사용
+        REAL_USER_ID = "ff49c2a0-9b82-4c4f-9f61-d39930b16dd6"
+        sample_accounts = [
+            Account(
+                account_id=str(uuid_lib.uuid4()),
+                user_id=REAL_USER_ID,
+                bank_name="우리은행",
+                account_number="1002-123-456789",
+                account_type="입출금",
+                balance=1500000,
+                alias="주거래 통장",
+            ),
+            Account(
+                account_id=str(uuid_lib.uuid4()),
+                user_id=REAL_USER_ID,
+                bank_name="우리은행",
+                account_number="1002-987-654321",
+                account_type="저축",
+                balance=5000000,
+                alias="저축 통장",
+            ),
+        ]
+        db.add_all(sample_accounts)
+        db.commit()
+        print("✅ 샘플 계좌 2개가 추가되었습니다.")
+    except Exception as e:
+        db.rollback()
+        print(f"⚠️ 계좌 삽입 실패: {e}")
+    finally:
+        db.close()
+        
 seed_sample_events()
+seed_sample_users()
+seed_sample_accounts()
 
-
-# ── 라우터 등록 ─────────────────────────────────────────────────────────────────
-# 각 feature 의 router 를 앱에 등록합니다.
-# 새 화면(feature)을 추가할 때마다 이 파일에 두 줄씩 추가합니다:
-# from app.features.{name}.router import router as {name}_router
-# app.include_router({name}_router)
 app.include_router(event_router)
+app.include_router(account_router)
 
 
-# ── 헬스체크 ────────────────────────────────────────────────────────────────────
 @app.get("/health", tags=["system"])
 def health_check():
-    """서버가 정상 실행 중인지 확인하는 엔드포인트."""
     return {"status": "ok"}
