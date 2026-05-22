@@ -50,13 +50,14 @@ async def transcribe_audio(
     Args:
         audio_bytes: 변환할 음성 파일의 바이트 데이터.
         content_type: 오디오 파일의 MIME 타입.
+            지원 형식: wav, mp3, mp4, m4a, aac, flac, ogg.
+            미지정 시 audio/wav로 처리.
 
     Returns:
         Clova Speech가 인식한 텍스트 문자열.
 
     Raises:
-        ValueError: 파일 용량·길이 초과 또는 지원하지 않는 포맷인 경우.
-        STTError: Clova Speech API 호출 또는 응답 파싱 실패 시.
+        STTError: 파일 용량·길이 초과, 지원하지 않는 포맷, 또는 API 호출 실패 시.
     """
     _validate_audio(audio_bytes, content_type)  # API 호출 전에 용량·포맷·길이를 검증
 
@@ -107,18 +108,27 @@ def _validate_audio(audio_bytes: bytes, content_type: str) -> None:
         content_type: 오디오 파일의 MIME 타입.
 
     Raises:
-        ValueError: 용량 초과, 지원하지 않는 포맷, 또는 재생 시간 초과인 경우.
+        STTError: 용량 초과, 지원하지 않는 포맷, 또는 재생 시간 초과인 경우.
     """
     if len(audio_bytes) > MAX_AUDIO_BYTES:
-        raise ValueError("VOICE_AUDIO_TOO_LARGE")
+        raise STTError(
+            code="VOICE_AUDIO_TOO_LARGE",
+            message="음성 파일 크기가 10 MB를 초과합니다.",
+        )
 
     mime = content_type.split(";")[0].strip().lower()
     if mime not in SUPPORTED_CONTENT_TYPES:
-        raise ValueError("VOICE_AUDIO_INVALID_FORMAT")
+        raise STTError(
+            code="VOICE_AUDIO_INVALID_FORMAT",
+            message="지원하지 않는 오디오 형식입니다.",
+        )
 
     duration = _get_audio_duration(audio_bytes)
     if duration is not None and duration > MAX_AUDIO_DURATION:
-        raise ValueError("VOICE_AUDIO_TOO_LONG")
+        raise STTError(
+            code="VOICE_AUDIO_TOO_LONG",
+            message="음성은 60초를 초과할 수 없습니다.",
+        )
 
 
 def _get_audio_duration(audio_bytes: bytes) -> float | None:

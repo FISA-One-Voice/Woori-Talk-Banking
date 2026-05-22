@@ -30,6 +30,8 @@ from app.core.database import Base, SessionLocal, engine
 from app.features.event.router import router as event_router
 from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
 from app.shared.voice.voice_router import router as voice_router
+from app.shared.voice.stt_service import STTError
+from app.shared.voice.tts_service import TTSError
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -74,12 +76,6 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
         "EVENT_NOT_FOUND": "이벤트를 찾을 수 없습니다.",
         "ALREADY_PARTICIPATED": "이미 참여한 이벤트입니다.",
         "EVENT_ENDED": "종료된 이벤트입니다.",
-        "STT_FAILED": "음성 변환에 실패했습니다.",
-        "VOICE_AUDIO_TOO_LONG": "음성은 60초를 초과할 수 없습니다.",
-        "VOICE_AUDIO_TOO_LARGE": "음성 파일 크기가 10 MB를 초과합니다.",
-        "VOICE_AUDIO_INVALID_FORMAT": "지원하지 않는 오디오 형식입니다.",
-        "TTS_SPEED_OUT_OF_RANGE": "TTS 속도는 0.25 ~ 4.0 범위여야 합니다.",
-        "SERVICE_UNAVAILABLE": "외부 서비스에 일시적인 문제가 발생했습니다.",
     }
 
     message = (
@@ -95,6 +91,42 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
             "data": None,
             "message": message,
             "error_code": error_code,
+        },
+    )
+
+
+@app.exception_handler(STTError)
+async def stt_error_handler(_request: Request, exc: STTError) -> JSONResponse:
+    """STTError를 표준 ApiResponse 형식으로 변환합니다."""
+    _400_CODES = {
+        "VOICE_AUDIO_TOO_LARGE",
+        "VOICE_AUDIO_INVALID_FORMAT",
+        "VOICE_AUDIO_TOO_LONG",
+    }
+    status_code = 400 if exc.code in _400_CODES else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "success": False,
+            "data": None,
+            "message": exc.message,
+            "error_code": exc.code,
+        },
+    )
+
+
+@app.exception_handler(TTSError)
+async def tts_error_handler(_request: Request, exc: TTSError) -> JSONResponse:
+    """TTSError를 표준 ApiResponse 형식으로 변환합니다."""
+    _400_CODES = {"INVALID_REQUEST", "TTS_SPEED_OUT_OF_RANGE"}
+    status_code = 400 if exc.code in _400_CODES else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "success": False,
+            "data": None,
+            "message": exc.message,
+            "error_code": exc.code,
         },
     )
 

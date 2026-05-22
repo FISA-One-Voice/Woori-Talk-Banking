@@ -36,11 +36,19 @@ async def synthesize_speech(
         MP3 형식의 음성 바이트 데이터.
 
     Raises:
-        ValueError: speed가 허용 범위를 벗어난 경우.
-        TTSError: Azure TTS API 호출 실패 시.
+        TTSError: text가 공백만 있거나, speed 범위 초과, 또는 API 호출 실패 시.
     """
+    if not text.strip():
+        raise TTSError(
+            code="INVALID_REQUEST",
+            message="텍스트가 비어 있습니다.",
+        )
+
     if not (TTS_SPEED_MIN <= speed <= TTS_SPEED_MAX):
-        raise ValueError("TTS_SPEED_OUT_OF_RANGE")
+        raise TTSError(
+            code="TTS_SPEED_OUT_OF_RANGE",
+            message="TTS 속도는 0.25 ~ 4.0 범위여야 합니다.",
+        )
 
     url = (
         f"https://{settings.AZURE_TTS_REGION}"
