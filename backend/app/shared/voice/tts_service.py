@@ -1,23 +1,14 @@
 import httpx
 
 from app.core.config import settings
+from app.core.exception import VoiceServiceError
 
 TTS_SPEED_MIN = 0.25
 TTS_SPEED_MAX = 4.0
 
 
-class TTSError(RuntimeError):
-    """Azure TTS API 호출 또는 응답 파싱 중 발생하는 예외.
-
-    Attributes:
-        code: 에러 코드 목록에 정의된 코드.
-        message: 사람이 읽는 에러 설명.
-    """
-
-    def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        self.message = message
-        super().__init__(message)
+class TTSError(VoiceServiceError):
+    """Azure TTS API 호출 또는 응답 파싱 중 발생하는 예외."""
 
 
 async def synthesize_speech(

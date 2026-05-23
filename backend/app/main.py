@@ -27,11 +27,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.database import Base, SessionLocal, engine
+from app.core.exception import VoiceServiceError
 from app.features.event.router import router as event_router
 from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
 from app.shared.voice.router import router as voice_router
-from app.shared.voice.stt_service import STTError
-from app.shared.voice.tts_service import TTSError
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -95,30 +94,16 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
     )
 
 
-@app.exception_handler(STTError)
-async def stt_error_handler(_request: Request, exc: STTError) -> JSONResponse:
-    """STTError를 표준 ApiResponse 형식으로 변환합니다."""
+@app.exception_handler(VoiceServiceError)
+async def app_error_handler(_request: Request, exc: VoiceServiceError) -> JSONResponse:
+    """VoiceServiceError 및 하위 예외를 표준 ApiResponse 형식으로 변환합니다."""
     _400_CODES = {
         "VOICE_AUDIO_TOO_LARGE",
         "VOICE_AUDIO_INVALID_FORMAT",
         "VOICE_AUDIO_TOO_LONG",
+        "INVALID_REQUEST",
+        "TTS_SPEED_OUT_OF_RANGE",
     }
-    status_code = 400 if exc.code in _400_CODES else 503
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "success": False,
-            "data": None,
-            "message": exc.message,
-            "error_code": exc.code,
-        },
-    )
-
-
-@app.exception_handler(TTSError)
-async def tts_error_handler(_request: Request, exc: TTSError) -> JSONResponse:
-    """TTSError를 표준 ApiResponse 형식으로 변환합니다."""
-    _400_CODES = {"INVALID_REQUEST", "TTS_SPEED_OUT_OF_RANGE"}
     status_code = 400 if exc.code in _400_CODES else 503
     return JSONResponse(
         status_code=status_code,
