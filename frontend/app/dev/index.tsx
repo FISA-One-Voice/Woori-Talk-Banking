@@ -1,0 +1,55 @@
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { TopBar } from '@/components/layout';
+import { DEV_LINKS } from '@/constants/devLinks';
+import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
+
+export default function DevHubScreen() {
+  return (
+    <SafeAreaView style={styles.root}>
+      <View style={styles.pad}>
+        <TopBar variant="back" title="테스트 허브" onBack={() => router.back()} />
+        <Text style={styles.hint}>
+          앱 진입(홈)은 첫 화면의 「앱 진입」을 사용하세요.{'\n'}
+          여기는 컴포넌트·API 등 개발용 화면만 모아 둡니다.
+        </Text>
+        {DEV_LINKS.map((item) => (
+          <Pressable key={item.path} style={styles.link} onPress={() => router.push(item.path)}>
+            <Text style={styles.linkText}>{item.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  pad: {
+    flex: 1,
+    padding: LAYOUT.paddingMedium,
+    gap: 10,
+  },
+  hint: {
+    fontSize: FONT_SIZES.caption,
+    color: COLORS.grayMedium,
+    marginBottom: 8,
+    lineHeight: 28,
+  },
+  link: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: LAYOUT.borderRadius,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  linkText: {
+    fontSize: FONT_SIZES.body,
+    color: COLORS.highlightYellow,
+    fontWeight: '600',
+  },
+});

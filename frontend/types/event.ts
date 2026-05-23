@@ -19,7 +19,7 @@
 // 이벤트 목록 한 줄에 해당하는 데이터
 // 백엔드 schema.py 의 EventSummary 와 대응됩니다.
 export interface Event {
-  event_id: string;  // UUID 문자열 (예: "550e8400-e29b-41d4-a716-446655440000")
+  event_id: string; // UUID 문자열 (예: "550e8400-e29b-41d4-a716-446655440000")
   title: string;
   // 날짜는 ISO 8601 문자열로 옵니다. 예: "2024-01-01T00:00:00"
   // 화면에 표시할 때 new Date(startAt) 로 변환해서 사용합니다.
@@ -32,9 +32,9 @@ export interface Event {
 // Event 를 확장(extends)하므로 Event 의 모든 필드를 포함합니다.
 // 백엔드 schema.py 의 EventDetail 과 대응됩니다.
 export interface EventDetail extends Event {
-  description: string | null;      // 상세 설명 (목록에는 없고 상세에만 있습니다)
+  description: string | null; // 상세 설명 (목록에는 없고 상세에만 있습니다)
   banner_image_url: string | null; // 배너 이미지 URL (없을 수 있습니다)
-  participant_count: number;       // 현재까지 참여한 사람 수
+  participant_count: number; // 현재까지 참여한 사람 수
 }
 
 // 이벤트 참여 성공 시 받는 데이터
@@ -46,12 +46,9 @@ export interface ParticipationResult {
 }
 
 // 백엔드의 모든 API 가 이 형태로 응답합니다.
-// T 는 "제네릭(Generic)"입니다. 호출 시 실제 타입으로 교체됩니다.
-// 예: ApiResponse<Event[]>    → data 가 Event 배열
-//     ApiResponse<EventDetail> → data 가 EventDetail 하나
 export interface ApiResponse<T> {
   success: boolean;
-  data: T | null; // 성공 시 실제 데이터, 실패 시 null
+  data: T | null;
   message: string;
-  error_code?: string; // 실패 시에만 포함됩니다. (? = 선택 필드)
+  error_code?: string;
 }
