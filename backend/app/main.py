@@ -29,7 +29,7 @@ from fastapi.responses import JSONResponse
 from app.core.database import Base, SessionLocal, engine
 from app.features.event.router import router as event_router
 from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
-from app.shared.voice.voice_router import router as voice_router
+from app.shared.voice.router import router as voice_router
 from app.shared.voice.stt_service import STTError
 from app.shared.voice.tts_service import TTSError
 
