@@ -5,7 +5,7 @@ class VoiceServiceError(Exception):
     main.py 의 전역 핸들러는 이 클래스 하나만 등록하면 하위 예외를 모두 처리합니다.
 
     Attributes:
-        code: CLAUDE.md 에러 코드 목록에 정의된 코드.
+        code: 에러 식별 코드 (예: "STT_FAILED", "SERVICE_UNAVAILABLE").
         message: 사람이 읽는 에러 설명.
     """
 

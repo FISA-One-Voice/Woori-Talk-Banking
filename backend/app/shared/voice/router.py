@@ -1,7 +1,7 @@
-'''
+"""
 stt_service, tts_service의 로직을 HTTP로 노출하는 창구 역할입니다.
 비즈니스 로직은 없고 요청을 받아서 서비스에 넘기고 결과를 포장해서 돌려줍니다.
-'''
+"""
 
 import base64
 from typing import Any
@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
 
-
 # ── 모델 ────────────────────────────────────────────────────────────────────────
+
 
 class TTSRequest(BaseModel):
     """POST /api/voice/tts 요청 바디."""
@@ -36,7 +36,6 @@ class TTSResult(BaseModel):
 
 
 class ApiResponse(BaseModel):
-
     success: bool
     data: Any = None
     message: str
@@ -91,6 +90,8 @@ async def text_to_speech(body: TTSRequest) -> ApiResponse:
 
     return ApiResponse(
         success=True,
-        data=TTSResult(audio_base64=base64.b64encode(audio_bytes).decode()).model_dump(),
+        data=TTSResult(
+            audio_base64=base64.b64encode(audio_bytes).decode()
+        ).model_dump(),
         message="음성 변환이 완료되었습니다.",
     )
