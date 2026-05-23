@@ -5,7 +5,9 @@ class VoiceServiceError(Exception):
     main.py 의 전역 핸들러는 이 클래스 하나만 등록하면 하위 예외를 모두 처리합니다.
 
     Attributes:
-        code: 에러 식별 코드 (예: "STT_FAILED", "SERVICE_UNAVAILABLE").
+        code: 에러 식별 코드 (STT_FAILED, VOICE_AUDIO_TOO_LARGE,
+        VOICE_AUDIO_INVALID_FORMAT, VOICE_AUDIO_TOO_LONG,
+        TTS_SPEED_OUT_OF_RANGE,SERVICE_UNAVAILABLE,INVALID_REQUEST)
         message: 사람이 읽는 에러 설명.
     """
 
