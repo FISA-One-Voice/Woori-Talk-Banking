@@ -72,6 +72,17 @@ class Settings(BaseSettings):
         return "sqlite:///./woori_talk.db"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # JWT 인증 설정
+    JWT_SECRET_KEY: str = "supersecretkey-change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    class Config:
+        # 프로젝트 루트의 .env 파일을 자동으로 읽습니다.
+        # .env 가 없어도 오류 없이 기본값을 사용합니다.
+        env_file = ".env"
+        extra = "ignore"  # .env 에 정의되지 않은 변수가 있어도 오류 없이 무시
 
 
 # 싱글턴 패턴: 이 모듈을 import 하는 모든 파일이 같은 객체를 공유합니다.

@@ -27,8 +27,9 @@ from fastapi.responses import JSONResponse
 
 from app.core.database import Base, SessionLocal, engine
 from app.features.event.router import router as event_router
-import app.models  # noqa: F401 — 전체 모델 등록 트리거
-from app.models.event import Event
+from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
+from app.models.user import User
+from app.core.exceptions import AppError
 
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
@@ -88,8 +89,33 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
             "success": False,
             "data": None,
             "message": message,
-            "error_code": error_code,
+            "code": error_code,
         },
+    )
+
+
+@app.exception_handler(AppError)
+async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False, 
+            "data": None, 
+            "message": exc.message, 
+            "code": exc.code
+        }
+    )
+
+@app.exception_handler(Exception)
+async def unhandled_handler(_: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False, 
+            "data": None, 
+            "message": "서버 내부 오류", 
+            "code": "INTERNAL_ERROR"
+        }
     )
 
 
@@ -163,6 +189,8 @@ seed_sample_events()
 # from app.features.{name}.router import router as {name}_router
 # app.include_router({name}_router)
 app.include_router(event_router)
+from app.features.jwt_auth.router import router as jwt_auth_router
+app.include_router(jwt_auth_router)
 
 
 # ── 헬스체크 ────────────────────────────────────────────────────────────────────

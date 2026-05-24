@@ -53,3 +53,5 @@ CODE_STYLE_4.md
 
 *.db
 *.dbml
+# Documentation
+develop/

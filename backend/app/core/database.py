@@ -28,7 +28,8 @@ connect_args = (
 
 # DB 엔진: 실제 데이터베이스에 연결하는 핵심 객체
 # DATABASE_URL 하나만 바꾸면 SQLite ↔ PostgreSQL 전환이 됩니다.
-engine = create_engine(settings.database_url, connect_args=connect_args)
+# pool_pre_ping=True: Aiven 등 클라우드 DB에서 유휴 연결을 강제로 끊었을 때 발생하는 OperationalError 방지
+engine = create_engine(settings.DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 
 # 세션 팩토리: DB 연결(세션)을 생성하는 틀(공장)
 # autocommit=False → db.commit() 을 직접 호출해야만 DB에 반영됩니다. (실수 방지)
