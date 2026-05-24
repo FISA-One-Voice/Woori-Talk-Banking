@@ -22,7 +22,7 @@ from app.core.config import settings
 # PostgreSQL 사용 시에는 이 옵션이 자동으로 무시되니 그냥 두어도 됩니다.
 connect_args = (
     {"check_same_thread": False}
-    if settings.DATABASE_URL.startswith("sqlite")
+    if settings.database_url.startswith("sqlite")
     else {}
 )
 

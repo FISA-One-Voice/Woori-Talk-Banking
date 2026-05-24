@@ -93,9 +93,9 @@ class EventParticipation(Base):
         String(36), ForeignKey("events.event_id"), nullable=False
     )
 
-    # 참여한 사용자 ID (UUID 문자열)
-    # TODO: auth 모듈 완성 후 ForeignKey("users.user_id") 추가 예정
-    user_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.user_id"), nullable=False
+    )
 
     # 참여 시각 (삽입 시 자동으로 현재 시각이 기록됩니다)
     participated_at: Mapped[datetime] = mapped_column(
