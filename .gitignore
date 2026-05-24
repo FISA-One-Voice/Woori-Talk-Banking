@@ -50,6 +50,10 @@ docs/
 CLAUDE.md
 작업일지.md
 CODE_STYLE_4.md
+CODE_STYLE.md
+STYLE_GUIDE.md
+guideline.md
+SCR007_DATA_FLOW.md
 
 *.db
 *.dbml

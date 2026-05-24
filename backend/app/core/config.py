@@ -41,6 +41,17 @@ class Settings(BaseSettings):
     # 실행 환경 구분 ("development" | "production")
     ENV: str = "development"
 
+    # NAVER CLOVA Speech (STT)
+    # ─ CLOVA_SECRET_KEY: 네이버 클라우드 플랫폼에서 발급받은 Secret Key
+    # ─ CLOVA_URL:        STT 요청을 보낼 API 엔드포인트 (기본값: 한국어)
+    CLOVA_SECRET_KEY: str = ""
+    CLOVA_URL: str = "https://clovaspeech-gw.ncloud.com/recog/v1/stt?lang=Kor"
+
+    # Azure Cognitive Services Text-to-Speech (TTS)
+    # ─ AZURE_TTS_KEY:    Azure 포털에서 발급받은 구독 키
+    # ─ AZURE_TTS_REGION: 리소스가 배포된 Azure 리전 (기본값: 한국 중부)
+    AZURE_TTS_KEY: str = ""
+    AZURE_TTS_REGION: str = "koreacentral"
     # AES-256-GCM 암호화 키 (base64url 인코딩된 32바이트)
     # 생성: python -c "import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
     CRYPTO_KEY: str = ""
@@ -81,7 +92,7 @@ class Settings(BaseSettings):
     class Config:
         # 프로젝트 루트의 .env 파일을 자동으로 읽습니다.
         # .env 가 없어도 오류 없이 기본값을 사용합니다.
-        env_file = ".env"
+        env_file = "../.env"
         extra = "ignore"  # .env 에 정의되지 않은 변수가 있어도 오류 없이 무시
 
 

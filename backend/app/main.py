@@ -22,12 +22,15 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.database import Base, SessionLocal, engine
+from app.core.exception import VoiceServiceError
 from app.features.event.router import router as event_router
 from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
+from app.shared.voice.router import router as voice_router
 from app.models.user import User
 from app.core.exceptions import AppError
 
@@ -94,6 +97,44 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
     )
 
 
+@app.exception_handler(VoiceServiceError)
+async def app_error_handler(_request: Request, exc: VoiceServiceError) -> JSONResponse:
+    """VoiceServiceError 및 하위 예외를 표준 ApiResponse 형식으로 변환합니다."""
+    _400_CODES = {
+        "VOICE_AUDIO_TOO_LARGE",
+        "VOICE_AUDIO_INVALID_FORMAT",
+        "VOICE_AUDIO_TOO_LONG",
+        "INVALID_REQUEST",
+        "TTS_SPEED_OUT_OF_RANGE",
+    }
+    status_code = 400 if exc.code in _400_CODES else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "success": False,
+            "data": None,
+            "message": exc.message,
+            "error_code": exc.code,
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(_request: Request, exc: RequestValidationError):
+    """Pydantic 요청 검증 오류를 표준 ApiResponse 형식으로 변환합니다."""
+    first = exc.errors()[0] if exc.errors() else {}
+    field = ".".join(str(loc) for loc in first.get("loc", [])[1:])
+    detail = first.get("msg", "입력값이 올바르지 않습니다.")
+    message = f"{field}: {detail}" if field else detail
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "success": False,
+            "data": None,
+            "message": message,
+            "error_code": "INVALID_REQUEST",
+        },
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
@@ -175,7 +216,6 @@ def seed_sample_events() -> None:
 
         db.add_all(sample_events)
         db.commit()
-        print("✅ 샘플 이벤트 3개가 추가되었습니다.")
     finally:
         db.close()
 
@@ -189,6 +229,7 @@ seed_sample_events()
 # from app.features.{name}.router import router as {name}_router
 # app.include_router({name}_router)
 app.include_router(event_router)
+app.include_router(voice_router)
 from app.features.jwt_auth.router import router as jwt_auth_router
 app.include_router(jwt_auth_router)
 
