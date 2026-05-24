@@ -7,12 +7,7 @@ import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-class AuthError(RuntimeError):
-    """인증 및 JWT 토큰 처리 관련 에러"""
-    def __init__(self, code: str, message: str):
-        self.code = code
-        self.message = message
-        super().__init__(message)
+from app.core.exceptions import AuthError
 
 security = HTTPBearer()
 
@@ -90,7 +85,8 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
     if not payload or "sub" not in payload:
         raise AuthError(
             code="TOKEN_INVALID",
-            message="토큰 위변조 또는 유효하지 않습니다."
+            message="토큰 위변조 또는 유효하지 않습니다.",
+            status_code=401
         )
         
     return payload["sub"]

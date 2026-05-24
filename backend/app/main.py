@@ -29,7 +29,7 @@ from app.core.database import Base, SessionLocal, engine
 from app.features.event.router import router as event_router
 from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
 from app.models.user import User
-from app.core.jwt_utils import AuthError
+from app.core.exceptions import AppError
 
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
@@ -89,25 +89,33 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
             "success": False,
             "data": None,
             "message": message,
-            "error_code": error_code,
+            "code": error_code,
         },
     )
 
 
-@app.exception_handler(AuthError)
-async def auth_error_handler(request: Request, exc: AuthError):
-    """AuthError 커스텀 예외를 표준 ApiResponse 형식으로 변환합니다."""
-    # 에러 코드별 HTTP 상태 코드 매핑 (기본값 401)
-    status_code = 404 if exc.code == "USER_NOT_FOUND" else 401
-    
+@app.exception_handler(AppError)
+async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
-        status_code=status_code,
+        status_code=exc.status_code,
         content={
-            "success": False,
-            "data": None,
-            "message": exc.message,
-            "error_code": exc.code,
-        },
+            "success": False, 
+            "data": None, 
+            "message": exc.message, 
+            "code": exc.code
+        }
+    )
+
+@app.exception_handler(Exception)
+async def unhandled_handler(_: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False, 
+            "data": None, 
+            "message": "서버 내부 오류", 
+            "code": "INTERNAL_ERROR"
+        }
     )
 
 
