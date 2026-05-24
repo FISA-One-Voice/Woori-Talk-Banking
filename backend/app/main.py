@@ -18,6 +18,7 @@
 # - 헬스체크: http://localhost:8000/health
 # =============================================================================
 
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -28,6 +29,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.database import Base, SessionLocal, engine
 from app.core.exception import AppError
+from app.core.opensearch import create_indices_if_not_exists
 from app.features.event.router import router as event_router
 from app.features.jwt_auth.router import router as jwt_auth_router
 from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
@@ -131,6 +133,14 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
 # import 된 모든 모델(Base 를 상속한 클래스)의 테이블을 DB 에 생성합니다.
 # 테이블이 이미 존재하면 건너뜁니다. (덮어쓰지 않습니다)
 Base.metadata.create_all(bind=engine)
+
+# ── OpenSearch 인덱스 생성 ──────────────────────────────────────────────────────
+# financial_docs, chatbot_logs 인덱스가 없으면 자동 생성합니다.
+# 이미 존재하는 인덱스는 건너뜁니다.
+try:
+    create_indices_if_not_exists()
+except Exception as exc:
+    logging.getLogger(__name__).warning("OpenSearch 인덱스 생성 실패: %s", exc)
 
 
 # ── 샘플 데이터 추가 ────────────────────────────────────────────────────────────
