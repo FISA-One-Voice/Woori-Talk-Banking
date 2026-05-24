@@ -23,5 +23,6 @@
     "editor.codeActionsOnSave": {
       "source.organizeImports": "explicit"
     }
-  }
+  },
+  "editor.fontFamily": "MesloLGS NF"
 }
