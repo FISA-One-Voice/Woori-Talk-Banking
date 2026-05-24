@@ -1,61 +1,8 @@
-# Python
 .venv/
 .venv
-__pycache__/
-*.pyc
-.pytest_cache/
-
-# 환경변수
 .env
 
-.env.local
-.env.*.local
-
-# 로그
 *.log
-npm-debug.log*
-
-# IDE
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
-.idea/
-.cursor/
-
-# Node.js
-node_modules/
-package-lock.json
-
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# iOS / Android (네이티브 빌드)
-ios/
-android/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Personal
-.claude/
-
-report/
-.bkit/
-docs/
-
-CLAUDE.md
-작업일지.md
-CODE_STYLE_4.md
-CODE_STYLE.md
-STYLE_GUIDE.md
-guideline.md
-SCR007_DATA_FLOW.md
-
-*.db
-*.dbml
-# Documentation
-develop/
+__pycache__/
+*.pyc
+.vscode/
