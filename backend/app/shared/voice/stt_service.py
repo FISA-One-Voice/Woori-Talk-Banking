@@ -4,7 +4,7 @@ import httpx
 import mutagen
 
 from app.core.config import settings
-from app.core.exception import VoiceServiceError
+from app.core.exception import STTError
 
 # CLOVA STT가 지원하는 오디오 MIME 타입, 절대 안바뀌는 값 이므로 frozenset으로 정의
 SUPPORTED_CONTENT_TYPES = frozenset(
@@ -26,10 +26,6 @@ MAX_AUDIO_BYTES = 10 * 1024 * 1024
 
 # CLOVA STT 음성 길이 상한 (60초)
 MAX_AUDIO_DURATION = 60.0
-
-
-class STTError(VoiceServiceError):
-    """Clova Speech API 호출 또는 응답 파싱 중 발생하는 예외."""
 
 
 async def transcribe_audio(

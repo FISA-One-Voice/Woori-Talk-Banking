@@ -364,27 +364,31 @@ Raises:
 
 ### 8.1 Custom Exception Classes — `core/exception.py`
 
-All domain errors inherit from `AppError`. One subclass per feature module — matching the team's ownership model. `main.py` handles only the parent class; all subclasses are caught automatically.
+All domain errors inherit from `AppError`. One subclass per feature module — matching the team's ownership model. Shared services (STT, TTS) use a second level of subclassing under their service base class. `main.py` handles only `AppError`; all subclasses are caught automatically.
 
 ```python
 # core/exception.py
 class AppError(Exception):
-    def __init__(self, code: str, status_code: int = 400, message: str = ""):
-        self.code, self.status_code, self.message = code, status_code, message
+    def __init__(self, code: str, message: str, status_code: int = 400):
+        self.code, self.message, self.status_code = code, message, status_code
 
-# One class per feature — mirrors features/ directory structure
+# Level 1 — one class per feature, mirrors features/ directory structure
 class AuthError(AppError): pass          # features/auth/
 class BalanceError(AppError): pass       # features/balance/
 class TransferError(AppError): pass      # features/transfer/
 class AutoTransferError(AppError): pass  # features/auto_transfer/
 class HistoryError(AppError): pass       # features/history/
 class EventError(AppError): pass         # features/event/
-class ChatbotError(AppError): pass       # features/chatbot/
-class VoiceError(AppError): pass         # features/voice/
+
+# Level 2 — shared voice services use a two-level hierarchy
+class VoiceServiceError(AppError): pass  # shared/voice/ base
+class STTError(VoiceServiceError): pass  # shared/voice/stt_service.py
+class TTSError(VoiceServiceError): pass  # shared/voice/tts_service.py
 ```
 
-> Shared utilities (`shared/audit.py`, `shared/stt.py`) must not raise feature-specific errors.
-> Let the exception propagate; the calling service wraps it in its own error class.
+> **설계 근거 (현재 결정)**
+> - 서브클래스별 핸들러는 `main.py`에 추가하지 않는다. `AppError` 핸들러 하나로 충분하며, 서브클래스별 다른 처리(Sentry 알림, 보안 로그 등)가 필요해지면 그때 추가한다.
+> - 2단계 서브클래스(`STTError`, `TTSError`)는 현재 런타임 분기 없이 선언만 한다. 모니터링 필터링과 추후 핸들러 확장을 위해 미리 선언해 둔다.
 
 ### 8.2 Rules
 
@@ -401,36 +405,30 @@ class VoiceError(AppError): pass         # features/voice/
 
 ```python
 # service.py — raise AppError subclass, never catch
-async def verify_speaker(audio_path: str, user_id: int) -> dict:
+async def speech_to_text(audio_bytes: bytes) -> str:
     try:
-        similarity = await compare_voice_vector(audio_path, user_id)
+        result = await clova_api.recognize(audio_bytes)
     except Exception:
-        raise VoiceAuthError("VOICE_VECTOR_EXTRACT_FAILED", status_code=500)
+        raise STTError(code="STT_FAILED", message="음성 인식 실패", status_code=502)
 
-    if similarity < 0.66:
-        raise VoiceAuthError("ASV_CONFIDENCE_LOW", status_code=401)
-    return {"similarity": similarity}
+    if not result:
+        raise STTError(code="STT_EMPTY_RESULT", message="인식 결과 없음", status_code=422)
+    return result
 
 # router.py — no try/except; propagates automatically
-@router.post("/verify")
-async def verify(audio: UploadFile, user_id: str = Depends(get_current_user)):
-    result = await service.verify_speaker(audio.filename, user_id)
-    return ApiResponse(success=True, data=result, message="인증 완료")
+@router.post("/voice")
+async def voice_pipeline(audio: UploadFile, user_id: str = Depends(get_current_user)):
+    text = await stt_service.speech_to_text(await audio.read())
+    return ApiResponse(success=True, data={"text": text}, message="인식 완료")
 
-# main.py — AppError handler + fallback
+# main.py — AppError handler only; STTError → VoiceServiceError → AppError 체인으로 자동 처리
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(exc.status_code,
         {"success": False, "data": None, "message": exc.message, "code": exc.code})
-
-@app.exception_handler(Exception)
-async def unhandled_handler(_: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(500,
-        {"success": False, "data": None, "message": "서버 내부 오류", "code": "INTERNAL_ERROR"})
 ```
 
-> FastAPI internal errors (Pydantic 422, OAuth2 401) still use `HTTPException`, so add
-> `@app.exception_handler(HTTPException)` if needed.
+> FastAPI 내부 오류(Pydantic 422)는 `RequestValidationError` 핸들러로 별도 처리한다.
 
 ### 8.4 Anti-patterns
 

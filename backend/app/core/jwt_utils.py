@@ -7,7 +7,7 @@ import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.core.exceptions import AuthError
+from app.core.exception import AuthError
 
 security = HTTPBearer()
 

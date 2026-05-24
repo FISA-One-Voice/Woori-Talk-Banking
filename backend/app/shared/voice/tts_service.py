@@ -1,14 +1,10 @@
 import httpx
 
 from app.core.config import settings
-from app.core.exception import VoiceServiceError
+from app.core.exception import TTSError
 
 TTS_SPEED_MIN = 0.25
 TTS_SPEED_MAX = 4.0
-
-
-class TTSError(VoiceServiceError):
-    """Azure TTS API 호출 또는 응답 파싱 중 발생하는 예외."""
 
 
 async def synthesize_speech(
