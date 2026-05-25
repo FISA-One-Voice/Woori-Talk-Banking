@@ -1,3 +1,14 @@
+# =============================================================================
+# backend/app/features/account/router.py
+#
+# [이 파일의 역할]
+# "어떤 URL 로 요청이 오면 어떤 함수를 실행할지" 를 정의합니다.
+#
+# [엔드포인트 목록]
+# GET /api/accounts/summary → 계좌 목록 + 총 자산 조회
+# GET /api/accounts/list    → 출금 가능 계좌 목록 조회 (송금용)
+# =============================================================================
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -5,19 +16,27 @@ from app.core.database import get_db
 from app.features.account import service
 from app.features.account.schema import (
     AccountDetail,
+    AccountListResponse,
     AccountSummaryItem,
     AccountSummaryResponse,
-    AccountListResponse,
 )
 
-router = APIRouter(prefix="/api/accounts", tags=["accounts"])
-
 # JWT 구현 전 임시 고정 user_id
+# TODO: JWT 토큰 검증으로 교체 예정
 TEMP_USER_ID = "ff49c2a0-9b82-4c4f-9f61-d39930b16dd6"
+
+router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
 
 @router.get("/summary")
 def get_account_summary(db: Session = Depends(get_db)):
+    """
+    계좌 목록 및 총 자산 조회.
+
+    GET /api/accounts/summary
+    성공: {"success": true, "data": {"totalAsset": int, "accounts": [...]}, "message": "..."}
+    실패: {"success": false, "data": null, "message": "...", "error_code": "ACCOUNT_NOT_FOUND"}
+    """
     accounts = service.get_user_accounts(db, TEMP_USER_ID)
     total_asset = sum(a.balance for a in accounts)
 
@@ -31,10 +50,12 @@ def get_account_summary(db: Session = Depends(get_db)):
                 account_type=a.account_type,
                 alias=a.alias,
                 balance=a.balance,
+                is_primary=a.is_primary,
             )
             for a in accounts
         ],
     )
+
     return {
         "success": True,
         "data": data,
@@ -45,6 +66,13 @@ def get_account_summary(db: Session = Depends(get_db)):
 
 @router.get("/list")
 def get_account_list(db: Session = Depends(get_db)):
+    """
+    출금 가능 계좌 목록 조회 (송금 화면에서 계좌 선택용).
+
+    GET /api/accounts/list
+    성공: {"success": true, "data": {"accounts": [...]}, "message": "..."}
+    실패: {"success": false, "data": null, "message": "...", "error_code": "ACCOUNT_NOT_FOUND"}
+    """
     accounts = service.get_user_accounts(db, TEMP_USER_ID)
 
     data = AccountListResponse(
@@ -55,10 +83,12 @@ def get_account_list(db: Session = Depends(get_db)):
                 last4=a.account_number[-4:] if a.account_number else "****",
                 alias=a.alias,
                 balance=a.balance,
+                is_primary=a.is_primary,
             )
             for a in accounts
         ]
     )
+
     return {
         "success": True,
         "data": data,
