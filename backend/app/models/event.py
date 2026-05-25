@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -93,8 +94,8 @@ class EventParticipation(Base):
         String(36), ForeignKey("events.event_id"), nullable=False
     )
 
-    user_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("users.user_id"), nullable=False
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.user_id"), nullable=False
     )
 
     # 참여 시각 (삽입 시 자동으로 현재 시각이 기록됩니다)

@@ -18,8 +18,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-import app.models  # noqa: F401 — create_all 인식용
-from app.core.database import Base, SessionLocal, engine
+# app.models import는 conftest.py에서 처리합니다.
+# engine은 test_all_tables_exist에서 테이블 목록 조회에 직접 사용합니다.
+from app.core.database import engine
 from app.models.account import Account
 from app.models.event import Event, EventParticipation
 from app.models.recipient import RegisteredRecipient
@@ -33,15 +34,7 @@ def _now() -> datetime:
 
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
-
-@pytest.fixture(scope="module")
-def db():
-    """테스트용 DB 세션. 모듈 종료 시 테스트 데이터 전체 삭제."""
-    Base.metadata.create_all(bind=engine)
-    session = SessionLocal()
-    yield session
-    session.close()
-
+# db 픽스처는 conftest.py에서 제공합니다.
 
 @pytest.fixture(scope="module")
 def test_user(db):
@@ -85,10 +78,11 @@ def test_all_tables_exist():
 
 # ── User CRUD ─────────────────────────────────────────────────────────────────
 
-def test_user_create(db, test_user):
+def test_user_create(test_user):
     """users 테이블 CREATE 확인."""
     assert test_user.user_id is not None
-    assert len(str(test_user.user_id)) == 36  # UUID 문자열 (PostgreSQL은 UUID 객체로 반환)
+    # UUID 문자열 36자 확인 (PostgreSQL은 UUID 객체로 반환되므로 str 변환)
+    assert len(str(test_user.user_id)) == 36
 
 
 def test_user_read(db, test_user):

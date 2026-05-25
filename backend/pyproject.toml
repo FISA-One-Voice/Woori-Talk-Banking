@@ -1,3 +1,13 @@
+[tool.pytest.ini_options]
+# 테스트 파일 탐색 경로
+testpaths = ["tests"]
+# 비동기 테스트 지원 (현재는 동기 테스트만 사용하지만 나중을 위해 설정)
+asyncio_mode = "auto"
+# 테스트 실행 시 출력 옵션: -v는 CLI에서 직접 붙이는 편이 좋습니다
+# CRYPTO_NOOP 은 config.py 기본값이 True이므로 별도 설정 불필요
+# 프로덕션 배포 시 .env에 CRYPTO_NOOP=false 로 변경할 것
+addopts = "--tb=short --cov=app"
+
 [tool.ruff]
 line-length = 88
 target-version = "py311"
