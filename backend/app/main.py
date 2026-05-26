@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse
 from app.core.database import Base, engine
 from app.core.exception import AppError
 from app.features.jwt_auth.router import router as jwt_auth_router
+from app.features.voice.router import router as voice_register_router
 from app.shared.voice.router import router as voice_router
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
@@ -123,6 +124,7 @@ Base.metadata.create_all(bind=engine)
 # app.include_router({name}_router)
 app.include_router(voice_router)
 app.include_router(jwt_auth_router)
+app.include_router(voice_register_router)
 
 
 # ── 헬스체크 ────────────────────────────────────────────────────────────────────

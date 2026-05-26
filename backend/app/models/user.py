@@ -42,7 +42,7 @@ class User(Base):
     tts_speed: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     pin_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     # 로그인 후 음성을 등록할 수 있으므로 nullable=True 로 변경
-    embedding_vector: Mapped[list | None] = mapped_column(Vector(256), nullable=True)
+    embedding_vector: Mapped[list | None] = mapped_column(Vector(192), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
 
     accounts: Mapped[list["Account"]] = relationship(
