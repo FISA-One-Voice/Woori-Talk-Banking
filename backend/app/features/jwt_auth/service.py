@@ -42,7 +42,7 @@ def login(db: Session, req: JwtLoginRequest) -> JwtTokenResponse:
     
     # DB에 벡터가 등록되어 있는지 확인
     is_voice_registered = False
-    if user.embedding_vector and len(user.embedding_vector) > 0:
+    if user.embedding_vector is not None and len(user.embedding_vector) > 0:
         is_voice_registered = True
 
     return JwtTokenResponse(
