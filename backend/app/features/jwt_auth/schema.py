@@ -22,3 +22,5 @@ class JwtTokenResponse(BaseModel):
     access_token: str = Field(alias="accessToken")
     refresh_token: Optional[str] = Field(default=None, alias="refreshToken")
     user_id: str = Field(alias="userId")
+    has_voice_registered: bool = Field(default=False, alias="hasVoiceRegistered")
+
