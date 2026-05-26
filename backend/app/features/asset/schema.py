@@ -5,19 +5,21 @@
 # 자산 화면 API 요청/응답 형태를 Pydantic 모델로 정의합니다.
 #
 # [스키마 목록]
-# AccountBalanceItem   → 계좌별 잔액 정보
-# AssetSummaryResponse → GET /api/asset/summary 응답
-# TransactionItem      → 거래 내역 단건
+# AccountBalanceItem      → 계좌별 잔액 정보
+# AssetSummaryResponse    → GET /api/asset/summary 응답
+# TransactionItem         → 거래 내역 단건
 # TransactionListResponse → GET /api/asset/history 응답
 # =============================================================================
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class AccountBalanceItem(BaseModel):
     """계좌별 잔액 정보."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     account_id: str
     bank_name: str
@@ -25,9 +27,6 @@ class AccountBalanceItem(BaseModel):
     alias: str | None
     balance: int
     is_primary: bool
-
-    class Config:
-        from_attributes = True
 
 
 class AssetSummaryResponse(BaseModel):
@@ -40,6 +39,8 @@ class AssetSummaryResponse(BaseModel):
 class TransactionItem(BaseModel):
     """거래 내역 단건."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     tx_id: str
     from_account_id: str
     to_bank_name: str
@@ -50,9 +51,6 @@ class TransactionItem(BaseModel):
     category: str | None
     memo: str | None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class TransactionListResponse(BaseModel):
