@@ -7,6 +7,7 @@
 # - 각 feature 의 router 를 등록합니다.
 # - DB 테이블을 생성합니다.
 # - 전역 예외 핸들러를 등록합니다.
+# - 테스트용 샘플 데이터를 추가합니다.
 #
 # [서버 실행 방법]
 # cd backend
@@ -25,7 +26,6 @@ from fastapi.responses import JSONResponse
 from app.core.database import Base, engine
 from app.core.exception import AppError
 from app.features.jwt_auth.router import router as jwt_auth_router
-from app.features.asset.router import router as asset_router
 from app.shared.voice.router import router as voice_router
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
@@ -123,7 +123,6 @@ Base.metadata.create_all(bind=engine)
 # app.include_router({name}_router)
 app.include_router(voice_router)
 app.include_router(jwt_auth_router)
-app.include_router(asset_router)  # 자산 화면 — 잔액 조회 + 거래 내역 조회
 
 
 # ── 헬스체크 ────────────────────────────────────────────────────────────────────
