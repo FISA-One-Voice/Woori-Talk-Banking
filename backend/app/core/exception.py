@@ -36,6 +36,12 @@ class TTSError(VoiceServiceError):
     pass
 
 
+class EventError(AppError):
+    """이벤트 기능(features/event/) 관련 커스텀 에러 기반 클래스."""
+
+    pass
+
+
 class AgentError(AppError):
     """LangGraph 에이전트 초기화·실행 중 발생하는 예외.
 

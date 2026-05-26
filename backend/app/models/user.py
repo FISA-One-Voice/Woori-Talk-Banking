@@ -42,7 +42,8 @@ class User(Base):
     tts_speed: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     pin_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     # NOT NULL — 음성 등록 완료 후 계정 생성 가능
-    embedding_vector: Mapped[list] = mapped_column(Vector(256), nullable=False)
+    # DB 컬럼 차원 수: 192 (실제 ASV 모델 출력 차원과 일치)
+    embedding_vector: Mapped[list] = mapped_column(Vector(192), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
 
     accounts: Mapped[list["Account"]] = relationship(
