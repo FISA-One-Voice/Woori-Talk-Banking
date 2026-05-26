@@ -33,7 +33,7 @@ Woori-Talk-Banking/
 │       ├── core/
 │       │   ├── config.py        # 환경변수 로드 (../.env 참조)
 │       │   ├── exception.py     # AppError 및 모든 서브클래스 선언
-│       │   └── database.py      # DB 연결 및 세션
+│       │   └── database.py     s     # DB 연결 및 세션
 │       ├── features/            # 기능별 모듈 (router / service / schema)
 │       ├── shared/
 │       │   ├── voice/           # STT(stt_service.py) · TTS(tts_service.py) 래퍼
