@@ -8,7 +8,7 @@ def register_voice_vector(db: Session, user_id: str, vector: list[float]) -> dic
     """
     if len(vector) != 192:
         raise AppError(
-            code="INVALID_VECTOR_DIMENSION",
+            code="INVALID_REQUEST",
             message="음성 벡터는 정확히 192차원이어야 합니다.",
             status_code=400
         )
