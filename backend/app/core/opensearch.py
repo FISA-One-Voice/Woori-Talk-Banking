@@ -13,9 +13,10 @@
 from collections.abc import Generator
 from typing import Any
 
-from opensearchpy import OpenSearch
+from opensearchpy import OpenSearch, OpenSearchException
 
 from app.core.config import settings
+from app.core.exception import OpenSearchIndexError
 
 FINANCIAL_DOCS_INDEX = "financial_docs"
 CHATBOT_LOGS_INDEX = "chatbot_logs"
@@ -100,9 +101,15 @@ def create_indices_if_not_exists() -> None:
     이미 존재하는 인덱스는 건너뜁니다. (덮어쓰지 않습니다)
     """
     client = get_os_client()
-    for index, mapping in [
-        (FINANCIAL_DOCS_INDEX, _FINANCIAL_DOCS_MAPPING),
-        (CHATBOT_LOGS_INDEX, _CHATBOT_LOGS_MAPPING),
-    ]:
-        if not client.indices.exists(index=index):
-            client.indices.create(index=index, body=mapping)
+    try:
+        for index, mapping in [
+            (FINANCIAL_DOCS_INDEX, _FINANCIAL_DOCS_MAPPING),
+            (CHATBOT_LOGS_INDEX, _CHATBOT_LOGS_MAPPING),
+        ]:
+            if not client.indices.exists(index=index):
+                client.indices.create(index=index, body=mapping)
+    except OpenSearchException as e:
+        raise OpenSearchIndexError(
+            code="INDEX_CREATION_FAILED",
+            message="OpenSearch 인덱스 생성에 실패했습니다.",
+        ) from e

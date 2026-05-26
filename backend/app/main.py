@@ -18,7 +18,6 @@
 # - 헬스체크: http://localhost:8000/health
 # =============================================================================
 
-import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -137,10 +136,8 @@ Base.metadata.create_all(bind=engine)
 # ── OpenSearch 인덱스 생성 ──────────────────────────────────────────────────────
 # financial_docs, chatbot_logs 인덱스가 없으면 자동 생성합니다.
 # 이미 존재하는 인덱스는 건너뜁니다.
-try:
-    create_indices_if_not_exists()
-except Exception as exc:
-    logging.getLogger(__name__).warning("OpenSearch 인덱스 생성 실패: %s", exc)
+# 실패 시 OpenSearchIndexError 를 raise 하며 서버가 시작되지 않습니다.
+create_indices_if_not_exists()
 
 
 # ── 샘플 데이터 추가 ────────────────────────────────────────────────────────────
