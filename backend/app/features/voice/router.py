@@ -12,7 +12,7 @@ def register_voice(
     req: VoiceRegistrationRequest,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id)
-):
+) -> dict:
     """사용자의 192차원 음성 벡터를 DB에 등록합니다.
 
     실제 음성 파일 추출 로직이 연결되기 전, 192차원 벡터 배열을 입력받아 
