@@ -4,7 +4,7 @@
 from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.exception import AuthError

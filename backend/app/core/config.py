@@ -94,6 +94,12 @@ class Settings(BaseSettings):
     OPENSEARCH_PASSWORD: str = ""
     OPENSEARCH_USE_SSL: bool = True
     OPENSEARCH_CA_CERT: str = ""
+    # OpenAI 에이전트 설정
+    # ─ OPENAI_CHAT_API_KEY: OpenAI 플랫폼에서 발급받은 API 키
+    # ─ OPENAI_MODEL:   사용할 모델명 (기본: gpt-4o-mini — 비용/성능 균형)
+    #   교체 예: OPENAI_MODEL=gpt-4o (더 높은 정확도, 비용 증가)
+    OPENAI_CHAT_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
 
     # JWT 인증 설정
     JWT_SECRET_KEY: str = "supersecretkey-change-me-in-production"

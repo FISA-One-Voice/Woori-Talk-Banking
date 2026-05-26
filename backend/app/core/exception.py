@@ -62,3 +62,12 @@ class OpenSearchIndexError(OpenSearchError):
     """OpenSearch 인덱스 생성 실패 에러."""
 
     pass
+class AgentError(AppError):
+    """LangGraph 에이전트 초기화·실행 중 발생하는 예외.
+
+    shared/agent/ 모듈 전담. 주요 발생 시점:
+        - build_graph() — ChatOpenAI 설정 오류, create_react_agent 초기화 실패
+        - Phase 2 이후 — tool 호출 중 예외 (AgentInvokeError 등 서브클래스 추가 예정)
+    """
+
+    pass

@@ -18,20 +18,16 @@
 # - 헬스체크: http://localhost:8000/health
 # =============================================================================
 
-import uuid
-from datetime import datetime, timedelta, timezone
-
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.core.database import Base, SessionLocal, engine
+from app.core.database import Base, engine
 from app.core.exception import AppError
 from app.core.opensearch import create_indices_if_not_exists
 from app.features.event.router import router as event_router
 from app.features.jwt_auth.router import router as jwt_auth_router
-from app.models.event import Event  # 테이블 생성 전에 모델을 import 해야 합니다
 from app.shared.voice.router import router as voice_router
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
@@ -71,19 +67,7 @@ async def http_exception_handler(_request: Request, exc: HTTPException):
     else:
         error_code = None
 
-    # 오류 코드 → 사용자 안내 메시지 변환표
-    # 프론트엔드는 message 가 아닌 error_code 로 분기해야 합니다.
-    ERROR_MESSAGES: dict[str, str] = {
-        "EVENT_NOT_FOUND": "이벤트를 찾을 수 없습니다.",
-        "ALREADY_PARTICIPATED": "이미 참여한 이벤트입니다.",
-        "EVENT_ENDED": "종료된 이벤트입니다.",
-    }
-
-    message = (
-        ERROR_MESSAGES.get(error_code, str(exc.detail))
-        if error_code
-        else str(exc.detail)
-    )
+    message = str(exc.detail) if not error_code else error_code
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -140,69 +124,11 @@ Base.metadata.create_all(bind=engine)
 create_indices_if_not_exists()
 
 
-# ── 샘플 데이터 추가 ────────────────────────────────────────────────────────────
-# 팀원이 서버를 처음 실행했을 때 바로 테스트할 수 있도록
-# 이벤트 테이블이 비어 있으면 샘플 이벤트 3개를 자동으로 추가합니다.
-def seed_sample_events() -> None:
-    """이벤트 테이블이 비어 있으면 샘플 데이터를 삽입합니다."""
-    db = SessionLocal()
-    try:
-        if db.query(Event).count() > 0:
-            return  # 이미 데이터가 있으면 중복 삽입 방지
-
-        # DB 저장용 naive datetime (timezone 정보 제거)
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        sample_events = [
-            Event(
-                event_id=str(uuid.uuid4()),
-                title="신규 가입 환영 이벤트",
-                description=(
-                    "우리톡뱅킹에 처음 가입하신 고객님께 드리는 특별 혜택입니다. "
-                    "이벤트 참여 시 계좌 개설 수수료가 면제됩니다."
-                ),
-                start_at=now - timedelta(days=1),
-                end_at=now + timedelta(days=30),
-                is_active=True,
-            ),
-            Event(
-                event_id=str(uuid.uuid4()),
-                title="첫 이체 캐시백 이벤트",
-                description=(
-                    "첫 이체를 완료하신 고객님께 캐시백 500원을 지급합니다. "
-                    "이체 완료 후 영업일 기준 3일 이내에 지급됩니다."
-                ),
-                start_at=now,
-                end_at=now + timedelta(days=14),
-                is_active=True,
-            ),
-            Event(
-                event_id=str(uuid.uuid4()),
-                title="음성 인증 등록 완료 이벤트",
-                description=(
-                    "음성 보안 등록을 완료하신 고객님께"
-                    " 편의점 상품권 1,000원을 드립니다."
-                ),
-                start_at=now - timedelta(days=10),
-                end_at=now + timedelta(days=5),
-                is_active=True,
-            ),
-        ]
-
-        db.add_all(sample_events)
-        db.commit()
-    finally:
-        db.close()
-
-
-seed_sample_events()
-
-
 # ── 라우터 등록 ─────────────────────────────────────────────────────────────────
 # 각 feature 의 router 를 앱에 등록합니다.
 # 새 화면(feature)을 추가할 때마다 이 파일에 두 줄씩 추가합니다:
 # from app.features.{name}.router import router as {name}_router
 # app.include_router({name}_router)
-app.include_router(event_router)
 app.include_router(voice_router)
 app.include_router(jwt_auth_router)
 
