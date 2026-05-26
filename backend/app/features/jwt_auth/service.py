@@ -1,4 +1,3 @@
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from app.core.jwt_utils import create_access_token, create_refresh_token, decode_token, verify_pin
 from app.core.exception import AuthError
