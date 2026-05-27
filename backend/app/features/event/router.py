@@ -59,8 +59,8 @@ def get_event(event_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/{event_id}/participate", response_model=dict)
-def participate(
+@router.post("/{event_id}/join", response_model=dict)
+def join_event(
     event_id: str,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),  # JWT 인증 필요

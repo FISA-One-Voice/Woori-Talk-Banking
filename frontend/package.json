@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios"
+    "start": "dotenv -e ../.env -- expo start",
+    "android": "dotenv -e ../.env -- expo run:android",
+    "ios": "dotenv -e ../.env -- expo run:ios"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
     "axios": "^1.16.1",
     "expo": "~54.0.0",
     "expo-av": "~16.0.8",
@@ -16,15 +17,18 @@
     "expo-speech": "~14.0.8",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-web": "^0.21.0",
     "react-native-worklets": "0.5.1",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "dotenv-cli": "^11.0.0",
     "typescript": "~5.8.0"
   },
   "expo": {

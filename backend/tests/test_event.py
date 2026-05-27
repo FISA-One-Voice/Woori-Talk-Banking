@@ -40,7 +40,13 @@ TEST_PIN = "123456"
 
 # ── 헬퍼 함수 ─────────────────────────────────────────────────────────────────
 
-def _make_event(db: Session, title: str, is_active: bool = True, banner_url: str | None = None) -> Event:
+def _make_event(
+    db: Session,
+    title: str,
+    is_active: bool = True,
+    banner_url: str | None = None,
+    end_at: datetime | None = None,
+) -> Event:
     """테스트용 이벤트를 DB에 직접 삽입합니다."""
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     event = Event(
@@ -49,7 +55,7 @@ def _make_event(db: Session, title: str, is_active: bool = True, banner_url: str
         banner_image_url=banner_url,
         is_active=is_active,
         start_at=now - timedelta(days=1),
-        end_at=now + timedelta(days=7),
+        end_at=end_at if end_at is not None else now + timedelta(days=7),
     )
     db.add(event)
     db.commit()
@@ -118,6 +124,22 @@ def inactive_event(db: Session) -> Event:
 
 
 @pytest.fixture
+def expired_event(db: Session) -> Event:
+    """만료된 테스트 이벤트 (end_at이 과거).
+
+    start_at = now - 2일, end_at = now - 1시간 으로 설정해
+    end_at > start_at DB 제약을 만족하면서 이미 만료된 이벤트를 만듭니다.
+    """
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    return _make_event(
+        db,
+        title="테스트_만료이벤트",
+        is_active=True,
+        end_at=now - timedelta(hours=1),
+    )
+
+
+@pytest.fixture
 def test_user(db: Session) -> User:
     """테스트 사용자."""
     return _make_user(db)
@@ -177,6 +199,39 @@ class TestListEvents:
         assert target["banner_image_url"] == "https://example.com/banner.png"
 
 
+class TestExpiredEvent:
+    """만료된 이벤트(end_at < now) 처리"""
+
+    def test_expired_event_not_in_list(self, client: TestClient, expired_event: Event):
+        """만료된 이벤트는 목록에 나오지 않습니다."""
+        res = client.get("/events")
+
+        assert res.status_code == 200
+        ids = [e["event_id"] for e in res.json()["data"]["events"]]
+        assert str(expired_event.event_id) not in ids
+
+    def test_expired_event_detail_returns_404(
+        self, client: TestClient, expired_event: Event
+    ):
+        """만료된 이벤트 ID로 상세 조회하면 404가 반환됩니다."""
+        res = client.get(f"/events/{expired_event.event_id}")
+
+        assert res.status_code == 404
+        assert res.json()["code"] == "EVENT_NOT_FOUND"
+
+    def test_participate_expired_event(
+        self, client: TestClient, expired_event: Event, auth_headers: dict
+    ):
+        """만료된 이벤트에 참여 시도하면 404가 반환됩니다."""
+        res = client.post(
+            f"/events/{expired_event.event_id}/join",
+            headers=auth_headers,
+        )
+
+        assert res.status_code == 404
+        assert res.json()["code"] == "EVENT_NOT_FOUND"
+
+
 class TestGetEventDetail:
     """GET /events/{event_id} — 이벤트 상세 조회"""
 
@@ -214,15 +269,15 @@ class TestGetEventDetail:
         assert res.json()["code"] == "EVENT_NOT_FOUND"
 
 
-class TestParticipateEvent:
-    """POST /events/{event_id}/participate — 이벤트 참여"""
+class TestJoinEvent:
+    """POST /events/{event_id}/join — 이벤트 참여"""
 
     def test_participate_success(
         self, client: TestClient, active_event: Event, auth_headers: dict
     ):
         """로그인 사용자가 이벤트에 참여하면 participation_id가 반환됩니다."""
         res = client.post(
-            f"/events/{active_event.event_id}/participate",
+            f"/events/{active_event.event_id}/join",
             headers=auth_headers,
         )
 
@@ -239,13 +294,13 @@ class TestParticipateEvent:
         """같은 이벤트에 두 번 참여하면 409, ALREADY_PARTICIPATED."""
         # 첫 번째 참여
         client.post(
-            f"/events/{active_event.event_id}/participate",
+            f"/events/{active_event.event_id}/join",
             headers=auth_headers,
         )
 
         # 두 번째 참여 시도
         res = client.post(
-            f"/events/{active_event.event_id}/participate",
+            f"/events/{active_event.event_id}/join",
             headers=auth_headers,
         )
 
@@ -254,7 +309,7 @@ class TestParticipateEvent:
 
     def test_participate_without_auth(self, client: TestClient, active_event: Event):
         """로그인 없이 참여 시도하면 401이 반환됩니다."""
-        res = client.post(f"/events/{active_event.event_id}/participate")
+        res = client.post(f"/events/{active_event.event_id}/join")
 
         assert res.status_code == 401
 
@@ -263,7 +318,7 @@ class TestParticipateEvent:
     ):
         """존재하지 않는 이벤트에 참여 시도하면 404가 반환됩니다."""
         res = client.post(
-            "/events/non-existent-uuid-9999/participate",
+            "/events/non-existent-uuid-9999/join",
             headers=auth_headers,
         )
 

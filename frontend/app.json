@@ -4,7 +4,7 @@
     "slug": "woori-talk-banking",
     "version": "1.0.0",
     "scheme": "wooritalk",
-    "platforms": ["ios", "android"],
+    "platforms": ["ios", "android", "web"],
     "assetBundlePatterns": ["**/*"],
     "plugins": ["expo-router"]
   }
