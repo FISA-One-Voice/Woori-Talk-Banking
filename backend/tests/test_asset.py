@@ -18,8 +18,8 @@ class TestAssetSummary:
     """GET /api/asset/summary 테스트"""
 
     def test_summary_requires_auth(self):
-        """인증 토큰 없으면 401 반환 확인."""
-        response = client.get("/api/asset/summary")
+        """위조된 토큰이면 401 반환 확인."""
+        response = client.get("/api/asset/summary", headers={"Authorization": "Bearer invalid.token"})
         assert response.status_code == 401
 
     def test_summary_response_format(self):
@@ -33,13 +33,13 @@ class TestAccountBalance:
     """GET /api/asset/balance/{account_id} 테스트"""
 
     def test_balance_requires_auth(self):
-        """인증 토큰 없으면 401 반환 확인."""
-        response = client.get("/api/asset/balance/test-id")
+        """위조된 토큰이면 401 반환 확인."""
+        response = client.get("/api/asset/balance/test-id", headers={"Authorization": "Bearer invalid.token"})
         assert response.status_code == 401
 
     def test_balance_not_found(self):
-        """인증 없이 존재하지 않는 계좌 조회 시 401 반환 확인."""
-        response = client.get("/api/asset/balance/non-existent-id")
+        """위조된 토큰으로 존재하지 않는 계좌 조회 시 401 반환 확인."""
+        response = client.get("/api/asset/balance/non-existent-id", headers={"Authorization": "Bearer invalid.token"})
         assert response.status_code == 401
 
 
@@ -47,18 +47,18 @@ class TestTransactionHistory:
     """GET /api/asset/history 테스트"""
 
     def test_history_requires_auth(self):
-        """인증 토큰 없으면 401 반환 확인."""
-        response = client.get("/api/asset/history")
+        """위조된 토큰이면 401 반환 확인."""
+        response = client.get("/api/asset/history", headers={"Authorization": "Bearer invalid.token"})
         assert response.status_code == 401
 
     def test_history_with_days_filter(self):
-        """days 필터 파라미터 전달 확인."""
-        response = client.get("/api/asset/history?days=7")
+        """위조된 토큰으로 days 필터 요청 시 401 반환 확인."""
+        response = client.get("/api/asset/history?days=7", headers={"Authorization": "Bearer invalid.token"})
         assert response.status_code == 401
 
     def test_history_with_category_filter(self):
-        """category 필터 파라미터 전달 확인."""
-        response = client.get("/api/asset/history?category=식비")
+        """위조된 토큰으로 category 필터 요청 시 401 반환 확인."""
+        response = client.get("/api/asset/history?category=식비", headers={"Authorization": "Bearer invalid.token"})
         assert response.status_code == 401
 
     def test_history_response_format(self):

@@ -113,13 +113,7 @@ class TestSystemPrompt:
 class TestAllTools:
     """tools/__init__.py 의 ALL_TOOLS 초기 상태 검증."""
 
-    def test_all_tools_is_empty_list_in_phase1(self) -> None:
-        """TC-09: Phase 1 에서 ALL_TOOLS 는 빈 리스트여야 한다.
-
-        Phase 2 tool 등록 전에는 빈 리스트가 정상 상태입니다.
-        Phase 2 에서 tool 이 추가되면 이 테스트는 업데이트 필요합니다.
-        """
+    def test_all_tools_is_list(self) -> None:
+        """TC-09: ALL_TOOLS 는 list 타입이며 tool 이 등록되어 있어야 한다."""
         assert isinstance(ALL_TOOLS, list), "ALL_TOOLS 가 list 타입이 아닙니다."
-        assert ALL_TOOLS == [], (
-            f"Phase 1 에서 ALL_TOOLS 는 빈 리스트여야 합니다. (현재: {ALL_TOOLS})"
-        )
+        assert len(ALL_TOOLS) > 0, "ALL_TOOLS 에 tool 이 하나도 없습니다."

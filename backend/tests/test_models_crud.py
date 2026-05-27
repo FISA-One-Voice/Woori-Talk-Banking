@@ -45,7 +45,7 @@ def test_user(db):
         disability_type="전맹",
         tts_speed=1.0,
         pin_hash="$2b$12$test_hash",
-        embedding_vector=[0.0] * 256,
+        embedding_vector=[0.0] * 192,
     )
     db.add(user)
     db.commit()

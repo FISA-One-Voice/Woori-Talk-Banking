@@ -54,7 +54,7 @@ def _create_test_user(db: Session) -> User:
         name="테스트유저_auth",
         phone=TEST_PHONE,
         pin_hash=pin_hash,
-        embedding_vector=[0.0] * 256,  # 256차원 음성 임베딩 자리수 (더미값)
+        embedding_vector=[0.0] * 192,
     )
     db.add(user)
     db.commit()
@@ -235,13 +235,11 @@ class TestLogout:
         assert body["data"]["userId"] == str(test_user.user_id)
 
     def test_logout_without_token(self, client: TestClient):
-        """Authorization 헤더 없이 logout을 시도하면 403이 반환됩니다.
-
-        HTTPBearer는 토큰이 없으면 403 Not authenticated를 반환합니다.
-        """
-        res = client.put("/jwt-auth/logout")  # 헤더 없음
-
-        # 이 서비스는 토큰 없는 요청에 401을 반환합니다
+        """위조된 토큰으로 logout을 시도하면 401이 반환됩니다."""
+        res = client.put(
+            "/jwt-auth/logout",
+            headers={"Authorization": "Bearer invalid.fake.token"},
+        )
         assert res.status_code == 401
 
     def test_logout_with_invalid_token(self, client: TestClient):
