@@ -7,11 +7,15 @@
 // not_found  → 이벤트 없음
 //
 // [참여 확인 모달 상태]
-// confirm    → 이벤트 정보 확인 + 참여 동의
-// processing → 처리 중 (버튼 비활성)
+// confirm    → 이벤트 정보 확인 + 참여 동의 (로컬 UI 상태)
+// processing → 처리 중, loading 상태와 동기화 (버튼 비활성)
 // success    → 참여 완료 → 홈으로 이동
 // duplicate  → 이미 참여
 // error      → 오류
+//
+// [Zustand 스토어]
+// useAuthStore  → DEV 토큰 입력 및 API 헤더 자동 첨부
+// useEventStore → 참여 요청 + 참여 완료 ID 목록 관리
 // =============================================================================
 
 import { ActionButton } from '@/components/display';
@@ -21,6 +25,8 @@ import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { apiClient, type ApiResponse } from '@/utils/api';
 import { useScreenAnnounce } from '@/hooks/useScreenAnnounce';
 import { useMic } from '@/context/MicContext';
+import { useEventStore } from '@/store/eventStore';
+import { useAuthStore } from '@/store/authStore';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -139,9 +145,9 @@ function ParticipateModal({
   const isDone       = isSuccess || isDuplicate || isError;
 
   const ttsMessage =
-    isConfirm   ? `${event.title}\n참여하시겠어요?` :
-    isSuccess   ? '이벤트 참여가 완료되었습니다!'   :
-    isDuplicate ? '이미 참여하신 이벤트입니다.'      :
+    isConfirm   ? `${event.title}\n참여하시겠어요?`    :
+    isSuccess   ? '이벤트 참여가 완료되었습니다!'       :
+    isDuplicate ? '이미 참여하신 이벤트입니다.'         :
                   '참여 처리 중 오류가 발생했습니다.';
 
   return (
@@ -214,7 +220,7 @@ function ParticipateModal({
                 activeOpacity={0.7}
               >
                 <Text style={modalStyles.btnTextPrimary}>
-                  {isSuccess ? '홈으로' : '닫기'}
+                  {isSuccess ? '확인' : '닫기'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -291,10 +297,28 @@ export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [screen, setScreen] = useState<Screen>('loading');
   const [event, setEvent] = useState<EventDetail | null>(null);
-  const [participated, setParticipated] = useState(false);
   const [modalState, setModalState] = useState<ModalState>(null);
 
+  // Zustand 스토어
+  const { joinedIds, joinStatus, joinEvent, resetJoinStatus } = useEventStore();
+  const token = useAuthStore((state) => state.token);
+
+  // DB 기준 참여 여부 (이벤트 로딩 시 백엔드에서 받아옴)
+  const [dbParticipated, setDbParticipated] = useState(false);
+
+  // DB 참여 여부 OR 이번 세션에서 참여한 경우 모두 반영
+  const participated =
+    dbParticipated || (event ? joinedIds.includes(event.event_id) : false);
+
   useScreenAnnounce('이벤트 상세 화면입니다.');
+
+  // joinStatus 변화 → modalState 동기화
+  useEffect(() => {
+    if (joinStatus === 'loading')   setModalState('processing');
+    else if (joinStatus === 'success')   setModalState('success');
+    else if (joinStatus === 'duplicate') setModalState('duplicate');
+    else if (joinStatus === 'error')     setModalState('error');
+  }, [joinStatus]);
 
   useEffect(() => {
     fetchEventDetail();
@@ -302,9 +326,14 @@ export default function EventDetailScreen() {
 
   async function fetchEventDetail(): Promise<void> {
     try {
-      const res = await apiClient.get<ApiResponse<EventDetail>>(`/events/${id}`);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await apiClient.get<ApiResponse<EventDetail & { has_participated: boolean }>>(
+        `/events/${id}`,
+        { headers },
+      );
       if (res.data.success && res.data.data) {
         setEvent(res.data.data);
+        setDbParticipated(res.data.data.has_participated ?? false);
         setScreen('detail');
       } else {
         setScreen('not_found');
@@ -314,31 +343,14 @@ export default function EventDetailScreen() {
     }
   }
 
-  async function handleConfirmParticipate(): Promise<void> {
+  function handleConfirmParticipate(): void {
     if (!event) return;
-    setModalState('processing');
-    try {
-      await apiClient.post(`/events/${event.event_id}/join`);
-      setParticipated(true);
-      setModalState('success');
-    } catch (err: unknown) {
-      const code = (err as { response?: { data?: { code?: string } } })
-        ?.response?.data?.code;
-      if (code === 'ALREADY_PARTICIPATED') {
-        setParticipated(true);
-        setModalState('duplicate');
-      } else {
-        setModalState('error');
-      }
-    }
+    joinEvent(event.event_id);  // eventStore 가 토큰 포함해서 API 호출
   }
 
   function handleCloseModal(): void {
-    if (modalState === 'success') {
-      router.replace('/dev/home' as never);  // 성공 후 홈으로
-    } else {
-      setModalState(null);
-    }
+    setModalState(null);
+    resetJoinStatus();
   }
 
   const ttsMap: Record<Screen, { message: string; variant: 'default' | 'error' }> = {

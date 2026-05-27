@@ -31,6 +31,7 @@ class EventResponse(BaseModel):
     is_active: bool
     start_at: datetime
     end_at: datetime
+    has_participated: bool = False  # 현재 사용자의 참여 여부 (토큰 없으면 False)
 
     # orm_mode(v1) → from_attributes(v2): SQLAlchemy 객체를 직접 변환 가능하게 함
     model_config = {"from_attributes": True}

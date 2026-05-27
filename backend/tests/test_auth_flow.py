@@ -54,7 +54,7 @@ def _create_test_user(db: Session) -> User:
         name="테스트유저_auth",
         phone=TEST_PHONE,
         pin_hash=pin_hash,
-        embedding_vector=[0.0] * 256,  # 256차원 음성 임베딩 자리수 (더미값)
+        embedding_vector=[0.0] * 192,  # 192차원 음성 임베딩 자리수 (더미값)
     )
     db.add(user)
     db.commit()

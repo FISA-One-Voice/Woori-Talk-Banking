@@ -13,11 +13,12 @@
 # 서버 실행 후 http://localhost:8000/docs 에서 직접 테스트 가능합니다.
 # =============================================================================
 
+from typing import Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.jwt_utils import get_current_user_id
+from app.core.jwt_utils import get_current_user_id, get_optional_user_id
 from app.features.event import service
 
 router = APIRouter(prefix="/events", tags=["Events"])
@@ -42,16 +43,24 @@ def list_events(db: Session = Depends(get_db)):
 
 
 @router.get("/{event_id}", response_model=dict)
-def get_event(event_id: str, db: Session = Depends(get_db)):
+def get_event(
+    event_id: str,
+    db: Session = Depends(get_db),
+    user_id: Optional[str] = Depends(get_optional_user_id),
+):
     """특정 이벤트의 상세 정보를 반환합니다.
+
+    로그인 없이도 조회 가능합니다.
+    Authorization 헤더가 있으면 해당 사용자의 참여 여부(has_participated)를 함께 반환합니다.
 
     Args:
         event_id: URL 경로에서 추출한 이벤트 UUID.
+        user_id: JWT에서 추출한 사용자 ID (선택).
 
     Returns:
         표준 ApiResponse: data 필드에 EventResponse 포함.
     """
-    data = service.get_event_detail(db, event_id)
+    data = service.get_event_detail(db, event_id, user_id)
     return {
         "success": True,
         "data": data.model_dump(),
