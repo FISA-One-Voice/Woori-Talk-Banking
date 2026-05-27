@@ -6,19 +6,15 @@
 // 모든 API 요청은 이 파일의 apiClient를 통해 이루어집니다.
 //
 // [BASE_URL 설정 방법]
-// frontend/.env.example 을 복사해서 frontend/.env 를 만들고 본인 IP를 입력하세요.
+// frontend/.env 파일에 아래 항목을 추가하세요:
 //   EXPO_PUBLIC_API_BASE_URL=http://본인_로컬IP:8000
 //
-// expo start 실행 시 Expo 가 frontend/.env 를 자동으로 읽습니다. (SDK 49+ 기본 지원)
+// expo start 실행 시 Expo 가 자동으로 읽습니다. (SDK 49+ 기본 지원)
 // frontend/.env 는 .gitignore 에 포함되어 있어 커밋되지 않습니다.
 //
 // IP 확인:
 //   Windows  → PowerShell: ipconfig   (IPv4 주소)
 //   Mac/Linux → 터미널: ipconfig getifaddr en0
-//
-// [환경별 주소]
-// 개발: http://172.21.x.x:8000  (각자 로컬 IP, frontend/.env 에서 관리)
-// 배포: https://api.도메인.com   (AWS 배포 시 .env 값만 교체)
 // =============================================================================
 
 import axios from 'axios';
