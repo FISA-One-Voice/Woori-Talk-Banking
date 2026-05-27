@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { TopBar } from '@/components/layout';
 import { AccessibleNumKeypad } from '@/components/input';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
+import { useAuthStore } from '@/store/authStore';
 
 export default function DevLoginScreen() {
   const [phone, setPhone] = useState('');
@@ -20,7 +21,7 @@ export default function DevLoginScreen() {
 
   const handleLogin = async (pinValue: string) => {
     try {
-      const response = await fetch('http://172.21.27.62:8000/users/login', {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -31,15 +32,18 @@ export default function DevLoginScreen() {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        router.push({
-          pathname: '/dev/voice-register',
-          params: { token: result.data.accessToken }
-        });
+        useAuthStore.getState().setToken(result.data.accessToken);
+        
+        if (result.data.hasVoiceRegistered) {
+          router.replace('/home');
+        } else {
+          router.replace('/dev/voice-register');
+        }
       } else {
         Alert.alert('로그인 실패 🚫', result.message || '인증에 실패했습니다.');
       }
     } catch (error) {
-      Alert.alert('서버 연결 에러 🔌', '백엔드 서버가 켜져 있는지 확인해주세요!\n(http://172.21.27.62:8000)');
+      Alert.alert('서버 연결 에러 🔌', `백엔드 서버가 켜져 있는지 확인해주세요!\n(${process.env.EXPO_PUBLIC_API_BASE_URL})`);
     }
   };
 

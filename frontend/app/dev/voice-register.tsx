@@ -1,22 +1,20 @@
-import { useState, useEffect, useRef } from 'react';
-import { SafeAreaView, StyleSheet, Text, View, Pressable, ActivityIndicator, Alert, Animated } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { SafeAreaView, StyleSheet, Text, View, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { router } from 'expo-router';
 import { TopBar } from '@/components/layout';
+import VoiceWaveAnimation from '@/components/feedback/VoiceWaveAnimation';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { authHeader } from '@/utils/api';
 
 type Step = 'TUTORIAL' | 'READY' | 'RECORDING' | 'SUCCESS' | 'FAIL';
 
 export default function DevVoiceRegisterScreen() {
-  const { token } = useLocalSearchParams<{ token: string }>();
   const [step, setStep] = useState<Step>('TUTORIAL');
   const [recordCount, setRecordCount] = useState(1);
   const [loading, setLoading] = useState(false);
-  
-  // 파동 애니메이션을 위한 Animated.Value 배열
-  const waveAnims = useRef(Array.from({ length: 9 }).map(() => new Animated.Value(0))).current;
 
-  // Ready -> Recording 자동 전환 (실제론 삐- 소리 후 전환됨)
+  // Ready -> Recording 자동 전환
   useEffect(() => {
     if (step === 'READY') {
       const timer = setTimeout(() => {
@@ -26,27 +24,9 @@ export default function DevVoiceRegisterScreen() {
     }
   }, [step]);
 
-  // Recording 중 3초 뒤에 다음 횟수나 성공 화면으로 전환 및 파형 애니메이션 (Mock)
+  // Recording 중 3초 뒤에 다음 횟수나 성공 화면으로 전환 (Mock)
   useEffect(() => {
     if (step === 'RECORDING') {
-      const animations = waveAnims.map((val) => {
-        return Animated.loop(
-          Animated.sequence([
-            Animated.timing(val, {
-              toValue: 1,
-              duration: 250 + Math.random() * 200, // 각 막대마다 랜덤한 속도
-              useNativeDriver: false,
-            }),
-            Animated.timing(val, {
-              toValue: 0,
-              duration: 250 + Math.random() * 200,
-              useNativeDriver: false,
-            })
-          ])
-        );
-      });
-      Animated.stagger(50, animations).start();
-
       const timer = setTimeout(() => {
         if (recordCount < 3) {
           setRecordCount((prev) => prev + 1);
@@ -55,17 +35,15 @@ export default function DevVoiceRegisterScreen() {
           // 3회 완료 시 서버 전송
           handleRegisterVoice();
         }
-      }, 3000); // 3초로 늘려 애니메이션을 충분히 보여줌
+      }, 3000); // 3초 대기
       
-      return () => {
-        clearTimeout(timer);
-        animations.forEach(a => a.stop());
-      };
+      return () => clearTimeout(timer);
     }
   }, [step, recordCount]);
 
   const handleRegisterVoice = async () => {
-    if (!token) {
+    const headers = authHeader();
+    if (!headers.Authorization) {
       Alert.alert('오류', '로그인 토큰을 찾을 수 없습니다.');
       router.back();
       return;
@@ -73,11 +51,11 @@ export default function DevVoiceRegisterScreen() {
     setLoading(true);
     try {
       const dummyVector = Array(192).fill(0.1);
-      const response = await fetch('http://172.21.27.62:8000/voice/register', {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/voice/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          ...headers
         },
         body: JSON.stringify({ embedding_vector: dummyVector }),
       });
@@ -155,19 +133,8 @@ export default function DevVoiceRegisterScreen() {
                   <View style={styles.recordingDot} />
                   <Text style={styles.recordingBadgeText}>녹음 중</Text>
                 </View>
-                {/* 오디오 파형 애니메이션 */}
-                <View style={styles.waveContainer}>
-                  {waveAnims.map((val, i) => {
-                    const height = val.interpolate({
-                      inputRange: [0, 1],
-                      // 중앙에 가까운 바일수록 더 높이 올라가도록 기본 가중치 적용
-                      outputRange: [10, 20 + Math.random() * 30 + (4 - Math.abs(4 - i)) * 10]
-                    });
-                    return (
-                      <Animated.View key={i} style={[styles.waveBar, { height }]} />
-                    );
-                  })}
-                </View>
+                {/* 오디오 파형 애니메이션 (공통 컴포넌트) */}
+                <VoiceWaveAnimation isActive={step === 'RECORDING'} />
                 <Text style={styles.actionSubText}>{recordCount - 1}회 완료 - {4 - recordCount}회 남음</Text>
               </View>
             </View>
@@ -324,18 +291,6 @@ const styles = StyleSheet.create({
   recordingBadgeText: {
     color: '#4ADE80',
     fontWeight: '600',
-  },
-  waveContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 60,
-    gap: 4,
-    marginBottom: 32,
-  },
-  waveBar: {
-    width: 6,
-    backgroundColor: COLORS.highlightYellow,
-    borderRadius: 3,
   },
   actionSubText: {
     color: COLORS.grayMedium,
