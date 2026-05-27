@@ -3,10 +3,11 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
 interface AccessibleNumKeypadProps {
-  length: 4 | 6;
+  length: number;
   onComplete: (pin: string) => void;
   onFocusDigit?: (digit: string) => void;
   masked?: boolean;
+  renderHeader?: (currentValue: string) => React.ReactNode;
 }
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '삭제'];
@@ -16,6 +17,7 @@ export default function AccessibleNumKeypad({
   onComplete,
   onFocusDigit,
   masked: _masked = true,
+  renderHeader,
 }: AccessibleNumKeypadProps) {
   const [pin, setPin] = useState('');
 
@@ -42,15 +44,19 @@ export default function AccessibleNumKeypad({
 
   return (
     <View>
-      {/* PIN 점 표시 */}
-      <View style={styles.dotsRow}>
-        {Array.from({ length }, (_, i) => (
-          <View
-            key={i}
-            style={[styles.pinDot, i < pin.length && styles.pinDotFilled]}
-          />
-        ))}
-      </View>
+      {/* 커스텀 헤더가 있으면 렌더링, 없으면 기본 점(Dots) 표시 */}
+      {renderHeader ? (
+        renderHeader(pin)
+      ) : (
+        <View style={styles.dotsRow}>
+          {Array.from({ length }, (_, i) => (
+            <View
+              key={i}
+              style={[styles.pinDot, i < pin.length && styles.pinDotFilled]}
+            />
+          ))}
+        </View>
+      )}
 
       {/* 숫자 패드 */}
       <View style={styles.grid}>
