@@ -7,7 +7,7 @@ import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 
 export default function DevLoginScreen() {
   const [phone, setPhone] = useState('');
-  // AccessibleNumKeypad는 내부적으로 상태를 관리하므로 별도 state 불필요
+  const [step, setStep] = useState<'PHONE' | 'PIN'>('PHONE');
   
   const handlePhoneChange = (text: string) => {
     const cleaned = text.replace(/[^0-9]/g, ''); // 숫자만 남기기
@@ -22,10 +22,14 @@ export default function DevLoginScreen() {
     }
     
     setPhone(formatted);
+  };
 
-    // 11자리 번호가 꽉 차서 하이픈 포함 13자리가 되면 자동으로 키보드 내림
-    if (formatted.length === 13) {
+  const goToPinStep = () => {
+    if (phone.length === 13) {
       Keyboard.dismiss();
+      setStep('PIN');
+    } else {
+      Alert.alert('알림', '올바른 전화번호 11자리를 입력해주세요.');
     }
   };
 
@@ -62,29 +66,51 @@ export default function DevLoginScreen() {
         <TopBar variant="back" title="로그인 화면 테스트" onBack={() => router.back()} />
         
         <View style={styles.form}>
-          <Text style={styles.label}>전화번호</Text>
-          <TextInput
-            style={styles.input}
-            value={phone}
-            onChangeText={handlePhoneChange}
-            keyboardType="phone-pad"
-            returnKeyType="done"
-            maxLength={13}
-            onSubmitEditing={() => Keyboard.dismiss()}
-            placeholder="010-0000-0000"
-            placeholderTextColor={COLORS.grayMedium}
-            accessibilityLabel="전화번호 입력창"
-          />
+          {step === 'PHONE' ? (
+            <View style={styles.stepContainer}>
+              <Text style={styles.label}>전화번호</Text>
+              <TextInput
+                style={styles.input}
+                value={phone}
+                onChangeText={handlePhoneChange}
+                keyboardType="phone-pad"
+                returnKeyType="done"
+                maxLength={13}
+                onSubmitEditing={goToPinStep}
+                placeholder="010-0000-0000"
+                placeholderTextColor={COLORS.grayMedium}
+                accessibilityLabel="전화번호 입력창"
+                autoFocus={true}
+              />
+              <Pressable 
+                style={[styles.nextButton, phone.length !== 13 && styles.nextButtonDisabled]} 
+                onPress={goToPinStep}
+                disabled={phone.length !== 13}
+                accessibilityLabel="다음 단계로 이동"
+              >
+                <Text style={styles.nextButtonText}>다음</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.stepContainer}>
+              <View style={styles.phoneSummary}>
+                <Text style={styles.phoneSummaryText} accessibilityLabel={`입력된 전화번호: ${phone}`}>{phone}</Text>
+                <Pressable onPress={() => setStep('PHONE')} accessibilityLabel="전화번호 수정하기">
+                  <Text style={styles.editButtonText}>수정</Text>
+                </Pressable>
+              </View>
 
-          <View style={{ marginTop: 24, marginBottom: 12 }}>
-            <Text style={styles.label}>PIN 번호 (6자리)</Text>
-            <Text style={styles.subLabel}>번호를 모두 입력하면 자동으로 로그인됩니다.</Text>
-          </View>
-          
-          <AccessibleNumKeypad 
-            length={6} 
-            onComplete={handleLogin} 
-          />
+              <View style={{ marginTop: 24, marginBottom: 12 }}>
+                <Text style={styles.label}>PIN 번호 (6자리)</Text>
+                <Text style={styles.subLabel}>번호를 모두 입력하면 자동으로 로그인됩니다.</Text>
+              </View>
+              
+              <AccessibleNumKeypad 
+                length={6} 
+                onComplete={handleLogin} 
+              />
+            </View>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -123,7 +149,45 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: LAYOUT.borderRadius,
     padding: 16,
-    fontSize: FONT_SIZES.title,
+    fontSize: 32, // 13자리 전화번호가 잘리지 않도록 크기 조정
     color: '#FFF080', // 기존 노란색보다 눈이 편안한 연한 노란색
+  },
+  stepContainer: {
+    flex: 1,
+  },
+  nextButton: {
+    backgroundColor: COLORS.highlightYellow,
+    paddingVertical: 20,
+    borderRadius: LAYOUT.borderRadius,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  nextButtonDisabled: {
+    opacity: 0.3,
+  },
+  nextButtonText: {
+    fontSize: FONT_SIZES.button,
+    color: COLORS.background,
+    fontWeight: '700',
+  },
+  phoneSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.surfaceLight,
+    padding: 16,
+    borderRadius: LAYOUT.borderRadius,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  phoneSummaryText: {
+    fontSize: 24,
+    color: COLORS.textMain,
+    fontWeight: '600',
+  },
+  editButtonText: {
+    fontSize: 20,
+    color: COLORS.highlightYellow,
+    fontWeight: '600',
   },
 });
