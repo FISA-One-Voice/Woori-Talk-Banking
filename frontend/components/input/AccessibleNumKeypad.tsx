@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
 interface AccessibleNumKeypadProps {
@@ -8,7 +8,6 @@ interface AccessibleNumKeypadProps {
   onFocusDigit?: (digit: string) => void;
   masked?: boolean;
   renderHeader?: (currentValue: string) => React.ReactNode;
-  style?: StyleProp<ViewStyle>;
 }
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '삭제'];
@@ -19,7 +18,6 @@ export default function AccessibleNumKeypad({
   onFocusDigit,
   masked: _masked = true,
   renderHeader,
-  style,
 }: AccessibleNumKeypadProps) {
   const [pin, setPin] = useState('');
 
@@ -45,7 +43,7 @@ export default function AccessibleNumKeypad({
   };
 
   return (
-    <View style={style}>
+    <>
       {/* 커스텀 헤더가 있으면 렌더링, 없으면 기본 점(Dots) 표시 */}
       {renderHeader ? (
         renderHeader(pin)
@@ -78,7 +76,7 @@ export default function AccessibleNumKeypad({
           </TouchableOpacity>
         ))}
       </View>
-    </View>
+    </>
   );
 }
 
