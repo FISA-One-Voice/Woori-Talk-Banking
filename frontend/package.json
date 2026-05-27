@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios"
+  "start": "dotenv -e ../.env -- expo start",
+  "android": "dotenv -e ../.env -- expo run:android",
+  "ios": "dotenv -e ../.env -- expo run:ios"
   },
   "dependencies": {
     "axios": "^1.16.1",
@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "dotenv-cli": "^11.0.0",
     "typescript": "~5.8.0"
   },
   "expo": {
