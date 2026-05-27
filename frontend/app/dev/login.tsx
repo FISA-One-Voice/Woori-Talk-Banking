@@ -51,30 +51,33 @@ export default function DevLoginScreen() {
         <View style={styles.form}>
           {step === 'PHONE' ? (
             <View style={{ flex: 1 }}>
-              <View style={{ marginBottom: 12 }}>
+              <View>
                 <Text style={styles.label}>전화번호 11자리</Text>
                 <Text style={styles.subLabel}>번호를 모두 입력하면 PIN 입력으로 넘어갑니다.</Text>
               </View>
-              <AccessibleNumKeypad 
-                length={11} 
-                onComplete={handlePhoneComplete} 
-                renderHeader={(currentValue) => {
-                  let display = currentValue;
-                  if (currentValue.length > 3 && currentValue.length <= 7) {
-                    display = `${currentValue.slice(0, 3)}-${currentValue.slice(3)}`;
-                  } else if (currentValue.length > 7) {
-                    display = `${currentValue.slice(0, 3)}-${currentValue.slice(3, 7)}-${currentValue.slice(7)}`;
-                  }
-                  
-                  return (
-                    <View style={styles.phoneHeaderBox}>
-                      <Text style={[styles.phoneHeaderText, currentValue.length === 0 && { color: COLORS.grayMedium }]}>
-                        {currentValue.length === 0 ? '010-0000-0000' : display}
-                      </Text>
-                    </View>
-                  );
-                }}
-              />
+              
+              <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+                <AccessibleNumKeypad 
+                  length={11} 
+                  onComplete={handlePhoneComplete} 
+                  renderHeader={(currentValue) => {
+                    let display = currentValue;
+                    if (currentValue.length > 3 && currentValue.length <= 7) {
+                      display = `${currentValue.slice(0, 3)}-${currentValue.slice(3)}`;
+                    } else if (currentValue.length > 7) {
+                      display = `${currentValue.slice(0, 3)}-${currentValue.slice(3, 7)}-${currentValue.slice(7)}`;
+                    }
+                    
+                    return (
+                      <View style={styles.phoneHeaderBox}>
+                        <Text style={[styles.phoneHeaderText, currentValue.length === 0 && { color: COLORS.grayMedium }]}>
+                          {currentValue.length === 0 ? '010-0000-0000' : display}
+                        </Text>
+                      </View>
+                    );
+                  }}
+                />
+              </View>
             </View>
           ) : (
             <View style={{ flex: 1 }}>
@@ -85,15 +88,17 @@ export default function DevLoginScreen() {
                 </Pressable>
               </View>
 
-              <View style={{ marginTop: 24, marginBottom: 12 }}>
+              <View style={{ marginTop: 24 }}>
                 <Text style={styles.label}>PIN 번호 (6자리)</Text>
                 <Text style={styles.subLabel}>번호를 모두 입력하면 자동으로 로그인됩니다.</Text>
               </View>
               
-              <AccessibleNumKeypad 
-                length={6} 
-                onComplete={handleLogin} 
-              />
+              <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+                <AccessibleNumKeypad 
+                  length={6} 
+                  onComplete={handleLogin} 
+                />
+              </View>
             </View>
           )}
         </View>
