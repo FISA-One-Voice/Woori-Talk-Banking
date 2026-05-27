@@ -60,6 +60,8 @@ class OpenSearchIndexError(OpenSearchError):
     """OpenSearch 인덱스 생성 실패 에러."""
 
     pass
+
+
 class AgentError(AppError):
     """LangGraph 에이전트 초기화·실행 중 발생하는 예외.
 
