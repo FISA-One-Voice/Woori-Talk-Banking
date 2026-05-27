@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   instruction: {
-    fontSize: FONT_SIZES.title,
+    fontSize: 32, // 글자가 밑으로 떨어지지 않도록 한 줄 크기로 조정
     color: COLORS.highlightYellow,
     fontWeight: '700',
     marginBottom: 16,
