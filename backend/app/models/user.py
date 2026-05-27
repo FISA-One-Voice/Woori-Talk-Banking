@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return (datetime.now(timezone.utc) + timedelta(hours=9)).replace(tzinfo=None)
 
 
 class User(Base):
@@ -44,10 +44,7 @@ class User(Base):
     # 로그인 후 음성을 등록할 수 있으므로 nullable=True 로 변경
     embedding_vector: Mapped[list | None] = mapped_column(Vector(192), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
-
-    accounts: Mapped[list["Account"]] = relationship(
-        "Account", back_populates="user"
-    )
+    accounts: Mapped[list["Account"]] = relationship("Account", back_populates="user")
     recipients: Mapped[list["RegisteredRecipient"]] = relationship(
         "RegisteredRecipient", back_populates="user"
     )
