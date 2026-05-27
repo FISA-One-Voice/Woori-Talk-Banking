@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -10,14 +10,17 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 
-const MOCK_TRANSACTIONS = [
-  { tx_id: '1', to_name: 'OO마트', amount: -30000, category: '쇼핑', created_at: '05.18' },
-  { tx_id: '2', to_name: '월급', amount: 3000000, category: '수입', created_at: '05.13' },
-  { tx_id: '3', to_name: '카페', amount: -5500, category: '식비', created_at: '05.14' },
-  { tx_id: '4', to_name: '편의점', amount: -8900, category: '식비', created_at: '05.13' },
-];
+const ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDUwMjEwMi00M2JmLTQ5MDktYjNhMy1mYWMzYTI1ODVlNTYiLCJleHAiOjE4MTE0MDc1NTF9.yyM3C40mAsdAFn4f3fnxSW_rAJfmSKsi7ShU7OnARlY';
+const API_BASE = 'http://172.21.27.166:8000';
 
 type Step = 'slot' | 'result' | 'history' | 'error';
+
+function periodToDays(period: string): number {
+  if (period === '이번달') return 30;
+  if (period === '지난달') return 60;
+  if (period === '최근 7일') return 7;
+  return 30;
+}
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -25,9 +28,35 @@ export default function HistoryScreen() {
 
   const [step, setStep] = useState<Step>(type === 'history' ? 'history' : 'slot');
   const [period, setPeriod] = useState('이번달');
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const income = MOCK_TRANSACTIONS.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const expense = MOCK_TRANSACTIONS.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0);
+  const income = transactions.filter((t) => t.category === '수입').reduce((s, t) => s + t.amount, 0);
+  const expense = transactions.filter((t) => t.category !== '수입').reduce((s, t) => s + t.amount, 0);
+
+  // 거래내역 API 호출
+  const fetchHistory = (days: number) => {
+    setLoading(true);
+    fetch(`${API_BASE}/api/asset/history?days=${days}`, {
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        console.log('거래내역 응답:', JSON.stringify(json));
+        if (json.success) {
+          setTransactions(json.data.transactions);
+        }
+      })
+      .catch((e) => console.error('거래내역 오류:', e))
+      .finally(() => setLoading(false));
+  };
+
+  // 거래내역 화면 진입 시 자동 호출
+  useEffect(() => {
+    if (step === 'history') {
+      fetchHistory(30);
+    }
+  }, [step]);
 
   // ── 슬롯 요청 화면 (SCR005-F03)
   if (step === 'slot') {
@@ -43,6 +72,7 @@ export default function HistoryScreen() {
           </View>
 
           <View style={styles.ttsBubble}>
+            <Text style={styles.ttsLabel}>슬롯 미완성</Text>
             <Text style={styles.ttsTextYellow}>
               어느 기간을{'\n'}알려드릴까요?
             </Text>
@@ -63,7 +93,11 @@ export default function HistoryScreen() {
             <TouchableOpacity
               key={p}
               style={[styles.periodBtn, period === p && styles.periodBtnActive]}
-              onPress={() => { setPeriod(p); setStep('result'); }}
+              onPress={() => {
+                setPeriod(p);
+                fetchHistory(periodToDays(p));
+                setStep('result');
+              }}
             >
               <Text style={[styles.periodBtnText, period === p && styles.periodBtnTextActive]}>
                 {p}
@@ -91,7 +125,8 @@ export default function HistoryScreen() {
           <View style={styles.ttsBubble}>
             <Text style={styles.ttsLabel}>음성 안내</Text>
             <Text style={styles.ttsText}>
-              {period}{'\n'}수입 300만 / 지출 120만
+              {period}{'\n'}
+              수입 {(income / 10000).toFixed(0)}만 / 지출 {Math.abs(expense / 10000).toFixed(0)}만
             </Text>
           </View>
 
@@ -136,20 +171,28 @@ export default function HistoryScreen() {
             <Text style={styles.ttsText}>최근 거래내역</Text>
           </View>
 
-          {MOCK_TRANSACTIONS.map((tx) => (
-            <View key={tx.tx_id} style={styles.txCard}>
-              <View style={styles.txLeft}>
-                <Text style={styles.txDate}>{tx.created_at}</Text>
-                <Text style={styles.txName}>{tx.to_name}</Text>
+          {loading ? (
+            <Text style={{ color: COLORS.grayLight, textAlign: 'center', marginTop: 20 }}>불러오는 중...</Text>
+          ) : transactions.length === 0 ? (
+            <Text style={{ color: COLORS.grayLight, textAlign: 'center', marginTop: 20 }}>거래내역이 없습니다</Text>
+          ) : (
+            transactions.map((tx) => (
+              <View key={tx.tx_id} style={styles.txCard}>
+                <View style={styles.txLeft}>
+                  <Text style={styles.txDate}>
+                    {new Date(tx.created_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
+                  </Text>
+                  <Text style={styles.txName}>{tx.to_name}</Text>
+                </View>
+                <Text style={[
+                  styles.txAmount,
+                  { color: tx.amount > 0 ? COLORS.success : COLORS.error }
+                ]}>
+                  {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}원
+                </Text>
               </View>
-              <Text style={[
-                styles.txAmount,
-                { color: tx.amount > 0 ? COLORS.success : COLORS.error }
-              ]}>
-                {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}원
-              </Text>
-            </View>
-          ))}
+            ))
+          )}
         </ScrollView>
       </SafeAreaView>
     );
@@ -189,7 +232,6 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     gap: 12,
   },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -206,7 +248,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flex: 1,
   },
-
   ttsBubble: {
     backgroundColor: COLORS.yellowBg,
     borderRadius: LAYOUT.borderRadius,
@@ -230,7 +271,6 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     fontWeight: 'bold',
   },
-
   listenBtn: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
@@ -245,7 +285,6 @@ const styles = StyleSheet.create({
     color: COLORS.highlightYellow,
     fontWeight: 'bold',
   },
-
   periodBox: {
     backgroundColor: COLORS.surface,
     borderRadius: LAYOUT.borderRadius,
@@ -260,7 +299,6 @@ const styles = StyleSheet.create({
     color: COLORS.grayMedium,
     marginTop: -4,
   },
-
   periodBtn: {
     backgroundColor: COLORS.surfaceLight,
     borderRadius: LAYOUT.borderRadius,
@@ -272,7 +310,6 @@ const styles = StyleSheet.create({
   periodBtnActive: { borderColor: COLORS.highlightYellow, backgroundColor: COLORS.yellowBg },
   periodBtnText: { fontSize: FONT_SIZES.body, color: COLORS.grayLight },
   periodBtnTextActive: { color: COLORS.highlightYellow },
-
   resultCard: {
     backgroundColor: COLORS.surface,
     borderRadius: LAYOUT.cardRadius,
@@ -284,7 +321,6 @@ const styles = StyleSheet.create({
   resultRow: { flexDirection: 'row', justifyContent: 'space-between' },
   resultLabel: { fontSize: FONT_SIZES.body, color: COLORS.textMain },
   resultAmount: { fontSize: FONT_SIZES.body, fontWeight: 'bold' },
-
   txCard: {
     backgroundColor: COLORS.surface,
     borderRadius: LAYOUT.borderRadius,
@@ -299,7 +335,6 @@ const styles = StyleSheet.create({
   txDate: { fontSize: FONT_SIZES.caption, color: COLORS.grayLight },
   txName: { fontSize: FONT_SIZES.body, color: COLORS.textMain },
   txAmount: { fontSize: FONT_SIZES.body, fontWeight: 'bold' },
-
   errorContainer: { justifyContent: 'center', alignItems: 'center' },
   errorTitle: { fontSize: FONT_SIZES.button, color: COLORS.textMain, fontWeight: 'bold' },
   errorSub: { fontSize: FONT_SIZES.body, color: COLORS.grayLight },

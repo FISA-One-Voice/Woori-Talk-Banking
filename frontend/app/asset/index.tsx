@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -10,11 +10,8 @@ import {
 import { useRouter } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 
-const MOCK_ACCOUNTS = [
-  { account_id: '1', bank_name: '우리은행', account_type: '입출금', alias: '주거래 통장', balance: 10000000, is_primary: true },
-  { account_id: '2', bank_name: '우리은행', account_type: '저축', alias: '저축 통장', balance: 5000000, is_primary: false },
-];
-const TOTAL_ASSET = MOCK_ACCOUNTS.reduce((sum, a) => sum + a.balance, 0);
+const ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDUwMjEwMi00M2JmLTQ5MDktYjNhMy1mYWMzYTI1ODVlNTYiLCJleHAiOjE4MTE0MDc1NTF9.yyM3C40mAsdAFn4f3fnxSW_rAJfmSKsi7ShU7OnARlY';
+const API_BASE = 'http://172.21.27.166:8000';
 
 function formatAmount(amount: number): string {
   if (amount >= 100000000) {
@@ -31,6 +28,25 @@ function formatAmount(amount: number): string {
 export default function AssetScreen() {
   const router = useRouter();
   const [isListening, setIsListening] = useState(false);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [totalAsset, setTotalAsset] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/asset/summary`, {
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        console.log('API 응답:', JSON.stringify(json));
+        if (json.success) {
+          setAccounts(json.data.accounts);
+          setTotalAsset(json.data.total_asset);
+        }
+      })
+      .catch((e) => console.error('API 오류:', e))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <SafeAreaView style={styles.root}>
@@ -45,11 +61,11 @@ export default function AssetScreen() {
           <View style={styles.headerRight} />
         </View>
 
-        {/* TTS 안내 버블 — 노란 배경 */}
+        {/* TTS 버블 */}
         <View style={styles.ttsBubble}>
           <Text style={styles.ttsLabel}>음성 안내</Text>
           <Text style={styles.ttsText}>
-            총 자산 {formatAmount(TOTAL_ASSET)} 입니다{'\n'}
+            {loading ? '불러오는 중...' : `총 자산 ${formatAmount(totalAsset)} 입니다`}{'\n'}
             지출·수입 / 거래내역
           </Text>
         </View>
@@ -57,19 +73,17 @@ export default function AssetScreen() {
         {/* 총 자산 카드 */}
         <View style={styles.totalCard}>
           <Text style={styles.totalLabel}>총 자산</Text>
-          <Text style={styles.totalAmount}>{TOTAL_ASSET.toLocaleString()}원</Text>
+          <Text style={styles.totalAmount}>{totalAsset.toLocaleString()}원</Text>
           <TouchableOpacity
-            style={[styles.listenBtn, isListening && styles.listenBtnActive]}
+            style={styles.listenBtn}
             onPress={() => setIsListening((v) => !v)}
           >
-            <Text style={[styles.listenBtnText, isListening && styles.listenBtnTextActive]}>
-            {isListening ? '● 듣고 있어요' : '● 듣고 있어요'}
-            </Text>
+            <Text style={styles.listenBtnText}>● 듣고 있어요</Text>
           </TouchableOpacity>
         </View>
 
         {/* 계좌 목록 */}
-        {MOCK_ACCOUNTS.map((account) => (
+        {accounts.map((account) => (
           <View key={account.account_id} style={styles.accountCard}>
             <View style={styles.accountInfo}>
               <Text style={styles.accountBank}>{account.bank_name}</Text>
@@ -101,14 +115,8 @@ export default function AssetScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scroll: {
-    padding: LAYOUT.paddingMedium,
-    gap: 12,
-  },
+  root: { flex: 1, backgroundColor: COLORS.background },
+  scroll: { padding: LAYOUT.paddingMedium, gap: 12 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -116,10 +124,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   backBtn: { width: 40 },
-  backIcon: {
-    fontSize: FONT_SIZES.button,
-    color: COLORS.textMain,
-  },
+  backIcon: { fontSize: FONT_SIZES.button, color: COLORS.textMain },
   headerRight: { width: 40 },
   headerTitle: {
     fontSize: FONT_SIZES.button,
@@ -128,8 +133,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flex: 1,
   },
-
-  // TTS 버블 — 노란 배경
   ttsBubble: {
     backgroundColor: COLORS.yellowBg,
     borderRadius: LAYOUT.borderRadius,
@@ -147,7 +150,6 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
     lineHeight: 36,
   },
-
   totalCard: {
     backgroundColor: COLORS.surfaceLight,
     borderRadius: LAYOUT.cardRadius,
@@ -155,30 +157,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  totalLabel: {
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.grayLight,
-  },
+  totalLabel: { fontSize: FONT_SIZES.caption, color: COLORS.grayLight },
   totalAmount: {
     fontSize: FONT_SIZES.title,
     color: COLORS.textMain,
     fontWeight: 'bold',
   },
-listenBtn: {
-  backgroundColor: 'transparent',
-  borderWidth: 1.5,
-  borderColor: COLORS.highlightYellow,
-  borderRadius: 999,
-  paddingVertical: 10,
-  paddingHorizontal: 28,
-  alignSelf: 'center',
-},
-listenBtnText: {
-  fontSize: FONT_SIZES.caption,
-  color: COLORS.highlightYellow,
-  fontWeight: 'bold',
-},
-
+  listenBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: COLORS.highlightYellow,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+    alignSelf: 'center',
+  },
+  listenBtnText: {
+    fontSize: FONT_SIZES.caption,
+    color: COLORS.highlightYellow,
+    fontWeight: 'bold',
+  },
   accountCard: {
     backgroundColor: COLORS.surface,
     borderRadius: LAYOUT.borderRadius,
@@ -190,26 +188,10 @@ listenBtnText: {
     borderColor: COLORS.border,
   },
   accountInfo: { gap: 4 },
-  accountBank: {
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textMain,
-    fontWeight: 'bold',
-  },
-  accountAlias: {
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.grayLight,
-  },
-  accountBalance: {
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textMain,
-    fontWeight: 'bold',
-  },
-
-  bottomBtns: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
+  accountBank: { fontSize: FONT_SIZES.body, color: COLORS.textMain, fontWeight: 'bold' },
+  accountAlias: { fontSize: FONT_SIZES.caption, color: COLORS.grayLight },
+  accountBalance: { fontSize: FONT_SIZES.body, color: COLORS.textMain, fontWeight: 'bold' },
+  bottomBtns: { flexDirection: 'row', gap: 12, marginTop: 8 },
   actionBtn: {
     flex: 1,
     backgroundColor: COLORS.surfaceLight,
@@ -219,9 +201,5 @@ listenBtnText: {
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  actionBtnText: {
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textMain,
-    fontWeight: 'bold',
-  },
+  actionBtnText: { fontSize: FONT_SIZES.body, color: COLORS.textMain, fontWeight: 'bold' },
 });

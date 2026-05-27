@@ -9,9 +9,12 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.exception import AuthError
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 from app.core.config import settings
+
+# 개발 환경에서 토큰 없이 테스트할 때 사용할 더미 user_id
+_DEV_USER_ID = "10502102-43bf-4909-b3a3-fac3a2585e56"
 
 def verify_pin(plain_pin: str, hashed_pin: str) -> bool:
     """입력받은 평문 PIN 번호가 해시값과 일치하는지 검증합니다.
@@ -79,14 +82,24 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
     요청 헤더의 Bearer 토큰을 검증하고, 유효한 경우 user_id(sub)를 반환합니다.
     API 라우터에서 매개변수로 "Depends(get_current_user_id)" 와 같이 사용합니다.
     """
+    # 개발 환경: 토큰 없으면 더미 유저로 fallback
+    if credentials is None:
+        if settings.ENV == "development":
+            return _DEV_USER_ID
+        raise AuthError(
+            code="TOKEN_MISSING",
+            message="인증 토큰이 필요합니다.",
+            status_code=401
+        )
+
     token = credentials.credentials
     payload = decode_token(token)
-    
+
     if not payload or "sub" not in payload:
         raise AuthError(
             code="TOKEN_INVALID",
             message="토큰 위변조 또는 유효하지 않습니다.",
             status_code=401
         )
-        
+
     return payload["sub"]
