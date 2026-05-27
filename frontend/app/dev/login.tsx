@@ -9,28 +9,14 @@ export default function DevLoginScreen() {
   const [phone, setPhone] = useState('');
   const [step, setStep] = useState<'PHONE' | 'PIN'>('PHONE');
   
-  const handlePhoneChange = (text: string) => {
-    const cleaned = text.replace(/[^0-9]/g, ''); // 숫자만 남기기
-    let formatted = cleaned;
-    
-    if (cleaned.length <= 3) {
-      formatted = cleaned;
-    } else if (cleaned.length <= 7) {
-      formatted = `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
-    } else {
-      formatted = `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7, 11)}`;
+  const handlePhoneComplete = (completedPhone: string) => {
+    // 11자리가 다 입력되면 자동으로 형식을 맞추고 PIN 단계로 이동
+    let formatted = completedPhone;
+    if (completedPhone.length === 11) {
+      formatted = `${completedPhone.slice(0, 3)}-${completedPhone.slice(3, 7)}-${completedPhone.slice(7, 11)}`;
     }
-    
     setPhone(formatted);
-  };
-
-  const goToPinStep = () => {
-    if (phone.length === 13) {
-      Keyboard.dismiss();
-      setStep('PIN');
-    } else {
-      Alert.alert('알림', '올바른 전화번호 11자리를 입력해주세요.');
-    }
+    setStep('PIN');
   };
 
   const handleLogin = async (pinValue: string) => {
@@ -68,28 +54,15 @@ export default function DevLoginScreen() {
         <View style={styles.form}>
           {step === 'PHONE' ? (
             <View style={styles.stepContainer}>
-              <Text style={styles.label}>전화번호</Text>
-              <TextInput
-                style={styles.input}
-                value={phone}
-                onChangeText={handlePhoneChange}
-                keyboardType="phone-pad"
-                returnKeyType="done"
-                maxLength={13}
-                onSubmitEditing={goToPinStep}
-                placeholder="010-0000-0000"
-                placeholderTextColor={COLORS.grayMedium}
-                accessibilityLabel="전화번호 입력창"
-                autoFocus={true}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={styles.label}>전화번호 11자리</Text>
+                <Text style={styles.subLabel}>번호를 모두 입력하면 PIN 입력으로 넘어갑니다.</Text>
+              </View>
+              <AccessibleNumKeypad 
+                length={11} 
+                mode="phone"
+                onComplete={handlePhoneComplete} 
               />
-              <Pressable 
-                style={[styles.nextButton, phone.length !== 13 && styles.nextButtonDisabled]} 
-                onPress={goToPinStep}
-                disabled={phone.length !== 13}
-                accessibilityLabel="다음 단계로 이동"
-              >
-                <Text style={styles.nextButtonText}>다음</Text>
-              </Pressable>
             </View>
           ) : (
             <View style={styles.stepContainer}>
@@ -143,34 +116,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 8,
   },
-  input: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: LAYOUT.borderRadius,
-    padding: 16,
-    fontSize: 32, // 13자리 전화번호가 잘리지 않도록 크기 조정
-    color: '#FFF080', // 기존 노란색보다 눈이 편안한 연한 노란색
-  },
   stepContainer: {
-    flex: 1,
-  },
-  nextButton: {
-    backgroundColor: COLORS.highlightYellow,
-    paddingVertical: 20,
-    borderRadius: LAYOUT.borderRadius,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  nextButtonDisabled: {
-    opacity: 0.3,
-  },
-  nextButtonText: {
-    fontSize: FONT_SIZES.button,
-    color: COLORS.background,
-    fontWeight: '700',
-  },
-  phoneSummary: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
