@@ -10,8 +10,8 @@ import {
 import { useRouter } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 
-const ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDUwMjEwMi00M2JmLTQ5MDktYjNhMy1mYWMzYTI1ODVlNTYiLCJleHAiOjE4MTE0MDc1NTF9.yyM3C40mAsdAFn4f3fnxSW_rAJfmSKsi7ShU7OnARlY';
-const API_BASE = 'http://172.21.27.166:8000';
+declare const process: { env: { EXPO_PUBLIC_API_BASE_URL?: string } };
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
 function formatAmount(amount: number): string {
   if (amount >= 100000000) {
@@ -33,9 +33,7 @@ export default function AssetScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/asset/summary`, {
-      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
-    })
+    fetch(`${API_BASE}/api/asset/summary`)
       .then((res) => res.json())
       .then((json) => {
         console.log('API 응답:', JSON.stringify(json));
