@@ -9,9 +9,10 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
+import { getTtsMessage } from '@/utils/errorHandler';
 
 declare const process: { env: { EXPO_PUBLIC_API_BASE_URL?: string } };
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
 type Step = 'slot' | 'result' | 'history' | 'error';
 
@@ -37,15 +38,17 @@ export default function HistoryScreen() {
   // 거래내역 API 호출
   const fetchHistory = (days: number) => {
     setLoading(true);
-    fetch(`${API_BASE}/api/asset/history?days=${days}`)
+    fetch(`${API_BASE_URL}/api/asset/history?days=${days}`)
       .then((res) => res.json())
       .then((json) => {
-        console.log('거래내역 응답:', JSON.stringify(json));
         if (json.success) {
           setTransactions(json.data.transactions);
+        } else {
+          console.warn('[asset/history]', getTtsMessage(json.code));
+          setTransactions([]);
         }
       })
-      .catch((e) => console.error('거래내역 오류:', e))
+      .catch(() => console.warn('[asset/history]', getTtsMessage('NETWORK_ERROR')))
       .finally(() => setLoading(false));
   };
 
