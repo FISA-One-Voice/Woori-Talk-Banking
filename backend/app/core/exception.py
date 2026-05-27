@@ -36,6 +36,17 @@ class TTSError(VoiceServiceError):
     pass
 
 
+class ASVError(VoiceServiceError):
+    """ai/asv/ 화자 인증 서버(CAM++) HTTP 호출 실패 관련 에러.
+
+    ASV 서버가 반환한 에러 응답을 메인 백엔드에서 re-raise할 때 사용한다.
+    code / message 는 ASV 서버 응답의 동일 필드를 그대로 전달한다.
+    status_code 는 upstream 오류이므로 502를 기본값으로 사용한다.
+    """
+
+    pass
+
+
 class OpenSearchError(AppError):
     """OpenSearch 검색/색인 처리 중 발생하는 에러.
 
@@ -62,6 +73,8 @@ class OpenSearchIndexError(OpenSearchError):
     """OpenSearch 인덱스 생성 실패 에러."""
 
     pass
+
+
 class AgentError(AppError):
     """LangGraph 에이전트 초기화·실행 중 발생하는 예외.
 
