@@ -8,6 +8,7 @@
     "ios": "expo run:ios"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "axios": "^1.16.1",
     "expo": "~54.0.0",
     "expo-av": "~16.0.8",
