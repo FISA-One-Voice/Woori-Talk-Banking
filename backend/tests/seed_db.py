@@ -5,7 +5,7 @@ CRUD 동작 및 relationship 조회를 검증한다.
 
 실행:
     cd backend
-    CRYPTO_NOOP=true python tests/seed_db.py
+    python tests/seed_db.py
 """
 
 import sys
@@ -36,21 +36,21 @@ def seed() -> None:
 
     db = SessionLocal()
     try:
-        # ── CREATE ────────────────────────────────────────────────────────────
         print("\n[CREATE] 더미 데이터 삽입 중...")
 
-        user_id = str(uuid.uuid4())
+        # str() 제거 — uuid.UUID 객체로 넣어야 함
+        user_id = uuid.uuid4()
         user = User(
             user_id=user_id,
             name="홍길동",
             phone="010-1234-5678",
             birthday="1990-01-01",
             address="서울시 강남구",
-            resident_number="900101-1234567",  # 실제 환경에서는 encrypt() 호출
+            resident_number="900101-1234567",
             disability_type="전맹",
             tts_speed=1.0,
             pin_hash="$2b$12$dummy_hash_for_seed",
-            embedding_vector=[0.1] * 256,
+            embedding_vector=[0.1] * 192,
         )
         db.add(user)
         db.flush()
@@ -59,7 +59,7 @@ def seed() -> None:
         account_primary = Account(
             user_id=user_id,
             bank_name="우리은행",
-            account_number="1002-123-456789",  # 실제 환경에서는 encrypt() 호출
+            account_number="1002-123-456789",
             account_type="입출금",
             balance=1_000_000,
             alias="주거래 계좌",
@@ -165,13 +165,13 @@ def seed() -> None:
         db.commit()
         print(f"  event_participations: 1건")
 
-        # ── READ (relationship 조회) ───────────────────────────────────────────
+        # ── READ ──────────────────────────────────────────────────
         print("\n[READ] relationship 조회 검증...")
         db.expire_all()
 
         loaded_user = db.query(User).filter_by(user_id=user_id).first()
         assert loaded_user is not None
-        assert len(loaded_user.accounts) == 2, f"accounts: {len(loaded_user.accounts)}"
+        assert len(loaded_user.accounts) == 2
         assert len(loaded_user.recipients) == 2
         assert len(loaded_user.transactions) == 2
         assert len(loaded_user.standing_orders) == 1
@@ -189,9 +189,9 @@ def seed() -> None:
             .one()
         )
         assert found.recipient_name == "김순자"
-        print(f"  alias 검색 (WHERE user_id=? AND alias='엄마') → {found.recipient_name} ✅")
+        print(f"  alias 검색 → {found.recipient_name} ✅")
 
-        # ── UPDATE ────────────────────────────────────────────────────────────
+        # ── UPDATE ────────────────────────────────────────────────
         print("\n[UPDATE] 잔액 업데이트 검증...")
         loaded_account = db.query(Account).filter_by(account_id=account_primary.account_id).first()
         loaded_account.balance -= 100_000
@@ -200,8 +200,8 @@ def seed() -> None:
         assert loaded_account.balance == 900_000
         print(f"  balance 1,000,000 → 900,000 ✅")
 
-        # ── DELETE ────────────────────────────────────────────────────────────
-        print("\n[DELETE] standing_order 취소 (status=cancelled) 검증...")
+        # ── DELETE ────────────────────────────────────────────────
+        print("\n[DELETE] standing_order 취소 검증...")
         loaded_so = db.query(StandingOrder).filter_by(order_id=standing_order.order_id).first()
         loaded_so.status = "cancelled"
         db.commit()
@@ -209,20 +209,20 @@ def seed() -> None:
         assert loaded_so.status == "cancelled"
         print(f"  standing_order.status='cancelled' ✅")
 
-        # ── UniqueConstraint 검증 ─────────────────────────────────────────────
+        # ── UniqueConstraint ──────────────────────────────────────
         print("\n[UniqueConstraint] alias 중복 등록 오류 검증...")
         from sqlalchemy.exc import IntegrityError
         try:
             duplicate = RegisteredRecipient(
                 user_id=user_id,
-                alias="엄마",  # 중복
+                alias="엄마",
                 bank_name="하나은행",
                 account_number="111-222-333444",
                 recipient_name="홍길순",
             )
             db.add(duplicate)
             db.commit()
-            print("  ❌ UniqueConstraint 미동작 — 오류 발생하지 않음")
+            print("  ❌ UniqueConstraint 미동작")
         except IntegrityError:
             db.rollback()
             print("  UniqueConstraint 오류 정상 발생 ✅")
