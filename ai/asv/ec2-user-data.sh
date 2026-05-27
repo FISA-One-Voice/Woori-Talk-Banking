@@ -57,9 +57,9 @@ echo "  Docker 버전: $(docker --version)"
 
 # ── 3. Docker Hub에서 이미지 Pull ─────────────────────────────────────────────
 echo "[3/4] Docker Hub에서 이미지 pull..."
-# southgiri/asv-cpu:latest — 모델 가중치 포함 (빌드타임 다운로드 완료된 이미지)
-docker pull southgiri/asv-cpu:latest
-echo "  Pull 완료: southgiri/asv-cpu:latest"
+# southgiri/asv:latest — 모델 가중치 포함 (빌드타임 다운로드 완료된 이미지)
+docker pull southgiri/asv:latest
+echo "  Pull 완료: southgiri/asv:latest"
 
 # ── 4. ASV 컨테이너 실행 ──────────────────────────────────────────────────────
 echo "[4/4] ASV 컨테이너 시작..."
@@ -71,7 +71,7 @@ docker run -d \
   --name asv-server \
   --restart unless-stopped \
   -p 8000:8000 \
-  southgiri/asv-cpu:latest
+  southgiri/asv:latest
 
 echo "  컨테이너 시작 완료 (포트 매핑: 8000 → 8000)"
 
@@ -86,7 +86,7 @@ for i in $(seq 1 12); do
     echo " ✅ ASV 서버 기동 완료"
     echo " Health: http://${PUBLIC_IP}:8000/health"
     echo " Docs:   http://${PUBLIC_IP}:8000/docs"
-    echo " Image:  southgiri/asv-cpu:latest"
+    echo " Image:  southgiri/asv:latest"
     echo " ASV_THRESHOLD=0.6404"
     echo " $(date '+%Y-%m-%d %H:%M:%S')"
     echo "========================================"
