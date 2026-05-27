@@ -10,7 +10,6 @@ import {
 import { useRouter } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 
-// 임시 데이터 — JWT 연동 후 실제 API 호출로 교체
 const MOCK_ACCOUNTS = [
   { account_id: '1', bank_name: '우리은행', account_type: '입출금', alias: '주거래 통장', balance: 10000000, is_primary: true },
   { account_id: '2', bank_name: '우리은행', account_type: '저축', alias: '저축 통장', balance: 5000000, is_primary: false },
@@ -43,10 +42,12 @@ export default function AssetScreen() {
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>내 자산</Text>
+          <View style={styles.headerRight} />
         </View>
 
-        {/* TTS 안내 버블 */}
+        {/* TTS 안내 버블 — 노란 배경 */}
         <View style={styles.ttsBubble}>
+          <Text style={styles.ttsLabel}>음성 안내</Text>
           <Text style={styles.ttsText}>
             총 자산 {formatAmount(TOTAL_ASSET)} 입니다{'\n'}
             지출·수입 / 거래내역
@@ -61,8 +62,8 @@ export default function AssetScreen() {
             style={[styles.listenBtn, isListening && styles.listenBtnActive]}
             onPress={() => setIsListening((v) => !v)}
           >
-            <Text style={styles.listenBtnText}>
-              {isListening ? '● 듣고 있어요' : '듣고 있어요'}
+            <Text style={[styles.listenBtnText, isListening && styles.listenBtnTextActive]}>
+            {isListening ? '● 듣고 있어요' : '● 듣고 있어요'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -111,32 +112,42 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 4,
   },
-  backBtn: {
-    marginRight: 12,
-  },
+  backBtn: { width: 40 },
   backIcon: {
     fontSize: FONT_SIZES.button,
     color: COLORS.textMain,
   },
+  headerRight: { width: 40 },
   headerTitle: {
     fontSize: FONT_SIZES.button,
     color: COLORS.textMain,
     fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
   },
+
+  // TTS 버블 — 노란 배경
   ttsBubble: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.yellowBg,
     borderRadius: LAYOUT.borderRadius,
     padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.yellowBorder,
+  },
+  ttsLabel: {
+    fontSize: FONT_SIZES.caption,
+    color: COLORS.highlightYellow,
+    marginBottom: 6,
   },
   ttsText: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textMain,
     lineHeight: 36,
   },
+
   totalCard: {
     backgroundColor: COLORS.surfaceLight,
     borderRadius: LAYOUT.cardRadius,
@@ -153,23 +164,21 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
     fontWeight: 'bold',
   },
-  listenBtn: {
-    backgroundColor: COLORS.yellowBg,
-    borderWidth: 1,
-    borderColor: COLORS.yellowBorder,
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 24,
-  },
-  listenBtnActive: {
-    backgroundColor: COLORS.highlightYellow,
-    borderColor: COLORS.highlightYellow,
-  },
-  listenBtnText: {
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.highlightYellow,
-    fontWeight: 'bold',
-  },
+listenBtn: {
+  backgroundColor: 'transparent',
+  borderWidth: 1.5,
+  borderColor: COLORS.highlightYellow,
+  borderRadius: 999,
+  paddingVertical: 10,
+  paddingHorizontal: 28,
+  alignSelf: 'center',
+},
+listenBtnText: {
+  fontSize: FONT_SIZES.caption,
+  color: COLORS.highlightYellow,
+  fontWeight: 'bold',
+},
+
   accountCard: {
     backgroundColor: COLORS.surface,
     borderRadius: LAYOUT.borderRadius,
@@ -180,9 +189,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  accountInfo: {
-    gap: 4,
-  },
+  accountInfo: { gap: 4 },
   accountBank: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textMain,
@@ -197,6 +204,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
     fontWeight: 'bold',
   },
+
   bottomBtns: {
     flexDirection: 'row',
     gap: 12,

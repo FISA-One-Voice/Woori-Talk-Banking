@@ -10,7 +10,6 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 
-// 임시 거래 데이터 — JWT 연동 후 실제 API 호출로 교체
 const MOCK_TRANSACTIONS = [
   { tx_id: '1', to_name: 'OO마트', amount: -30000, category: '쇼핑', created_at: '05.18' },
   { tx_id: '2', to_name: '월급', amount: 3000000, category: '수입', created_at: '05.13' },
@@ -24,26 +23,29 @@ export default function HistoryScreen() {
   const router = useRouter();
   const { type } = useLocalSearchParams<{ type: string }>();
 
-  // type=expense → 지출·수입 흐름, type=history → 거래내역 바로 표시
   const [step, setStep] = useState<Step>(type === 'history' ? 'history' : 'slot');
   const [period, setPeriod] = useState('이번달');
-  const [failCount, setFailCount] = useState(0);
 
   const income = MOCK_TRANSACTIONS.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
   const expense = MOCK_TRANSACTIONS.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0);
 
-  // ── 슬롯 요청 화면 (SCR005-F03) ───────────────────────────────
+  // ── 슬롯 요청 화면 (SCR005-F03)
   if (step === 'slot') {
     return (
       <SafeAreaView style={styles.root}>
         <View style={styles.container}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.screenTitle}>지출·수입</Text>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Text style={styles.backIcon}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.screenTitle}>지출·수입</Text>
+            <View style={styles.headerRight} />
+          </View>
 
           <View style={styles.ttsBubble}>
-            <Text style={styles.ttsText}>어느 기간을{'\n'}알려드릴까요?</Text>
+            <Text style={styles.ttsTextYellow}>
+              어느 기간을{'\n'}알려드릴까요?
+            </Text>
           </View>
 
           <TouchableOpacity style={styles.listenBtn}>
@@ -52,10 +54,11 @@ export default function HistoryScreen() {
 
           <View style={styles.periodBox}>
             <Text style={styles.periodLabel}>기간</Text>
-            <Text style={styles.periodHint}>예: 이번달, 지난달, 최근 1주일</Text>
+            <Text style={styles.periodHint}>기간을 말씀해 주세요</Text>
           </View>
 
-          {/* 빠른 선택 버튼 */}
+          <Text style={styles.periodExample}>예: 이번달, 지난달, 최근 1주일</Text>
+
           {['이번달', '지난달', '최근 7일'].map((p) => (
             <TouchableOpacity
               key={p}
@@ -72,25 +75,31 @@ export default function HistoryScreen() {
     );
   }
 
-  // ── 지출·수입 결과 화면 (SCR005-F04) ──────────────────────────
+  // ── 지출·수입 결과 화면 (SCR005-F04)
   if (step === 'result') {
     return (
       <SafeAreaView style={styles.root}>
         <View style={styles.container}>
-          <TouchableOpacity onPress={() => setStep('slot')} style={styles.backBtn}>
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.screenTitle}>지출·수입</Text>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => setStep('slot')} style={styles.backBtn}>
+              <Text style={styles.backIcon}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.screenTitle}>지출·수입</Text>
+            <View style={styles.headerRight} />
+          </View>
 
           <View style={styles.ttsBubble}>
-            <Text style={styles.ttsText}>이번달</Text>
-            <Text style={[styles.ttsText, { color: COLORS.highlightYellow }]}>
-              수입 300만 / 지출 120만
+            <Text style={styles.ttsLabel}>음성 안내</Text>
+            <Text style={styles.ttsText}>
+              {period}{'\n'}수입 300만 / 지출 120만
             </Text>
           </View>
 
           <View style={styles.resultCard}>
-            <Text style={styles.resultPeriod}>기간&nbsp;&nbsp;&nbsp;{period}</Text>
+            <View style={styles.resultRow}>
+              <Text style={styles.resultLabel}>기간</Text>
+              <Text style={styles.resultLabel}>{period}</Text>
+            </View>
             <View style={styles.resultRow}>
               <Text style={styles.resultLabel}>수입</Text>
               <Text style={[styles.resultAmount, { color: COLORS.success }]}>
@@ -109,17 +118,21 @@ export default function HistoryScreen() {
     );
   }
 
-  // ── 거래내역 목록 화면 (SCR005-F05) ───────────────────────────
+  // ── 거래내역 목록 화면 (SCR005-F05)
   if (step === 'history') {
     return (
       <SafeAreaView style={styles.root}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.screenTitle}>거래내역</Text>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Text style={styles.backIcon}>←</Text>
+            </TouchableOpacity>
+            <Text style={styles.screenTitle}>거래내역</Text>
+            <View style={styles.headerRight} />
+          </View>
 
           <View style={styles.ttsBubble}>
+            <Text style={styles.ttsLabel}>음성 안내</Text>
             <Text style={styles.ttsText}>최근 거래내역</Text>
           </View>
 
@@ -142,7 +155,7 @@ export default function HistoryScreen() {
     );
   }
 
-  // ── 2회 연속 실패 화면 (SCR005-E01) ───────────────────────────
+  // ── 2회 연속 실패 화면 (SCR005-E01)
   return (
     <SafeAreaView style={styles.root}>
       <View style={[styles.container, styles.errorContainer]}>
@@ -165,27 +178,74 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
-  container: { flex: 1, padding: LAYOUT.paddingMedium, gap: 12 },
-  scroll: { padding: LAYOUT.paddingMedium, gap: 12 },
-  backBtn: { marginBottom: 4 },
+  container: {
+    flex: 1,
+    padding: LAYOUT.paddingMedium,
+    paddingTop: 40,
+    gap: 12,
+  },
+  scroll: {
+    padding: LAYOUT.paddingMedium,
+    paddingTop: 40,
+    gap: 12,
+  },
+
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  backBtn: { width: 40 },
   backIcon: { fontSize: FONT_SIZES.button, color: COLORS.textMain },
-  screenTitle: { fontSize: FONT_SIZES.button, color: COLORS.textMain, fontWeight: 'bold' },
+  headerRight: { width: 40 },
+  screenTitle: {
+    fontSize: FONT_SIZES.button,
+    color: COLORS.textMain,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
+  },
+
   ttsBubble: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.yellowBg,
     borderRadius: LAYOUT.borderRadius,
     padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.yellowBorder,
   },
-  ttsText: { fontSize: FONT_SIZES.body, color: COLORS.textMain, lineHeight: 36 },
+  ttsLabel: {
+    fontSize: FONT_SIZES.caption,
+    color: COLORS.highlightYellow,
+    marginBottom: 6,
+  },
+  ttsText: {
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textMain,
+    lineHeight: 36,
+  },
+  ttsTextYellow: {
+    fontSize: FONT_SIZES.body,
+    color: COLORS.highlightYellow,
+    lineHeight: 36,
+    fontWeight: 'bold',
+  },
+
   listenBtn: {
-    backgroundColor: COLORS.highlightYellow,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: COLORS.highlightYellow,
     borderRadius: 999,
     paddingVertical: 10,
     paddingHorizontal: 28,
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
-  listenBtnText: { fontSize: FONT_SIZES.caption, color: '#000', fontWeight: 'bold' },
+  listenBtnText: {
+    fontSize: FONT_SIZES.caption,
+    color: COLORS.highlightYellow,
+    fontWeight: 'bold',
+  },
+
   periodBox: {
     backgroundColor: COLORS.surface,
     borderRadius: LAYOUT.borderRadius,
@@ -195,6 +255,12 @@ const styles = StyleSheet.create({
   },
   periodLabel: { fontSize: FONT_SIZES.body, color: COLORS.textMain },
   periodHint: { fontSize: FONT_SIZES.caption, color: COLORS.grayLight, marginTop: 4 },
+  periodExample: {
+    fontSize: FONT_SIZES.caption,
+    color: COLORS.grayMedium,
+    marginTop: -4,
+  },
+
   periodBtn: {
     backgroundColor: COLORS.surfaceLight,
     borderRadius: LAYOUT.borderRadius,
@@ -206,6 +272,7 @@ const styles = StyleSheet.create({
   periodBtnActive: { borderColor: COLORS.highlightYellow, backgroundColor: COLORS.yellowBg },
   periodBtnText: { fontSize: FONT_SIZES.body, color: COLORS.grayLight },
   periodBtnTextActive: { color: COLORS.highlightYellow },
+
   resultCard: {
     backgroundColor: COLORS.surface,
     borderRadius: LAYOUT.cardRadius,
@@ -214,10 +281,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  resultPeriod: { fontSize: FONT_SIZES.caption, color: COLORS.grayLight },
   resultRow: { flexDirection: 'row', justifyContent: 'space-between' },
   resultLabel: { fontSize: FONT_SIZES.body, color: COLORS.textMain },
   resultAmount: { fontSize: FONT_SIZES.body, fontWeight: 'bold' },
+
   txCard: {
     backgroundColor: COLORS.surface,
     borderRadius: LAYOUT.borderRadius,
@@ -232,6 +299,7 @@ const styles = StyleSheet.create({
   txDate: { fontSize: FONT_SIZES.caption, color: COLORS.grayLight },
   txName: { fontSize: FONT_SIZES.body, color: COLORS.textMain },
   txAmount: { fontSize: FONT_SIZES.body, fontWeight: 'bold' },
+
   errorContainer: { justifyContent: 'center', alignItems: 'center' },
   errorTitle: { fontSize: FONT_SIZES.button, color: COLORS.textMain, fontWeight: 'bold' },
   errorSub: { fontSize: FONT_SIZES.body, color: COLORS.grayLight },
