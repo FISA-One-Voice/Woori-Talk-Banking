@@ -1,17 +1,17 @@
 // =============================================================================
-// app/dev/home-event/event/[id].tsx   (SCR-007 상세)
+// app/dev/event/[id].tsx   (SCR-007 이벤트 상세)
 //
 // [화면 흐름]
 // loading    → 데이터 로딩 중
 // detail     → 이벤트 상세 + "목록" / "참여하기" 버튼
 // not_found  → 이벤트 없음
 //
-// [참여 확인 모달]
-// confirm   → 이벤트 정보 확인 + 참여 동의
+// [참여 확인 모달 상태]
+// confirm    → 이벤트 정보 확인 + 참여 동의
 // processing → 처리 중 (버튼 비활성)
-// success   → 참여 완료
-// duplicate → 이미 참여
-// error     → 오류
+// success    → 참여 완료 → 홈으로 이동
+// duplicate  → 이미 참여
+// error      → 오류
 // =============================================================================
 
 import { ActionButton } from '@/components/display';
@@ -122,7 +122,12 @@ interface ParticipateModalProps {
   onClose: () => void;
 }
 
-function ParticipateModal({ event, modalState, onConfirm, onClose }: ParticipateModalProps) {
+function ParticipateModal({
+  event,
+  modalState,
+  onConfirm,
+  onClose,
+}: ParticipateModalProps) {
   const { activateMic } = useMic();
   if (!modalState) return null;
 
@@ -133,13 +138,11 @@ function ParticipateModal({ event, modalState, onConfirm, onClose }: Participate
   const isError      = modalState === 'error';
   const isDone       = isSuccess || isDuplicate || isError;
 
-  const ttsMessage = isConfirm
-    ? `${event.title}\n참여하시겠어요?`
-    : isSuccess
-    ? '이벤트 참여가 완료되었습니다!'
-    : isDuplicate
-    ? '이미 참여하신 이벤트입니다.'
-    : '참여 처리 중 오류가 발생했습니다.';
+  const ttsMessage =
+    isConfirm   ? `${event.title}\n참여하시겠어요?` :
+    isSuccess   ? '이벤트 참여가 완료되었습니다!'   :
+    isDuplicate ? '이미 참여하신 이벤트입니다.'      :
+                  '참여 처리 중 오류가 발생했습니다.';
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
@@ -161,13 +164,11 @@ function ParticipateModal({ event, modalState, onConfirm, onClose }: Participate
               </Text>
               <Text style={[
                 modalStyles.resultText,
-                isError && { color: COLORS.error ?? '#f87171' },
+                isError && { color: COLORS.error },
               ]}>
-                {isSuccess
-                  ? '참여가 완료되었습니다!'
-                  : isDuplicate
-                  ? '이미 참여하신 이벤트입니다.'
-                  : '처리 중 오류가 발생했습니다.'}
+                {isSuccess   ? '참여가 완료되었습니다!'    :
+                 isDuplicate ? '이미 참여하신 이벤트입니다.' :
+                               '처리 중 오류가 발생했습니다.'}
               </Text>
             </View>
           )}
@@ -313,10 +314,6 @@ export default function EventDetailScreen() {
     }
   }
 
-  function handleOpenConfirm(): void {
-    setModalState('confirm');
-  }
-
   async function handleConfirmParticipate(): Promise<void> {
     if (!event) return;
     setModalState('processing');
@@ -338,8 +335,7 @@ export default function EventDetailScreen() {
 
   function handleCloseModal(): void {
     if (modalState === 'success') {
-      // 성공 시 테스트 홈으로 이동
-      router.replace('/dev/home-event');
+      router.replace('/dev/home' as never);  // 성공 후 홈으로
     } else {
       setModalState(null);
     }
@@ -348,7 +344,7 @@ export default function EventDetailScreen() {
   const ttsMap: Record<Screen, { message: string; variant: 'default' | 'error' }> = {
     loading:   { message: '이벤트 정보를 불러오고 있습니다.', variant: 'default' },
     detail:    { message: `${event?.title ?? ''}\n참여하시겠어요?`,  variant: 'default' },
-    not_found: { message: '이벤트를 찾을 수\n없습니다',            variant: 'error'   },
+    not_found: { message: '이벤트를 찾을 수\n없습니다.',            variant: 'error'   },
   };
   const tts = ttsMap[screen];
 
@@ -382,14 +378,14 @@ export default function EventDetailScreen() {
                   label="목록"
                   variant="outline"
                   flex={1}
-                  onPress={() => router.back()}
+                  onPress={() => router.push('/dev/event' as never)}
                 />
                 <ActionButton
                   label={participated ? '참여완료' : '참여하기'}
                   variant={participated ? 'outline' : 'primary'}
                   flex={2}
                   disabled={participated}
-                  onPress={handleOpenConfirm}
+                  onPress={() => setModalState('confirm')}
                 />
               </View>
             </View>

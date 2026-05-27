@@ -1,5 +1,5 @@
 // =============================================================================
-// app/dev/home-event/event/index.tsx   (SCR-007 목록)
+// app/dev/event/index.tsx   (SCR-007 이벤트 목록)
 // =============================================================================
 
 import { ActionButton } from '@/components/display';
@@ -49,7 +49,7 @@ function EventRow({ event }: { event: EventItem }) {
   return (
     <TouchableOpacity
       style={rowStyles.container}
-      onPress={() => router.push(`/dev/home-event/event/${event.event_id}`)}
+      onPress={() => router.push(`/dev/event/${event.event_id}` as never)}
       onLongPress={activateMic}
       delayLongPress={600}
       activeOpacity={0.7}
@@ -115,9 +115,8 @@ export default function EventListScreen() {
     apiClient
       .get<ApiResponse<{ events: EventItem[]; total: number }>>('/events')
       .then((res) => {
-        const list = res.data.success && res.data.data
-          ? res.data.data.events
-          : [];
+        const list =
+          res.data.success && res.data.data ? res.data.data.events : [];
         setEvents(list);
         setScreen(list.length > 0 ? 'list' : 'empty');
       })
@@ -132,7 +131,7 @@ export default function EventListScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.body}>
-        <TopBar variant="back" title="이벤트" onBack={() => router.back()} />
+        <TopBar variant="back" title="이벤트" onBack={() => router.replace('/dev/home' as never)} />
         <TtsBubble message={ttsMessage} autoPlay />
 
         {screen === 'loading' && (
@@ -158,7 +157,7 @@ export default function EventListScreen() {
             <ActionButton
               label="홈으로 돌아가기"
               variant="outline"
-              onPress={() => router.replace('/dev/home-event')}
+              onPress={() => router.replace('/dev/home' as never)}
             />
           </View>
         )}

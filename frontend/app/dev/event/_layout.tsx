@@ -1,14 +1,14 @@
 // =============================================================================
-// app/dev/home-event/_layout.tsx
+// app/dev/event/_layout.tsx
 //
-// 홈 화면 & 이벤트 구현 테스트 영역의 레이아웃.
-// MicProvider 로 감싸서 이 영역 안의 모든 화면에서 useMic() 사용 가능.
+// 이벤트 화면 테스트 영역 레이아웃.
+// MicProvider 로 감싸서 useMic() 사용 가능하게 합니다.
 // =============================================================================
 
 import { MicProvider } from '@/context/MicContext';
 import { Stack } from 'expo-router';
 
-export default function HomeEventLayout() {
+export default function DevEventLayout() {
   return (
     <MicProvider>
       <Stack screenOptions={{ headerShown: false }} />
