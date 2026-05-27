@@ -74,7 +74,12 @@ def _make_user(db: Session) -> User:
     )
     db.add(user)
     db.commit()
-    db.refresh(user)
+    # NullPool 환경에서 commit 후 refresh 실패 시 세션 롤백 후 재조회
+    try:
+        db.refresh(user)
+    except Exception:
+        db.rollback()
+        user = db.query(User).filter(User.phone == TEST_PHONE).first()
     return user
 
 

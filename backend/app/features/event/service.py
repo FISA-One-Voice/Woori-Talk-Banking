@@ -91,15 +91,16 @@ def get_active_events(db: Session) -> EventListResponse:
     )
 
 
-def get_event_detail(db: Session, event_id: str) -> EventResponse:
+def get_event_detail(db: Session, event_id: str, user_id: str | None = None) -> EventResponse:
     """특정 이벤트의 상세 정보를 반환합니다.
 
     Args:
         db: SQLAlchemy DB 세션.
         event_id: 조회할 이벤트의 UUID 문자열.
+        user_id: JWT에서 추출한 사용자 ID (선택). 있으면 has_participated 를 실제 값으로 반환.
 
     Returns:
-        EventResponse: 이벤트 상세 정보.
+        EventResponse: 이벤트 상세 정보. has_participated 포함.
 
     Raises:
         EventNotFoundError: event_id 형식이 UUID가 아니거나 이벤트가 없는 경우.
@@ -119,7 +120,20 @@ def get_event_detail(db: Session, event_id: str) -> EventResponse:
     if not event:
         raise EventNotFoundError()
 
-    return EventResponse.model_validate(event)
+    # 로그인 사용자의 참여 여부 확인
+    has_participated = False
+    if user_id:
+        has_participated = (
+            db.query(EventParticipation)
+            .filter(
+                EventParticipation.event_id == event_id,
+                EventParticipation.user_id == user_id,
+            )
+            .first()
+        ) is not None
+
+    response = EventResponse.model_validate(event)
+    return response.model_copy(update={"has_participated": has_participated})
 
 
 def participate_event(db: Session, event_id: str, user_id: str) -> dict:
