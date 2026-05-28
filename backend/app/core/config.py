@@ -82,6 +82,18 @@ class Settings(BaseSettings):
             return url
         return "sqlite:///./woori_talk.db"
 
+    # ── OpenSearch ──────────────────────────────────────────────────────────────
+    # OPENSEARCH_HOST : Aiven 클러스터 호스트
+    # OPENSEARCH_PORT : 포트 (Aiven 기본값 11916)
+    # OPENSEARCH_USER / OPENSEARCH_PASSWORD : 클러스터 인증 정보
+    # OPENSEARCH_USE_SSL : SSL 사용 여부 (Aiven 항상 True)
+    # OPENSEARCH_CA_CERT : CA 인증서 경로 — 없으면 검증 비활성화 (로컬 개발용)
+    OPENSEARCH_HOST: str = ""
+    OPENSEARCH_PORT: int = 9200
+    OPENSEARCH_USER: str = ""
+    OPENSEARCH_PASSWORD: str = ""
+    OPENSEARCH_USE_SSL: bool = True
+    OPENSEARCH_CA_CERT: str = ""
     # OpenAI 에이전트 설정
     # ─ OPENAI_CHAT_API_KEY: OpenAI 플랫폼에서 발급받은 API 키
     # ─ OPENAI_MODEL:   사용할 모델명 (기본: gpt-4o-mini — 비용/성능 균형)
