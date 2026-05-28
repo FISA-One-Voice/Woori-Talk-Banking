@@ -14,6 +14,7 @@ SUPPORTED_CONTENT_TYPES = frozenset(
         "audio/mpeg",
         "audio/mp4",
         "audio/m4a",
+        "audio/x-m4a",  # Apple 구형 MIME 변형 (React Native iOS가 전송하는 타입)
         "audio/aac",
         "audio/flac",
         "audio/ogg",
