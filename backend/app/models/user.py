@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
@@ -16,8 +16,11 @@ if TYPE_CHECKING:
     from app.models.transaction import Transaction
 
 
+_KST = timezone(timedelta(hours=9))
+
+
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(_KST).replace(tzinfo=None)
 
 
 class User(Base):

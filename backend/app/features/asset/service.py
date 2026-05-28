@@ -99,7 +99,7 @@ def get_transaction_history(
         query = query.filter(Transaction.from_account_id == account_id)
 
     if days:
-        since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+        since = datetime.now(timezone(timedelta(hours=9))).replace(tzinfo=None) - timedelta(days=days)
         query = query.filter(Transaction.created_at >= since)
 
     if category:

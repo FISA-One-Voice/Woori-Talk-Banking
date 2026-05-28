@@ -25,8 +25,11 @@ from app.models.transaction import Transaction
 from app.models.user import User
 
 
+_KST = timezone(timedelta(hours=9))
+
+
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(_KST).replace(tzinfo=None)
 
 
 def _hash_pin(pin: str) -> str:
