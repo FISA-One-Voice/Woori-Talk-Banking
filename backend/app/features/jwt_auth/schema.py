@@ -23,4 +23,3 @@ class JwtTokenResponse(BaseModel):
     refresh_token: Optional[str] = Field(default=None, alias="refreshToken")
     user_id: str = Field(alias="userId")
     has_voice_registered: bool = Field(default=False, alias="hasVoiceRegistered")
-

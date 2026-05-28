@@ -1,16 +1,16 @@
-import { useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
-import { router } from 'expo-router';
-import { TopBar } from '@/components/layout';
 import { AccessibleNumKeypad } from '@/components/input';
+import { TopBar } from '@/components/layout';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import { apiClient, ApiResponse } from '@/utils/api';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 export default function DevLoginScreen() {
   const [phone, setPhone] = useState('');
   const [step, setStep] = useState<'PHONE' | 'PIN'>('PHONE');
-  
+
   const handlePhoneComplete = (completedPhone: string) => {
     let formatted = completedPhone;
     if (completedPhone.length === 11) {
@@ -22,9 +22,11 @@ export default function DevLoginScreen() {
 
   const handleLogin = async (pinValue: string) => {
     try {
-      const response = await apiClient.post<ApiResponse<{ accessToken: string; refreshToken: string; hasVoiceRegistered: boolean }>>('/users/login', { 
-        phone, 
-        pin: pinValue 
+      const response = await apiClient.post<
+        ApiResponse<{ accessToken: string; refreshToken: string; hasVoiceRegistered: boolean }>
+      >('/api/users/login', {
+        phone,
+        pin: pinValue,
       });
 
       const result = response.data;
@@ -32,7 +34,7 @@ export default function DevLoginScreen() {
       if (result.success && result.data) {
         // 새로 만든 setTokens를 통해 Access, Refresh 토큰 모두 저장
         useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken);
-        
+
         if (result.data.hasVoiceRegistered) {
           router.replace('/home');
         } else {
@@ -44,9 +46,12 @@ export default function DevLoginScreen() {
     } catch (error: any) {
       const message = error.response?.data?.message || '인증에 실패했습니다.';
       if (error.response?.status && error.response.status !== 500) {
-         Alert.alert('로그인 실패 🚫', message);
+        Alert.alert('로그인 실패 🚫', message);
       } else {
-         Alert.alert('서버 연결 에러 🔌', `백엔드 서버가 켜져 있는지 확인해주세요!\n(${process.env.EXPO_PUBLIC_API_BASE_URL})`);
+        Alert.alert(
+          '서버 연결 에러 🔌',
+          `백엔드 서버가 켜져 있는지 확인해주세요!\n(${process.env.EXPO_PUBLIC_API_BASE_URL})`,
+        );
       }
     }
   };
@@ -55,7 +60,7 @@ export default function DevLoginScreen() {
     <SafeAreaView style={styles.root}>
       <View style={styles.pad}>
         <TopBar variant="back" title="로그인 화면 테스트" onBack={() => router.back()} />
-        
+
         <View style={styles.form}>
           {step === 'PHONE' ? (
             <View style={{ flex: 1 }}>
@@ -63,11 +68,11 @@ export default function DevLoginScreen() {
                 <Text style={styles.label}>전화번호 11자리</Text>
                 <Text style={styles.subLabel}>번호를 모두 입력하면 PIN 입력으로 넘어갑니다.</Text>
               </View>
-              
+
               <View style={{ flex: 1, justifyContent: 'space-between', paddingTop: 32 }}>
-                <AccessibleNumKeypad 
-                  length={11} 
-                  onComplete={handlePhoneComplete} 
+                <AccessibleNumKeypad
+                  length={11}
+                  onComplete={handlePhoneComplete}
                   renderHeader={(currentValue) => {
                     let display = currentValue;
                     if (currentValue.length > 3 && currentValue.length <= 7) {
@@ -75,10 +80,15 @@ export default function DevLoginScreen() {
                     } else if (currentValue.length > 7) {
                       display = `${currentValue.slice(0, 3)}-${currentValue.slice(3, 7)}-${currentValue.slice(7)}`;
                     }
-                    
+
                     return (
                       <View style={styles.phoneHeaderBox}>
-                        <Text style={[styles.phoneHeaderText, currentValue.length === 0 && { color: COLORS.grayMedium }]}>
+                        <Text
+                          style={[
+                            styles.phoneHeaderText,
+                            currentValue.length === 0 && { color: COLORS.grayMedium },
+                          ]}
+                        >
                           {currentValue.length === 0 ? '010-0000-0000' : display}
                         </Text>
                       </View>
@@ -90,7 +100,12 @@ export default function DevLoginScreen() {
           ) : (
             <View style={{ flex: 1 }}>
               <View style={styles.phoneSummary}>
-                <Text style={styles.phoneSummaryText} accessibilityLabel={`입력된 전화번호: ${phone}`}>{phone}</Text>
+                <Text
+                  style={styles.phoneSummaryText}
+                  accessibilityLabel={`입력된 전화번호: ${phone}`}
+                >
+                  {phone}
+                </Text>
                 <Pressable onPress={() => setStep('PHONE')} accessibilityLabel="전화번호 수정하기">
                   <Text style={styles.editButtonText}>수정</Text>
                 </Pressable>
@@ -100,12 +115,9 @@ export default function DevLoginScreen() {
                 <Text style={styles.label}>PIN 번호 (6자리)</Text>
                 <Text style={styles.subLabel}>번호를 모두 입력하면 자동으로 로그인됩니다.</Text>
               </View>
-              
+
               <View style={{ flex: 1, justifyContent: 'space-between', paddingTop: 24 }}>
-                <AccessibleNumKeypad 
-                  length={6} 
-                  onComplete={handleLogin} 
-                />
+                <AccessibleNumKeypad length={6} onComplete={handleLogin} />
               </View>
             </View>
           )}

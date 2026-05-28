@@ -6,7 +6,7 @@ from app.core.jwt_utils import get_current_user_id
 from app.features.jwt_auth import service
 from app.features.jwt_auth.schema import JwtLoginRequest, JwtRefreshRequest
 
-router = APIRouter(prefix="/users", tags=["Users Auth"])
+router = APIRouter(prefix="/api/users", tags=["Users Auth"])
 
 
 @router.post("/login", response_model=dict)

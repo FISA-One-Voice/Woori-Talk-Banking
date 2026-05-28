@@ -54,7 +54,7 @@ export default function DevVoiceRegisterScreen() {
     setLoading(true);
     try {
       const dummyVector = Array(192).fill(0.1);
-      const response = await apiClient.post<ApiResponse>('/voice/register', { 
+      const response = await apiClient.post<ApiResponse>('/api/voice/register', { 
         embedding_vector: dummyVector 
       });
       

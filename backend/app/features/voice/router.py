@@ -6,7 +6,7 @@ from app.core.jwt_utils import get_current_user_id
 from app.features.voice import service
 from app.core.exception import AppError
 
-router = APIRouter(prefix="/voice", tags=["Voice"])
+router = APIRouter(prefix="/api/voice", tags=["Voice"])
 
 @router.post("/register", response_model=dict)
 async def register_voice(
