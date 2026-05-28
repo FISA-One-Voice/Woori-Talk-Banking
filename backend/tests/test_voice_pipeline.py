@@ -167,7 +167,7 @@ class TestNormalFlow:
             await process_voice_pipeline(FAKE_AUDIO, FAKE_USER_ID, db=MagicMock())
 
         # STT에 원본 오디오가 그대로 전달되는지, 각 단계가 정확히 한 번씩 호출되는지 검증
-        mock_stt.assert_called_once_with(FAKE_AUDIO)
+        mock_stt.assert_called_once_with(FAKE_AUDIO, "audio/wav")
         mock_graph.ainvoke.assert_called_once()
         mock_tts.assert_called_once()
 

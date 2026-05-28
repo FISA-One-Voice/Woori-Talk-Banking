@@ -64,6 +64,7 @@ async def process_voice_pipeline(
     audio_bytes: bytes,
     user_id: str,
     db: Session,
+    content_type: str = "audio/wav",
 ) -> VoiceResponseData:
     """음성 파이프라인 통합 진입점.
 
@@ -98,7 +99,9 @@ async def process_voice_pipeline(
     if awaiting_asv:
         return await _handle_asv_flow(audio_bytes, user_id, config, db, graph)
     else:
-        return await _handle_normal_flow(audio_bytes, user_id, config, graph)
+        return await _handle_normal_flow(
+            audio_bytes, user_id, config, graph, content_type
+        )
 
 
 # ── 정상 흐름: STT → 에이전트 → TTS ────────────────────────────────────────────
@@ -109,6 +112,7 @@ async def _handle_normal_flow(
     user_id: str,
     config: dict,
     graph,
+    content_type: str = "audio/wav",
 ) -> VoiceResponseData:
     """정상 음성 처리 흐름.
 
@@ -122,7 +126,7 @@ async def _handle_normal_flow(
         VoiceResponseData: TTS 오디오 + 에이전트 상태 반영.
     """
     # 1. STT: 오디오 → 텍스트
-    transcript = await transcribe_audio(audio_bytes)
+    transcript = await transcribe_audio(audio_bytes, content_type)
 
     # 2. LangGraph 에이전트 호출
     result = await graph.ainvoke(

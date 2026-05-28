@@ -27,7 +27,6 @@ MAX_AUDIO_BYTES = 10 * 1024 * 1024
 # CLOVA STT 음성 길이 상한 (60초)
 MAX_AUDIO_DURATION = 60.0
 
-
 async def transcribe_audio(
     audio_bytes: bytes,
     content_type: str = "audio/wav",
@@ -55,9 +54,9 @@ async def transcribe_audio(
                 content=audio_bytes,
                 headers={
                     "X-CLOVASPEECH-API-KEY": settings.CLOVA_SECRET_KEY,
-                    # 이 계정은 application/octet-stream 만 허용
                     "Content-Type": "application/octet-stream",
                 },
+                params={"lang": "Kor"},
             )
     except httpx.TimeoutException as exc:
         raise STTError(
@@ -73,7 +72,7 @@ async def transcribe_audio(
     if response.status_code != 200:
         raise STTError(
             code="STT_FAILED",
-            message=f"Clova Speech API 오류: status={response.status_code}",
+            message=f"Clova Speech API 오류: status={response.status_code}, body={response.text}",
         )
 
     payload = response.json()

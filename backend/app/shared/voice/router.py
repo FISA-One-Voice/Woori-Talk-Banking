@@ -63,7 +63,8 @@ async def voice_pipeline(
         503 Service Unavailable: STT/TTS 외부 API 장애.
     """
     audio_bytes = await audio.read()
-    data = await process_voice_pipeline(audio_bytes, user_id, db)
+    content_type = audio.content_type or "audio/wav"
+    data = await process_voice_pipeline(audio_bytes, user_id, db, content_type)
     return ApiResponse(
         success=True,
         data=data.model_dump(),
