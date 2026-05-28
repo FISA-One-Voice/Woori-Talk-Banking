@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.jwt_utils import get_current_user_id
 from app.features.recipients import service
 from app.models.recipient import RegisteredRecipient
+from app.shared.crypto import decrypt
 
 router = APIRouter(prefix="/api", tags=["수취인"])
 
@@ -34,8 +35,6 @@ def _mask_account(account_number: str) -> str:
 
 
 def _to_item(r: RegisteredRecipient) -> dict:
-    from app.shared.crypto import decrypt
-
     plain = decrypt(r.account_number) or ""
     return RecipientItem(
         recipient_id=str(r.recipient_id),
