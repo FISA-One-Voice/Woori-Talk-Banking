@@ -24,9 +24,5 @@
       "source.organizeImports": "explicit"
     }
   },
-  "editor.fontFamily": "MesloLGS NF",
-
-  // Python 인터프리터 — backend/.venv 자동 활성화
-  "python.defaultInterpreterPath": "backend/.venv/Scripts/python.exe",
-  "python.terminal.activateEnvironment": true
+  "editor.fontFamily": "MesloLGS NF"
 }
