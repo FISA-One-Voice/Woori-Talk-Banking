@@ -7,6 +7,7 @@
 # - 각 feature 의 router 를 등록합니다.
 # - DB 테이블을 생성합니다.
 # - 전역 예외 핸들러를 등록합니다.
+# - 테스트용 샘플 데이터를 추가합니다.
 #
 # [서버 실행 방법]
 # cd backend
@@ -24,6 +25,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.database import Base, engine
 from app.core.exception import AppError
+from app.core.opensearch import create_indices_if_not_exists
 from app.features.jwt_auth.router import router as jwt_auth_router
 from app.features.asset.router import router as asset_router
 from app.shared.voice.router import router as voice_router
@@ -37,6 +39,10 @@ app = FastAPI(
 
 
 # ── CORS 설정 ───────────────────────────────────────────────────────────────────
+# CORS(Cross-Origin Resource Sharing): 프론트엔드(다른 주소)에서 이 서버로
+# API 요청을 보낼 수 있도록 허용하는 설정입니다.
+# 개발 중에는 모든 출처("*")를 허용합니다. 배포 시 실제 도메인으로 교체하세요.
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

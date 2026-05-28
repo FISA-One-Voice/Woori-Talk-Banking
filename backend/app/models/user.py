@@ -41,7 +41,7 @@ class User(Base):
     disability_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     tts_speed: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     pin_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    # NOT NULL — 음성 등록 완료 후 계정 생성 가능
+    # NOT NULL — 음성 등록 완료 후 계정 생성 가능. 192차원 (CAM++ ASV 모델 실측값)
     embedding_vector: Mapped[list] = mapped_column(Vector(192), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
 

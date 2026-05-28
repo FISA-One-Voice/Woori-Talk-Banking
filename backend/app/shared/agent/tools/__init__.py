@@ -1,8 +1,17 @@
-"""에이전트 tool 등록 파일.
-
+# Design Ref: §3.3 — Phase 2 tool 집합 포인트. 이 파일만 수정하면 에이전트에 연결.
+"""에이전트 tool 등록 포인트.
 Phase 1 상태: ALL_TOOLS = [] (빈 리스트)
-Phase 2에서 각 화면 담당자가 아래 예시처럼 tool을 추가합니다.
+Phase 2에서 각 화면 담당자가 아래 패턴으로 tool을 추가합니다.
+    등록 방법 (tool 작성 가이드는 _sample.py 참고):
+    from app.shared.agent.tools.balance import get_balance, get_accounts
+    from app.shared.agent.tools.transfer import execute_transfer
+    ALL_TOOLS = [get_balance, get_accounts, execute_transfer, ...]
+주의:
+    - _sample.py 는 가이드 파일이므로 여기에 import 하지 마십시오.
+    - tool 파일명은 features/ 화면명과 동일하게 유지하십시오.
+      예: features/balance/ → tools/balance.py
 """
+# Plan SC: build_graph([]) 호출 시 오류 없이 초기화 (Issue #5 완료 조건)
 
 from app.shared.agent.tools.balance import get_total_balance, get_account_balance_by_id
 from app.shared.agent.tools.history import get_recent_history, get_category_history
