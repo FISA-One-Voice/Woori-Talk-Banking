@@ -75,6 +75,12 @@ class OpenSearchIndexError(OpenSearchError):
     pass
 
 
+class RecipientError(AppError):
+    """수취인 조회·등록 관련 에러"""
+
+    pass
+
+
 class AgentError(AppError):
     """LangGraph 에이전트 초기화·실행 중 발생하는 예외.
 
