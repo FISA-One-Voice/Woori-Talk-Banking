@@ -23,6 +23,8 @@
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
+
+KST = timezone(timedelta(hours=9))
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -48,7 +50,7 @@ def _make_event(
     end_at: datetime | None = None,
 ) -> Event:
     """테스트용 이벤트를 DB에 직접 삽입합니다."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(KST).replace(tzinfo=None)
     event = Event(
         title=title,
         description=f"{title} 설명입니다.",
@@ -140,7 +142,7 @@ def expired_event(db: Session) -> Event:
     start_at = now - 2일, end_at = now - 1시간 으로 설정해
     end_at > start_at DB 제약을 만족하면서 이미 만료된 이벤트를 만듭니다.
     """
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(KST).replace(tzinfo=None)
     return _make_event(
         db,
         title="테스트_만료이벤트",
