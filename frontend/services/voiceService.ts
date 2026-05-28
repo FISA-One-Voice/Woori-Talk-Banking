@@ -30,6 +30,7 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
 
   if (__DEV__) {
     console.log('[STT]', data.data.transcript ?? '(인식 결과 없음)');
+    console.log('[Agent] navigate_to=%s slots=%o', data.data.navigate_to, data.data.collected_slots);
   }
 
   return data.data;

@@ -294,6 +294,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
         # LLM 호출 (structured output)
         try:
             result: IntentResult = llm_structured.invoke(chat_messages)
+            logger.info(
+                "[Agent] intent=%s slots=%s confirmed=%s cancelled=%s",
+                result.intent,
+                result.extracted_slots,
+                result.user_confirmed,
+                result.user_cancelled,
+            )
         except Exception as e:
             logger.warning("intent_node LLM 호출 실패: %s", e)
             return {

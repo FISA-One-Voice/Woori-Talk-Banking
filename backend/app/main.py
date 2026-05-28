@@ -18,10 +18,14 @@
 # - 헬스체크: http://localhost:8000/health
 # =============================================================================
 
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import Base, engine
 from app.core.exception import AppError
@@ -104,6 +108,7 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
+    logger.error("[AppError] code=%s status=%s message=%s", exc.code, exc.status_code, exc.message)
     return JSONResponse(
         status_code=exc.status_code,
         content={
