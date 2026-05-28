@@ -25,6 +25,8 @@ from fastapi.responses import JSONResponse
 
 from app.core.database import Base, engine
 from app.core.exception import AppError
+from app.core.opensearch import create_indices_if_not_exists
+from app.features.event.router import router as event_router
 from app.features.jwt_auth.router import router as jwt_auth_router
 from app.features.voice.router import router as voice_register_router
 from app.shared.voice.router import router as voice_router
@@ -115,6 +117,12 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
 # import 된 모든 모델(Base 를 상속한 클래스)의 테이블을 DB 에 생성합니다.
 # 테이블이 이미 존재하면 건너뜁니다. (덮어쓰지 않습니다)
 Base.metadata.create_all(bind=engine)
+
+# ── OpenSearch 인덱스 생성 ──────────────────────────────────────────────────────
+# financial_docs, chatbot_logs 인덱스가 없으면 자동 생성합니다.
+# 이미 존재하는 인덱스는 건너뜁니다.
+# 실패 시 OpenSearchIndexError 를 raise 하며 서버가 시작되지 않습니다.
+create_indices_if_not_exists()
 
 
 # ── 라우터 등록 ─────────────────────────────────────────────────────────────────
