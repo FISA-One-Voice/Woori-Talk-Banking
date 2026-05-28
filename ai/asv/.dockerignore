@@ -1,0 +1,22 @@
+# Python 런타임 파일
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# 테스트 — Docker 이미지에 포함 불필요
+tests/
+pytest.ini
+
+# 로컬 환경변수 — Docker 실행 시 -e 플래그 또는 컨테이너 환경변수로 제공
+.env
+
+# 문서 / 메타
+README.md
+docs/
+
+# Git
+.git/
+.gitignore
