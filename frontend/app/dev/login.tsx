@@ -5,6 +5,7 @@ import { TopBar } from '@/components/layout';
 import { AccessibleNumKeypad } from '@/components/input';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
+import { apiClient, ApiResponse } from '@/utils/api';
 
 export default function DevLoginScreen() {
   const [phone, setPhone] = useState('');
@@ -21,17 +22,14 @@ export default function DevLoginScreen() {
 
   const handleLogin = async (pinValue: string) => {
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/users/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ phone, pin: pinValue }),
+      const response = await apiClient.post<ApiResponse<{ accessToken: string; hasVoiceRegistered: boolean }>>('/users/login', { 
+        phone, 
+        pin: pinValue 
       });
 
-      const result = await response.json();
+      const result = response.data;
 
-      if (response.ok && result.success) {
+      if (result.success && result.data) {
         useAuthStore.getState().setToken(result.data.accessToken);
         
         if (result.data.hasVoiceRegistered) {
@@ -42,8 +40,13 @@ export default function DevLoginScreen() {
       } else {
         Alert.alert('로그인 실패 🚫', result.message || '인증에 실패했습니다.');
       }
-    } catch (error) {
-      Alert.alert('서버 연결 에러 🔌', `백엔드 서버가 켜져 있는지 확인해주세요!\n(${process.env.EXPO_PUBLIC_API_BASE_URL})`);
+    } catch (error: any) {
+      const message = error.response?.data?.message || '인증에 실패했습니다.';
+      if (error.response?.status && error.response.status !== 500) {
+         Alert.alert('로그인 실패 🚫', message);
+      } else {
+         Alert.alert('서버 연결 에러 🔌', `백엔드 서버가 켜져 있는지 확인해주세요!\n(${process.env.EXPO_PUBLIC_API_BASE_URL})`);
+      }
     }
   };
 

@@ -5,7 +5,8 @@ import { TopBar } from '@/components/layout';
 import VoiceWaveAnimation from '@/components/feedback/VoiceWaveAnimation';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { authHeader } from '@/utils/api';
+import { apiClient, ApiResponse } from '@/utils/api';
+import { useAuthStore } from '@/store/authStore';
 
 type Step = 'TUTORIAL' | 'READY' | 'RECORDING' | 'SUCCESS' | 'FAIL';
 
@@ -42,25 +43,23 @@ export default function DevVoiceRegisterScreen() {
   }, [step, recordCount]);
 
   const handleRegisterVoice = async () => {
-    const headers = authHeader();
-    if (!headers.Authorization) {
+    // apiClient 인터셉터가 토큰을 자동 첨부하지만, 클라이언트 단에서 1차 방어
+    const token = useAuthStore.getState().token;
+    if (!token) {
       Alert.alert('오류', '로그인 토큰을 찾을 수 없습니다.');
       router.back();
       return;
     }
+    
     setLoading(true);
     try {
       const dummyVector = Array(192).fill(0.1);
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL}/voice/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers
-        },
-        body: JSON.stringify({ embedding_vector: dummyVector }),
+      const response = await apiClient.post<ApiResponse>('/voice/register', { 
+        embedding_vector: dummyVector 
       });
-      const result = await response.json();
-      if (response.ok && result.success) {
+      
+      const result = response.data;
+      if (result.success) {
         setStep('SUCCESS');
       } else {
         setStep('FAIL');
