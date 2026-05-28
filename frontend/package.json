@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
-  "start": "dotenv -e ../.env -- expo start",
-  "android": "dotenv -e ../.env -- expo run:android",
-  "ios": "dotenv -e ../.env -- expo run:ios"
+    "start": "dotenv -e ../.env -- expo start",
+    "android": "dotenv -e ../.env -- expo run:android",
+    "ios": "dotenv -e ../.env -- expo run:ios"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "axios": "^1.16.1",
     "expo": "~54.0.0",
     "expo-av": "~16.0.8",

@@ -50,7 +50,7 @@ def seed() -> None:
             disability_type="전맹",
             tts_speed=1.0,
             pin_hash="$2b$12$dummy_hash_for_seed",
-            embedding_vector=[0.1] * 256,
+            embedding_vector=[0.1] * 192,
         )
         db.add(user)
         db.flush()

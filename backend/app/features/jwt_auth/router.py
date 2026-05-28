@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+
 from app.core.database import get_db
 from app.core.jwt_utils import get_current_user_id
-from app.features.jwt_auth.schema import JwtLoginRequest, JwtRefreshRequest
 from app.features.jwt_auth import service
+from app.features.jwt_auth.schema import JwtLoginRequest, JwtRefreshRequest
 
-router = APIRouter(prefix="/jwt-auth", tags=["JWT Auth"])
+router = APIRouter(prefix="/api/users", tags=["Users Auth"])
+
 
 
 @router.post("/login", response_model=dict)

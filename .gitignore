@@ -60,3 +60,7 @@ SCR007_DATA_FLOW.md
 *.dbml
 # Documentation
 develop/
+
+# Media / Keys
+*.wav
+*.pem

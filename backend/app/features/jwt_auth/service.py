@@ -1,12 +1,13 @@
 from sqlalchemy.orm import Session
+
+from app.core.exception import AuthError
 from app.core.jwt_utils import (
     create_access_token,
     create_refresh_token,
     decode_token,
     verify_pin,
 )
-from app.core.exception import AuthError
-from app.features.jwt_auth.schema import JwtTokenResponse, JwtLoginRequest
+from app.features.jwt_auth.schema import JwtLoginRequest, JwtTokenResponse
 from app.models.user import User
 
 
@@ -46,10 +47,16 @@ def login(db: Session, req: JwtLoginRequest) -> JwtTokenResponse:
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
 
+    # DB에 벡터가 등록되어 있는지 확인
+    is_voice_registered = False
+    if user.embedding_vector is not None and len(user.embedding_vector) > 0:
+        is_voice_registered = True
+
     return JwtTokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
         user_id=str(user.user_id),
+        has_voice_registered=is_voice_registered,
     )
 
 

@@ -12,7 +12,7 @@
 # =============================================================================
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -22,8 +22,7 @@ from app.core.database import Base
 
 
 def _now() -> datetime:
-    """timezone-aware 없이 현재 UTC 시각을 반환합니다. (SQLite/PostgreSQL 호환)"""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return (datetime.now(timezone.utc) + timedelta(hours=9)).replace(tzinfo=None)
 
 
 class Event(Base):

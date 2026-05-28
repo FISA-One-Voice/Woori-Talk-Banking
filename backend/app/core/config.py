@@ -101,6 +101,9 @@ class Settings(BaseSettings):
     OPENAI_CHAT_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
 
+    # ASV 서버 주소
+    ASV_SERVER_URL: str = ""
+
     # JWT 인증 설정
     JWT_SECRET_KEY: str = "supersecretkey-change-me-in-production"
     JWT_ALGORITHM: str = "HS256"

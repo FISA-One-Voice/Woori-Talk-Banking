@@ -1,4 +1,3 @@
-# Design Ref: §3.3 — Phase 2 tool 집합 포인트. 이 파일만 수정하면 에이전트에 연결.
 """에이전트 tool 등록 포인트.
 
 Phase 2.5 (Issue #21): USE_MOCK_TOOLS=true (기본값) 이면 MOCK_TOOLS 사용.
