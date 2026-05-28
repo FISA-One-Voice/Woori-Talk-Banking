@@ -27,6 +27,7 @@ from app.shared.agent.tools import ALL_TOOLS
 
 # ── 테스트용 더미 tool ──────────────────────────────────────────────────────────
 
+
 @tool
 def dummy_balance_tool(user_id: str) -> str:
     """테스트용 잔액 조회 tool. 실제 DB 접근 없이 고정 문자열을 반환합니다."""
@@ -34,6 +35,7 @@ def dummy_balance_tool(user_id: str) -> str:
 
 
 # ── build_graph() 초기화 테스트 ────────────────────────────────────────────────
+
 
 class TestBuildGraph:
     """build_graph() 함수 초기화 및 반환 타입 테스트."""
@@ -74,6 +76,7 @@ class TestBuildGraph:
 
 # ── SYSTEM_PROMPT 검증 테스트 ──────────────────────────────────────────────────
 
+
 class TestSystemPrompt:
     """SYSTEM_PROMPT 상수 내용 검증.
 
@@ -109,6 +112,7 @@ class TestSystemPrompt:
 
 
 # ── ALL_TOOLS 초기 상태 테스트 ─────────────────────────────────────────────────
+
 
 class TestAllTools:
     """tools/__init__.py 의 ALL_TOOLS 상태 검증.

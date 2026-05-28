@@ -76,7 +76,9 @@ def seed() -> None:
         )
         db.add_all([account_primary, account_savings])
         db.flush()
-        print(f"  accounts: {account_primary.alias} (is_primary=True), {account_savings.alias}")
+        print(
+            f"  accounts: {account_primary.alias} (is_primary=True), {account_savings.alias}"
+        )
 
         recipient_mom = RegisteredRecipient(
             user_id=user_id,
@@ -94,7 +96,9 @@ def seed() -> None:
         )
         db.add_all([recipient_mom, recipient_company])
         db.flush()
-        print(f"  registered_recipients: '{recipient_mom.alias}', '{recipient_company.alias}'")
+        print(
+            f"  registered_recipients: '{recipient_mom.alias}', '{recipient_company.alias}'"
+        )
 
         standing_order = StandingOrder(
             user_id=user_id,
@@ -175,25 +179,31 @@ def seed() -> None:
         assert len(loaded_user.recipients) == 2
         assert len(loaded_user.transactions) == 2
         assert len(loaded_user.standing_orders) == 1
-        print(f"  user.accounts({len(loaded_user.accounts)}), recipients({len(loaded_user.recipients)}), "
-              f"transactions({len(loaded_user.transactions)}), standing_orders({len(loaded_user.standing_orders)}) ✅")
+        print(
+            f"  user.accounts({len(loaded_user.accounts)}), recipients({len(loaded_user.recipients)}), "
+            f"transactions({len(loaded_user.transactions)}), standing_orders({len(loaded_user.standing_orders)}) ✅"
+        )
 
         loaded_tx = db.query(Transaction).filter_by(tx_id=tx_registered.tx_id).first()
         assert loaded_tx.recipient is not None
         assert loaded_tx.from_account is not None
-        print(f"  transaction.recipient='{loaded_tx.recipient.alias}', from_account='{loaded_tx.from_account.alias}' ✅")
+        print(
+            f"  transaction.recipient='{loaded_tx.recipient.alias}', from_account='{loaded_tx.from_account.alias}' ✅"
+        )
 
         found = (
-            db.query(RegisteredRecipient)
-            .filter_by(user_id=user_id, alias="엄마")
-            .one()
+            db.query(RegisteredRecipient).filter_by(user_id=user_id, alias="엄마").one()
         )
         assert found.recipient_name == "김순자"
-        print(f"  alias 검색 (WHERE user_id=? AND alias='엄마') → {found.recipient_name} ✅")
+        print(
+            f"  alias 검색 (WHERE user_id=? AND alias='엄마') → {found.recipient_name} ✅"
+        )
 
         # ── UPDATE ────────────────────────────────────────────────────────────
         print("\n[UPDATE] 잔액 업데이트 검증...")
-        loaded_account = db.query(Account).filter_by(account_id=account_primary.account_id).first()
+        loaded_account = (
+            db.query(Account).filter_by(account_id=account_primary.account_id).first()
+        )
         loaded_account.balance -= 100_000
         db.commit()
         db.expire(loaded_account)
@@ -202,7 +212,9 @@ def seed() -> None:
 
         # ── DELETE ────────────────────────────────────────────────────────────
         print("\n[DELETE] standing_order 취소 (status=cancelled) 검증...")
-        loaded_so = db.query(StandingOrder).filter_by(order_id=standing_order.order_id).first()
+        loaded_so = (
+            db.query(StandingOrder).filter_by(order_id=standing_order.order_id).first()
+        )
         loaded_so.status = "cancelled"
         db.commit()
         db.expire(loaded_so)
@@ -212,6 +224,7 @@ def seed() -> None:
         # ── UniqueConstraint 검증 ─────────────────────────────────────────────
         print("\n[UniqueConstraint] alias 중복 등록 오류 검증...")
         from sqlalchemy.exc import IntegrityError
+
         try:
             duplicate = RegisteredRecipient(
                 user_id=user_id,

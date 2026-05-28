@@ -27,6 +27,7 @@ MAX_AUDIO_BYTES = 10 * 1024 * 1024
 # CLOVA STT 음성 길이 상한 (60초)
 MAX_AUDIO_DURATION = 60.0
 
+
 async def transcribe_audio(
     audio_bytes: bytes,
     content_type: str = "audio/wav",

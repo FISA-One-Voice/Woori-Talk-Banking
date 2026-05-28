@@ -45,9 +45,7 @@ class User(Base):
     embedding_vector: Mapped[list] = mapped_column(Vector(192), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
 
-    accounts: Mapped[list["Account"]] = relationship(
-        "Account", back_populates="user"
-    )
+    accounts: Mapped[list["Account"]] = relationship("Account", back_populates="user")
     recipients: Mapped[list["RegisteredRecipient"]] = relationship(
         "RegisteredRecipient", back_populates="user"
     )

@@ -78,9 +78,7 @@ def _make_mock_graph(
     graph.get_state.return_value = state_snapshot
 
     # ainvoke() 반환값 설정
-    graph.ainvoke = AsyncMock(
-        return_value=invoke_result or _make_agent_result()
-    )
+    graph.ainvoke = AsyncMock(return_value=invoke_result or _make_agent_result())
 
     # aupdate_state() 반환값 설정
     graph.aupdate_state = AsyncMock(return_value=None)
@@ -145,7 +143,9 @@ class TestNormalFlow:
                 new=AsyncMock(return_value=b"FAKE_MP3"),
             ),
         ):
-            result = await process_voice_pipeline(FAKE_AUDIO, FAKE_USER_ID, db=MagicMock())
+            result = await process_voice_pipeline(
+                FAKE_AUDIO, FAKE_USER_ID, db=MagicMock()
+            )
 
         assert isinstance(result, VoiceResponseData)
         # audio가 비어 있지 않으면 TTS가 실행되어 base64 인코딩된 MP3가 담긴 것
@@ -210,7 +210,9 @@ class TestNormalFlow:
                 new=AsyncMock(return_value=b"MP3"),
             ),
         ):
-            result = await process_voice_pipeline(FAKE_AUDIO, FAKE_USER_ID, db=MagicMock())
+            result = await process_voice_pipeline(
+                FAKE_AUDIO, FAKE_USER_ID, db=MagicMock()
+            )
 
         assert result.navigate_to == "balance"
 
@@ -245,7 +247,9 @@ class TestAsvFlow:
             ),
             patch(
                 "app.shared.voice.service._call_anti_spoofing_ec2",
-                new=AsyncMock(return_value=AntiSpoofResult(is_real=True, confidence=0.99)),
+                new=AsyncMock(
+                    return_value=AntiSpoofResult(is_real=True, confidence=0.99)
+                ),
             ),
             patch(
                 "app.shared.voice.service.synthesize_speech",
@@ -279,7 +283,9 @@ class TestAsvFlow:
             ),
             patch(
                 "app.shared.voice.service._call_anti_spoofing_ec2",
-                new=AsyncMock(return_value=AntiSpoofResult(is_real=True, confidence=0.99)),
+                new=AsyncMock(
+                    return_value=AntiSpoofResult(is_real=True, confidence=0.99)
+                ),
             ),
             patch(
                 "app.shared.voice.service.synthesize_speech",
@@ -312,7 +318,9 @@ class TestAsvFlow:
             ),
             patch(
                 "app.shared.voice.service._call_anti_spoofing_ec2",
-                new=AsyncMock(return_value=AntiSpoofResult(is_real=True, confidence=0.99)),
+                new=AsyncMock(
+                    return_value=AntiSpoofResult(is_real=True, confidence=0.99)
+                ),
             ),
             patch("app.shared.voice.service.synthesize_speech", new=mock_tts),
         ):
@@ -341,7 +349,9 @@ class TestAsvFlow:
             ),
             patch(
                 "app.shared.voice.service._call_anti_spoofing_ec2",
-                new=AsyncMock(return_value=AntiSpoofResult(is_real=True, confidence=0.99)),
+                new=AsyncMock(
+                    return_value=AntiSpoofResult(is_real=True, confidence=0.99)
+                ),
             ),
             patch(
                 "app.shared.voice.service.synthesize_speech",
