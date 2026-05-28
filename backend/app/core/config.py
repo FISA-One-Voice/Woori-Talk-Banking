@@ -107,6 +107,24 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # ── 에이전트 mock tool 설정 (Issue #21) ──────────────────────────────────────
+    # True : MOCK_TOOLS 사용 — Phase 2 화면 담당자 tool 완성 전 개발/테스트용 (기본값)
+    # False: 실제 tool 사용 — 각 화면 담당자의 features/*/tools 완성 후 전환
+    USE_MOCK_TOOLS: bool = True
+
+    # ── ASV 화자 인증 서버 설정 (Issue #7, ai/asv/) ───────────────────────────────
+    # ASV_SERVER_URL: CAM++ 기반 화자 인증 서버 주소 (POST /verify)
+    #   로컬 개발: ai/asv/main.py 실행 시 포트 8000
+    #   프로덕션: EC2 인스턴스 주소 (southgiri/asv:1.0 Docker 이미지)
+    ASV_SERVER_URL: str = "http://localhost:8000"
+
+    # ── Anti-spoofing 서버 설정 (ai/anti-spoofing/ — 미구현) ─────────────────────
+    # ANTI_SPOOFING_EC2_URL: 재생 공격 탐지 서버 주소 (미구현, 추후 활성화)
+    # USE_ANTI_SPOOFING: False이면 anti-spoofing 호출을 바이패스한다 (기본값).
+    #   anti-spoofing 서버 구현 완료 후 .env에 USE_ANTI_SPOOFING=true 설정.
+    ANTI_SPOOFING_EC2_URL: str = "http://localhost:8003"
+    USE_ANTI_SPOOFING: bool = False
+
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
 
 

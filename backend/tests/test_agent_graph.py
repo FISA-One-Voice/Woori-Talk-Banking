@@ -111,15 +111,33 @@ class TestSystemPrompt:
 # ── ALL_TOOLS 초기 상태 테스트 ─────────────────────────────────────────────────
 
 class TestAllTools:
-    """tools/__init__.py 의 ALL_TOOLS 초기 상태 검증."""
+    """tools/__init__.py 의 ALL_TOOLS 상태 검증.
 
-    def test_all_tools_is_empty_list_in_phase1(self) -> None:
-        """TC-09: Phase 1 에서 ALL_TOOLS 는 빈 리스트여야 한다.
+    Phase 2.5 (Issue #21) 업데이트:
+        USE_MOCK_TOOLS=true (기본값) → ALL_TOOLS = MOCK_TOOLS (5개 mock tool)
+        USE_MOCK_TOOLS=false → ALL_TOOLS = [] (Phase 2 실제 tool 대기)
+    """
 
-        Phase 2 tool 등록 전에는 빈 리스트가 정상 상태입니다.
-        Phase 2 에서 tool 이 추가되면 이 테스트는 업데이트 필요합니다.
-        """
+    def test_all_tools_is_list(self) -> None:
+        """TC-09: ALL_TOOLS 는 list 타입이어야 한다."""
         assert isinstance(ALL_TOOLS, list), "ALL_TOOLS 가 list 타입이 아닙니다."
-        assert ALL_TOOLS == [], (
-            f"Phase 1 에서 ALL_TOOLS 는 빈 리스트여야 합니다. (현재: {ALL_TOOLS})"
-        )
+
+    def test_all_tools_state_matches_use_mock_tools_setting(self) -> None:
+        """TC-10: USE_MOCK_TOOLS 설정에 따라 ALL_TOOLS 내용이 올바르게 결정되어야 한다.
+
+        USE_MOCK_TOOLS=true (기본값): ALL_TOOLS == MOCK_TOOLS (5개 mock tool 활성화)
+        USE_MOCK_TOOLS=false:          ALL_TOOLS == [] (Phase 2 실제 tool 대기)
+        """
+        from app.core.config import settings
+        from app.shared.agent.tools import MOCK_TOOLS
+
+        if settings.USE_MOCK_TOOLS:
+            assert ALL_TOOLS == MOCK_TOOLS, (
+                f"USE_MOCK_TOOLS=True 일 때 ALL_TOOLS = MOCK_TOOLS 여야 합니다. "
+                f"현재 ALL_TOOLS 길이: {len(ALL_TOOLS)}, MOCK_TOOLS 길이: {len(MOCK_TOOLS)}"
+            )
+        else:
+            assert ALL_TOOLS == [], (
+                f"USE_MOCK_TOOLS=False 일 때 ALL_TOOLS 는 빈 리스트여야 합니다. "
+                f"(현재: {len(ALL_TOOLS)}개)"
+            )
