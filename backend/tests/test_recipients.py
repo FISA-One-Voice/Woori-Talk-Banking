@@ -16,10 +16,10 @@ import pytest
 from app.core.exception import RecipientError
 from app.features.recipients.schema import ResolvedRecipient
 from app.features.recipients.service import (
+    create_recipient,
     match_by_name,
     resolve_by_id,
     resolve_by_phone,
-    resolve_or_create_by_alias,
 )
 from app.models.account import Account
 from app.models.recipient import RegisteredRecipient
@@ -163,13 +163,13 @@ def test_resolve_by_phone_no_primary_account(db):
         db.commit()
 
 
-# ── resolve_or_create_by_alias ─────────────────────────────────────────────────
+# ── create_recipient ───────────────────────────────────────────────────────────
 
-def test_resolve_or_create_by_alias_creates_new(db, test_user):
-    """존재하지 않는 별칭이면 신규 수취인을 등록하고 반환합니다."""
+def test_create_recipient_success(db, test_user):
+    """수취인을 신규 등록하고 반환합니다."""
     alias = f"친구_{uuid.uuid4().hex[:6]}"
 
-    result = resolve_or_create_by_alias(
+    result = create_recipient(
         db,
         test_user.user_id,
         alias=alias,
@@ -184,31 +184,12 @@ def test_resolve_or_create_by_alias_creates_new(db, test_user):
     assert result.account_number == "110-222-333444"
     assert result.recipient_name == "김철수"
 
-    # DB에 실제로 저장됐는지 확인
     saved = (
         db.query(RegisteredRecipient)
         .filter_by(user_id=test_user.user_id, alias=alias)
         .first()
     )
     assert saved is not None
-
-
-def test_resolve_or_create_by_alias_returns_existing(db, test_user, registered_recipient):
-    """이미 등록된 별칭이면 기존 수취인 정보를 반환합니다."""
-    result = resolve_or_create_by_alias(
-        db,
-        test_user.user_id,
-        alias="엄마",
-        bank_name="다른은행",        # 기존과 다른 값을 넘겨도
-        account_number="999-999-999",
-        recipient_name="다른이름",
-    )
-
-    # 기존 등록 수취인 정보 그대로 반환
-    assert result.recipient_id == registered_recipient.recipient_id
-    assert result.bank_name == "국민은행"
-    assert result.account_number == "123-456-789012"
-    assert result.recipient_name == "홍길동"
 
 
 # ── match_by_name ──────────────────────────────────────────────────────────────

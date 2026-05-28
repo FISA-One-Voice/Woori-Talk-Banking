@@ -7,7 +7,7 @@
     from app.features.recipients.service import (
         resolve_by_id,
         resolve_by_phone,
-        resolve_or_create_by_alias,
+        create_recipient,
         match_by_name,
     )
 """
@@ -126,7 +126,8 @@ def resolve_by_phone(
     )
 
 
-def resolve_or_create_by_alias(
+
+def create_recipient(
     db: Session,
     user_uuid: uuid.UUID,
     alias: str,
@@ -134,42 +135,30 @@ def resolve_or_create_by_alias(
     account_number: str,
     recipient_name: str,
 ) -> ResolvedRecipient:
-    """별칭으로 등록 수취인을 조회하고, 없으면 신규 등록합니다.
+    """수취인을 등록하고 반환합니다.
 
-    자동이체(auto_transfer) 등록 시 사용합니다.
-    동일 사용자 내 alias가 이미 존재하면 기존 수취인 정보를 반환합니다.
     account_number는 AES-256으로 암호화하여 저장합니다.
 
     Args:
         db: 데이터베이스 세션.
         user_uuid: 요청 사용자 UUID.
         alias: 수취인 별칭 (예: "엄마", "회사").
-        bank_name: 수취 은행명 (신규 등록 시 사용).
-        account_number: 수취 계좌번호 평문 (신규 등록 시 암호화 저장).
-        recipient_name: 수취인 실명 (신규 등록 시 사용).
+        bank_name: 수취 은행명.
+        account_number: 수취 계좌번호 평문 (암호화 저장).
+        recipient_name: 수취인 실명.
 
     Returns:
         ResolvedRecipient (account_number는 평문).
     """
-    recipient = (
-        db.query(RegisteredRecipient)
-        .filter(
-            RegisteredRecipient.user_id == user_uuid,
-            RegisteredRecipient.alias == alias,
-        )
-        .first()
+    recipient = RegisteredRecipient(
+        user_id=user_uuid,
+        alias=alias,
+        bank_name=bank_name,
+        account_number=encrypt(account_number),
+        recipient_name=recipient_name,
     )
-
-    if recipient is None:
-        recipient = RegisteredRecipient(
-            user_id=user_uuid,
-            alias=alias,
-            bank_name=bank_name,
-            account_number=encrypt(account_number),
-            recipient_name=recipient_name,
-        )
-        db.add(recipient)
-        db.flush()
+    db.add(recipient)
+    db.flush()
 
     return ResolvedRecipient(
         recipient_id=recipient.recipient_id,
