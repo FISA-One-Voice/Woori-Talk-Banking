@@ -46,13 +46,22 @@ class Base(DeclarativeBase):
 
 
 def get_db():
-    """FastAPI 의존성 주입용 DB 세션 제공 함수.
+    """FastAPI 의존성 주입(Dependency Injection)용 DB 세션 제공 함수.
 
     라우터 함수 매개변수에 "db: Session = Depends(get_db)" 라고 쓰면
     FastAPI 가 요청마다 자동으로 이 함수를 호출해서 세션을 주입해줍니다.
 
     Yields:
-        사용 가능한 DB 세션 객체. 요청 완료 후 finally에서 자동으로 닫힙니다.
+        Session: 사용 가능한 DB 세션 객체
+
+    사용 예시 (router.py):
+        @router.get("/events")
+        def list_events(db: Session = Depends(get_db)):
+            return db.query(Event).all()
+
+    중요: yield 구문은 요청 처리 중에는 세션을 제공하고,
+          요청이 끝나면(성공/실패 모두) finally 블록에서 세션을 닫습니다.
+          세션을 닫지 않으면 DB 연결이 계속 쌓여서 서버가 느려지거나 다운됩니다.
     """
     db = SessionLocal()  # 새 DB 세션 생성
     try:
