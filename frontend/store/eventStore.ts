@@ -17,7 +17,6 @@
 
 import { create } from 'zustand';
 import { apiClient } from '@/utils/api';
-import { useAuthStore } from '@/store/authStore';
 
 export type JoinStatus = 'idle' | 'loading' | 'success' | 'duplicate' | 'error';
 
@@ -48,12 +47,9 @@ export const useEventStore = create<EventState>((set, get) => ({
   joinEvent: async (eventId: string) => {
     set({ joinStatus: 'loading' });
 
-    // authStore 에서 토큰 꺼내기 (컴포넌트 밖이므로 getState() 사용)
-    const { token } = useAuthStore.getState();
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
     try {
-      await apiClient.post(`/events/${eventId}/join`, {}, { headers });
+      // 인터셉터가 authStore 토큰을 자동으로 헤더에 첨부합니다.
+      await apiClient.post(`/api/events/${eventId}/join`, {});
 
       set((state) => ({
         joinStatus: 'success',

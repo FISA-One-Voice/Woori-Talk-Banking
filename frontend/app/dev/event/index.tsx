@@ -113,7 +113,7 @@ export default function EventListScreen() {
 
   useEffect(() => {
     apiClient
-      .get<ApiResponse<{ events: EventItem[]; total: number }>>('/events')
+      .get<ApiResponse<{ events: EventItem[]; total: number }>>('/api/events')
       .then((res) => {
         const list =
           res.data.success && res.data.data ? res.data.data.events : [];

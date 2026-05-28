@@ -21,7 +21,7 @@ from app.core.database import get_db
 from app.core.jwt_utils import get_current_user_id, get_optional_user_id
 from app.features.event import service
 
-router = APIRouter(prefix="/events", tags=["Events"])
+router = APIRouter(prefix="/api/events", tags=["Events"])
 
 
 @router.get("", response_model=dict)

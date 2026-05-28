@@ -170,7 +170,7 @@ class TestListEvents:
 
     def test_list_events_success(self, client: TestClient, active_event: Event):
         """활성 이벤트가 목록에 포함됩니다."""
-        res = client.get("/events")
+        res = client.get("/api/events")
 
         assert res.status_code == 200
 
@@ -191,7 +191,7 @@ class TestListEvents:
         self, client: TestClient, inactive_event: Event
     ):
         """비활성(is_active=False) 이벤트는 목록에 나오지 않습니다."""
-        res = client.get("/events")
+        res = client.get("/api/events")
 
         assert res.status_code == 200
 
@@ -200,7 +200,7 @@ class TestListEvents:
 
     def test_list_includes_banner_url(self, client: TestClient, active_event: Event):
         """이벤트 목록에 banner_image_url 필드가 포함됩니다."""
-        res = client.get("/events")
+        res = client.get("/api/events")
 
         events = res.json()["data"]["events"]
         target = next(e for e in events if e["event_id"] == str(active_event.event_id))
@@ -214,7 +214,7 @@ class TestExpiredEvent:
 
     def test_expired_event_not_in_list(self, client: TestClient, expired_event: Event):
         """만료된 이벤트는 목록에 나오지 않습니다."""
-        res = client.get("/events")
+        res = client.get("/api/events")
 
         assert res.status_code == 200
         ids = [e["event_id"] for e in res.json()["data"]["events"]]
@@ -224,7 +224,7 @@ class TestExpiredEvent:
         self, client: TestClient, expired_event: Event
     ):
         """만료된 이벤트 ID로 상세 조회하면 404가 반환됩니다."""
-        res = client.get(f"/events/{expired_event.event_id}")
+        res = client.get(f"/api/events/{expired_event.event_id}")
 
         assert res.status_code == 404
         assert res.json()["code"] == "EVENT_NOT_FOUND"
@@ -234,7 +234,7 @@ class TestExpiredEvent:
     ):
         """만료된 이벤트에 참여 시도하면 404가 반환됩니다."""
         res = client.post(
-            f"/events/{expired_event.event_id}/join",
+            f"/api/events/{expired_event.event_id}/join",
             headers=auth_headers,
         )
 
@@ -247,7 +247,7 @@ class TestGetEventDetail:
 
     def test_get_event_detail_success(self, client: TestClient, active_event: Event):
         """존재하는 이벤트 ID로 상세 조회하면 200이 반환됩니다."""
-        res = client.get(f"/events/{active_event.event_id}")
+        res = client.get(f"/api/events/{active_event.event_id}")
 
         assert res.status_code == 200
 
@@ -261,7 +261,7 @@ class TestGetEventDetail:
 
     def test_get_event_not_found(self, client: TestClient):
         """존재하지 않는 event_id → 404, EVENT_NOT_FOUND."""
-        res = client.get("/events/non-existent-uuid-1234")
+        res = client.get("/api/events/non-existent-uuid-1234")
 
         assert res.status_code == 404
 
@@ -273,7 +273,7 @@ class TestGetEventDetail:
         self, client: TestClient, inactive_event: Event
     ):
         """비활성 이벤트 ID로 조회하면 404가 반환됩니다."""
-        res = client.get(f"/events/{inactive_event.event_id}")
+        res = client.get(f"/api/events/{inactive_event.event_id}")
 
         assert res.status_code == 404
         assert res.json()["code"] == "EVENT_NOT_FOUND"
@@ -287,7 +287,7 @@ class TestJoinEvent:
     ):
         """로그인 사용자가 이벤트에 참여하면 participation_id가 반환됩니다."""
         res = client.post(
-            f"/events/{active_event.event_id}/join",
+            f"/api/events/{active_event.event_id}/join",
             headers=auth_headers,
         )
 
@@ -304,13 +304,13 @@ class TestJoinEvent:
         """같은 이벤트에 두 번 참여하면 409, ALREADY_PARTICIPATED."""
         # 첫 번째 참여
         client.post(
-            f"/events/{active_event.event_id}/join",
+            f"/api/events/{active_event.event_id}/join",
             headers=auth_headers,
         )
 
         # 두 번째 참여 시도
         res = client.post(
-            f"/events/{active_event.event_id}/join",
+            f"/api/events/{active_event.event_id}/join",
             headers=auth_headers,
         )
 
@@ -319,7 +319,7 @@ class TestJoinEvent:
 
     def test_participate_without_auth(self, client: TestClient, active_event: Event):
         """로그인 없이 참여 시도하면 401이 반환됩니다."""
-        res = client.post(f"/events/{active_event.event_id}/join")
+        res = client.post(f"/api/events/{active_event.event_id}/join")
 
         assert res.status_code == 401
 
@@ -328,7 +328,7 @@ class TestJoinEvent:
     ):
         """존재하지 않는 이벤트에 참여 시도하면 404가 반환됩니다."""
         res = client.post(
-            "/events/non-existent-uuid-9999/join",
+            "/api/events/non-existent-uuid-9999/join",
             headers=auth_headers,
         )
 

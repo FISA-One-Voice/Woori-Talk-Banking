@@ -13,7 +13,9 @@
 # =============================================================================
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+KST = timezone(timedelta(hours=9))
 
 from sqlalchemy.orm import Session
 
@@ -57,7 +59,7 @@ def get_active_events(db: Session) -> EventListResponse:
     Returns:
         EventListResponse: 이벤트 목록과 전체 개수.
     """
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(KST).replace(tzinfo=None)
     events = (
         db.query(Event)
         .filter(Event.is_active == True, Event.end_at >= now)  # noqa: E712
@@ -86,7 +88,7 @@ def get_event_detail(db: Session, event_id: str, user_id: str | None = None) -> 
         EventNotFoundError: event_id 형식이 UUID가 아니거나 이벤트가 없는 경우.
     """
     _validate_event_id(event_id)
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(KST).replace(tzinfo=None)
     event = (
         db.query(Event)
         .filter(
@@ -136,7 +138,7 @@ def participate_event(db: Session, event_id: str, user_id: str) -> dict:
         AlreadyParticipatedError: 이미 참여한 경우.
     """
     _validate_event_id(event_id)
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(KST).replace(tzinfo=None)
     # 이벤트 존재 여부 확인
     event = (
         db.query(Event)

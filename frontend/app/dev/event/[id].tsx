@@ -26,7 +26,6 @@ import { apiClient, type ApiResponse } from '@/utils/api';
 import { useScreenAnnounce } from '@/hooks/useScreenAnnounce';
 import { useMic } from '@/context/MicContext';
 import { useEventStore } from '@/store/eventStore';
-import { useAuthStore } from '@/store/authStore';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -301,7 +300,6 @@ export default function EventDetailScreen() {
 
   // Zustand 스토어
   const { joinedIds, joinStatus, joinEvent, resetJoinStatus } = useEventStore();
-  const token = useAuthStore((state) => state.token);
 
   // DB 기준 참여 여부 (이벤트 로딩 시 백엔드에서 받아옴)
   const [dbParticipated, setDbParticipated] = useState(false);
@@ -326,10 +324,9 @@ export default function EventDetailScreen() {
 
   async function fetchEventDetail(): Promise<void> {
     try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      // 인터셉터가 authStore 토큰을 자동으로 헤더에 첨부합니다.
       const res = await apiClient.get<ApiResponse<EventDetail & { has_participated: boolean }>>(
-        `/events/${id}`,
-        { headers },
+        `/api/events/${id}`,
       );
       if (res.data.success && res.data.data) {
         setEvent(res.data.data);

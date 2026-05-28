@@ -19,10 +19,10 @@ from app.features.event.service import get_active_events
 
 
 @tool
-def get_event_list(user_id: str) -> str:
-    """현재 진행 중인 이벤트 목록을 안내합니다.
+def get_event_list(user_id: str) -> str:  # noqa: D401
+    """이벤트 목록 조회를 요청할 때 호출합니다.
 
-    사용자가 이벤트를 물어볼 때 호출합니다.
+    이 docstring은 LLM이 직접 읽습니다.
     트리거 발화 예시:
       - "이벤트 뭐 있어?"
       - "이벤트 알려줘"
@@ -31,11 +31,16 @@ def get_event_list(user_id: str) -> str:
 
     Args:
         user_id: JWT에서 추출한 사용자 ID. voice/router.py 가 주입합니다.
-                 이벤트 목록 조회는 인증 없이 가능하지만, 표준 패턴을 따릅니다.
+                 이 파라미터는 모든 tool에 포함되어야 합니다 (인증 검증용).
 
     Returns:
         TTS로 읽힐 자연어 문자열.
+        반드시 마크다운 없이, 숫자는 한국어로 작성하십시오.
         예: "현재 진행 중인 이벤트는 두 개입니다. 첫 번째, 봄맞이 이벤트. 두 번째, 신규 가입 혜택."
+
+    Raises:
+        EventNotFoundError: 이벤트 조회 중 오류가 발생한 경우.
+        (AppError 서브클래스만 raise — main.py 핸들러가 처리)
     """
     db: Session = next(get_db())
     try:
@@ -46,9 +51,7 @@ def get_event_list(user_id: str) -> str:
             return "현재 진행 중인 이벤트가 없습니다."
 
         count = len(events)
-        # 숫자를 한국어로 변환 (간단한 버전)
         count_kor = _to_korean_count(count)
-
         titles = [f"{_ordinal(i + 1)}, {e.title}" for i, e in enumerate(events)]
         titles_str = ". ".join(titles)
 

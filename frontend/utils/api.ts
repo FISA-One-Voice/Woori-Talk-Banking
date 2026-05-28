@@ -18,6 +18,7 @@
 // =============================================================================
 
 import axios from 'axios';
+import { useAuthStore } from '@/store/authStore';
 
 // EXPO_PUBLIC_API_BASE_URL 이 없으면 경고를 출력하고 localhost 를 사용합니다.
 // Expo Go(모바일)에서는 localhost 가 동작하지 않으므로 반드시 .env 를 설정하세요.
@@ -38,12 +39,13 @@ export const apiClient = axios.create({
   },
 });
 
-// TODO: 로그인 기능 연동 시 토큰 인터셉터 추가
-// apiClient.interceptors.request.use(async (config) => {
-//   const token = await SecureStore.getItemAsync('access_token');
-//   if (token) config.headers.Authorization = `Bearer ${token}`;
-//   return config;
-// });
+// 요청 인터셉터: 모든 API 요청에 authStore 토큰 자동 첨부
+// 각 스토어/화면에서 토큰을 직접 꺼내 헤더에 넣을 필요 없습니다.
+apiClient.interceptors.request.use((config) => {
+  const token = useAuthStore.getState().token;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
 /** 백엔드 표준 API 응답 형식 */
 export interface ApiResponse<T> {
