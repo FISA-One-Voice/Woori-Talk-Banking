@@ -32,11 +32,7 @@ from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 — Base.metadata에 모든 테이블 등록
 from app.core.database import Base, SessionLocal, engine
-from app.core.jwt_utils import get_current_user_id
 from app.main import app
-
-# 테스트용 더미 user_id — jwt_utils.py 공용 코드 건드리지 않고 테스트 시에만 인증 우회
-_TEST_USER_ID = "10502102-43bf-4909-b3a3-fac3a2585e56"
 
 
 # ── DB 세션 ────────────────────────────────────────────────────────────────────
@@ -53,7 +49,7 @@ def db() -> Generator[Session, None, None]:
     try:
         yield session
     finally:
-        session.close()
+        session.close() 
 
 
 # ── TestClient ─────────────────────────────────────────────────────────────────
@@ -62,8 +58,6 @@ def db() -> Generator[Session, None, None]:
 # scope="session": 전체 pytest 실행 중 한 번만 생성합니다.
 @pytest.fixture(scope="session")
 def client() -> Generator[TestClient, None, None]:
-    """테스트용 FastAPI 클라이언트. 테스트 시에만 인증을 더미 user_id로 오버라이드합니다."""
-    app.dependency_overrides[get_current_user_id] = lambda: _TEST_USER_ID
+    """테스트용 FastAPI 클라이언트. 세션 전체에서 공유됩니다."""
     with TestClient(app) as c:
         yield c
-    app.dependency_overrides.clear()
