@@ -17,33 +17,9 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.core.exception import EventError
+from app.core.exception import EventNotFoundError, AlreadyParticipatedError
 from app.models.event import Event, EventParticipation
 from app.features.event.schema import EventListResponse, EventResponse
-
-
-# ── 예외 클래스 정의 ─────────────────────────────────────────────────────────
-# EventError(AppError)를 상속합니다. (스타일 가이드 §8.1 Level-1 패턴)
-# main.py의 app_error_handler가 AppError 체인으로 자동 처리합니다.
-
-class EventNotFoundError(EventError):
-    """이벤트를 찾을 수 없을 때 발생합니다."""
-    def __init__(self) -> None:
-        super().__init__(
-            status_code=404,
-            code="EVENT_NOT_FOUND",
-            message="이벤트를 찾을 수 없습니다.",
-        )
-
-
-class AlreadyParticipatedException(EventError):
-    """이미 참여한 이벤트에 다시 참여할 때 발생합니다."""
-    def __init__(self) -> None:
-        super().__init__(
-            status_code=409,
-            code="ALREADY_PARTICIPATED",
-            message="이미 참여한 이벤트입니다.",
-        )
 
 
 # ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
@@ -60,7 +36,11 @@ def _validate_event_id(event_id: str) -> None:
     try:
         uuid.UUID(event_id)
     except ValueError:
-        raise EventNotFoundError()
+        raise EventNotFoundError(
+            code="EVENT_NOT_FOUND",
+            message="이벤트를 찾을 수 없습니다.",
+            status_code=404,
+        )
 
 
 # ── 서비스 함수 ───────────────────────────────────────────────────────────────
@@ -118,7 +98,11 @@ def get_event_detail(db: Session, event_id: str, user_id: str | None = None) -> 
     )
 
     if not event:
-        raise EventNotFoundError()
+        raise EventNotFoundError(
+            code="EVENT_NOT_FOUND",
+            message="이벤트를 찾을 수 없습니다.",
+            status_code=404,
+        )
 
     # 로그인 사용자의 참여 여부 확인
     has_participated = False
@@ -149,7 +133,7 @@ def participate_event(db: Session, event_id: str, user_id: str) -> dict:
 
     Raises:
         EventNotFoundError: event_id 형식이 UUID가 아니거나 이벤트가 없는 경우.
-        AlreadyParticipatedException: 이미 참여한 경우.
+        AlreadyParticipatedError: 이미 참여한 경우.
     """
     _validate_event_id(event_id)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -164,7 +148,11 @@ def participate_event(db: Session, event_id: str, user_id: str) -> dict:
         .first()
     )
     if not event:
-        raise EventNotFoundError()
+        raise EventNotFoundError(
+            code="EVENT_NOT_FOUND",
+            message="이벤트를 찾을 수 없습니다.",
+            status_code=404,
+        )
 
     # 중복 참여 확인
     existing = (
@@ -176,7 +164,11 @@ def participate_event(db: Session, event_id: str, user_id: str) -> dict:
         .first()
     )
     if existing:
-        raise AlreadyParticipatedException()
+        raise AlreadyParticipatedError(
+            code="ALREADY_PARTICIPATED",
+            message="이미 참여한 이벤트입니다.",
+            status_code=409,
+        )
 
     # 참여 기록 생성
     participation = EventParticipation(event_id=event_id, user_id=user_id)

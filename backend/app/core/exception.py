@@ -42,6 +42,18 @@ class EventError(AppError):
     pass
 
 
+class EventNotFoundError(EventError):
+    """이벤트를 찾을 수 없을 때 발생합니다."""
+
+    pass
+
+
+class AlreadyParticipatedError(EventError):
+    """이미 참여한 이벤트에 다시 참여할 때 발생합니다."""
+
+    pass
+
+
 class AgentError(AppError):
     """LangGraph 에이전트 초기화·실행 중 발생하는 예외.
 

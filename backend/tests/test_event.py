@@ -59,7 +59,12 @@ def _make_event(
     )
     db.add(event)
     db.commit()
-    db.refresh(event)
+    # NullPool 환경에서 commit 후 refresh 실패 시 세션 롤백 후 재조회
+    try:
+        db.refresh(event)
+    except Exception:
+        db.rollback()
+        event = db.query(Event).filter(Event.title == title).first()
     return event
 
 
