@@ -14,8 +14,7 @@
 // error      → 오류
 //
 // [Zustand 스토어]
-// useAuthStore  → DEV 토큰 입력 및 API 헤더 자동 첨부
-// useEventStore → 참여 요청 + 참여 완료 ID 목록 관리
+// useEventStore → 참여 요청 + 참여 완료 ID 목록 관리 (토큰은 api.ts 인터셉터가 자동 첨부)
 // =============================================================================
 
 import { ActionButton } from '@/components/display';
@@ -342,7 +341,7 @@ export default function EventDetailScreen() {
 
   function handleConfirmParticipate(): void {
     if (!event) return;
-    joinEvent(event.event_id);  // eventStore 가 토큰 포함해서 API 호출
+    joinEvent(event.event_id);  // 인터셉터가 authStore 토큰을 자동으로 첨부합니다.
   }
 
   function handleCloseModal(): void {

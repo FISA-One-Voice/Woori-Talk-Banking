@@ -10,7 +10,7 @@
 # 1. 이벤트 목록 조회       → 200, events 배열 + total 반환
 # 2. 비활성 이벤트 미노출   → is_active=False 이벤트는 목록에 없음
 # 3. 이벤트 상세 조회       → 200, event_id + banner_image_url 포함
-# 4. 없는 이벤트 조회       → 404, EVENT_NOT_FOUND
+# 4. 없는 이벤트 조회       → 404, INVALID_EVENT_ID (UUID 형식 오류) / EVENT_NOT_FOUND (DB에 없음)
 # 5. 이벤트 참여            → 200, participation_id 반환
 # 6. 중복 참여              → 409, ALREADY_PARTICIPATED
 # 7. 로그인 없이 참여 시도  → 401, 인증 오류
@@ -23,11 +23,11 @@
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-
-KST = timezone(timedelta(hours=9))
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+
+KST = timezone(timedelta(hours=9))
 
 from app.core.database import SessionLocal
 from app.core.jwt_utils import create_access_token
@@ -262,14 +262,14 @@ class TestGetEventDetail:
         assert "banner_image_url" in data
 
     def test_get_event_not_found(self, client: TestClient):
-        """존재하지 않는 event_id → 404, EVENT_NOT_FOUND."""
+        """UUID 형식이 아닌 event_id → 404, INVALID_EVENT_ID."""
         res = client.get("/api/events/non-existent-uuid-1234")
 
         assert res.status_code == 404
 
         body = res.json()
         assert body["success"] is False
-        assert body["code"] == "EVENT_NOT_FOUND"
+        assert body["code"] == "INVALID_EVENT_ID"
 
     def test_get_inactive_event_returns_404(
         self, client: TestClient, inactive_event: Event
@@ -328,11 +328,11 @@ class TestJoinEvent:
     def test_participate_nonexistent_event(
         self, client: TestClient, auth_headers: dict
     ):
-        """존재하지 않는 이벤트에 참여 시도하면 404가 반환됩니다."""
+        """UUID 형식이 아닌 이벤트 ID로 참여 시도하면 404, INVALID_EVENT_ID."""
         res = client.post(
             "/api/events/non-existent-uuid-9999/join",
             headers=auth_headers,
         )
 
         assert res.status_code == 404
-        assert res.json()["code"] == "EVENT_NOT_FOUND"
+        assert res.json()["code"] == "INVALID_EVENT_ID"

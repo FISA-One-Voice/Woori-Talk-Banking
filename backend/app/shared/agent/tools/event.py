@@ -22,7 +22,6 @@ from app.features.event.service import get_active_events
 def get_event_list(user_id: str) -> str:  # noqa: D401
     """이벤트 목록 조회를 요청할 때 호출합니다.
 
-    이 docstring은 LLM이 직접 읽습니다.
     트리거 발화 예시:
       - "이벤트 뭐 있어?"
       - "이벤트 알려줘"

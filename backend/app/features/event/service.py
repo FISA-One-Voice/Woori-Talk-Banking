@@ -15,9 +15,9 @@
 import uuid
 from datetime import datetime, timezone, timedelta
 
-KST = timezone(timedelta(hours=9))
-
 from sqlalchemy.orm import Session
+
+KST = timezone(timedelta(hours=9))
 
 from app.core.exception import EventNotFoundError, AlreadyParticipatedError
 from app.models.event import Event, EventParticipation
@@ -39,8 +39,8 @@ def _validate_event_id(event_id: str) -> None:
         uuid.UUID(event_id)
     except ValueError:
         raise EventNotFoundError(
-            code="EVENT_NOT_FOUND",
-            message="이벤트를 찾을 수 없습니다.",
+            code="INVALID_EVENT_ID",
+            message="유효하지 않은 이벤트 ID 형식입니다.",
             status_code=404,
         )
 

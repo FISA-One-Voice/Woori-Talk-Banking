@@ -5,9 +5,9 @@
 # HTTP 요청을 받아서 service 함수를 호출하고 표준 응답을 반환합니다.
 #
 # [API 목록]
-# GET  /events              → 활성 이벤트 목록 조회 (로그인 불필요)
-# GET  /events/{event_id}   → 이벤트 상세 조회 (로그인 불필요)
-# POST /events/{event_id}/participate → 이벤트 참여 (로그인 필요)
+# GET  /api/events                    → 활성 이벤트 목록 조회 (로그인 불필요)
+# GET  /api/events/{event_id}         → 이벤트 상세 조회 (로그인 불필요)
+# POST /api/events/{event_id}/join    → 이벤트 참여 (로그인 필요)
 #
 # [Swagger 문서]
 # 서버 실행 후 http://localhost:8000/docs 에서 직접 테스트 가능합니다.
