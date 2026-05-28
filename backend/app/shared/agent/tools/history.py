@@ -35,7 +35,9 @@ def get_recent_history(user_id: str, days: int = 7) -> str:  # noqa: D401
     try:
         transactions = get_transaction_history(db, user_id, days=days)
         total = sum(t.amount for t in transactions)
-        return f"최근 {days}일간 거래 내역은 총 {len(transactions)}건, {total:,}원입니다."
+        return (
+            f"최근 {days}일간 거래 내역은 총 {len(transactions)}건, {total:,}원입니다."
+        )
     finally:
         db.close()
 
@@ -63,6 +65,8 @@ def get_category_history(user_id: str, category: str, days: int = 30) -> str:  #
             db, user_id, days=days, category=category
         )
         total = sum(t.amount for t in transactions)
-        return f"{days}일간 {category} 지출은 총 {len(transactions)}건, {total:,}원입니다."
+        return (
+            f"{days}일간 {category} 지출은 총 {len(transactions)}건, {total:,}원입니다."
+        )
     finally:
         db.close()

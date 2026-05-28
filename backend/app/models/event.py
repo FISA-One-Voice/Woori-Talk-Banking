@@ -59,9 +59,7 @@ class Event(Base):
     end_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     # 이 레코드가 DB 에 추가된 시각 (삽입 시 자동으로 현재 시각이 기록됩니다)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=_now, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
 
     # 관계(Relationship): 이 이벤트에 연결된 참여 기록 목록
     # 실제 DB 컬럼은 아니고, SQLAlchemy 가 JOIN 쿼리를 대신 처리해주는 편의 속성입니다.

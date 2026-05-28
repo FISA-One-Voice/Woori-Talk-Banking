@@ -32,6 +32,7 @@ from langchain_core.tools import tool  # @tool 데코레이터 — LangChain 표
 
 # ── @tool 데코레이터 기본 패턴 ─────────────────────────────────────────────────
 
+
 @tool
 def sample_get_balance(user_id: str) -> str:  # noqa: D401
     """사용자의 대표 계좌 잔액을 조회합니다.
