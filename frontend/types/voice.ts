@@ -34,6 +34,12 @@ export interface VoiceResponseData {
    * transfer, auto_transfer 확인 후에만 true로 설정됨.
    */
   awaiting_asv_audio: boolean;
+
+  /**
+   * STT 변환 결과 텍스트 (사용자가 말한 내용).
+   * 정상 흐름에서만 채워지며 ASV 인증 흐름에서는 null.
+   */
+  transcript: string | null;
 }
 
 /**

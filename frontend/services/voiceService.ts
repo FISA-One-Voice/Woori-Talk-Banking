@@ -28,5 +28,9 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
     throw new Error(data.code ?? 'VOICE_PROCESSING_ERROR');
   }
 
+  if (__DEV__) {
+    console.log('[STT]', data.data.transcript ?? '(인식 결과 없음)');
+  }
+
   return data.data;
 }

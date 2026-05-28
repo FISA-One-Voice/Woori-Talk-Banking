@@ -149,6 +149,7 @@ async def _handle_normal_flow(
         collected_slots=result.get("collected_slots") or {},
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=result.get("awaiting_asv_audio", False),
+        transcript=transcript,
     )
 
 
@@ -268,6 +269,7 @@ async def _handle_asv_flow(
         collected_slots={},
         awaiting_confirmation=False,
         awaiting_asv_audio=awaiting_asv_next,
+        transcript=None,
     )
 
 
@@ -319,6 +321,7 @@ async def _proceed_after_asv_success(
         collected_slots=result.get("collected_slots") or {},
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=False,
+        transcript=None,
     )
 
 

@@ -95,3 +95,6 @@ class VoiceResponseData(BaseModel):
 
     awaiting_asv_audio: bool = False
     """True이면 다음 입력이 ASV 음성 인증용. ASV_REQUIRED_ACTIONS에서만 True."""
+
+    transcript: str | None = None
+    """STT 변환 결과 텍스트. 정상 흐름에서만 채워지며 ASV 인증 흐름에서는 None."""
