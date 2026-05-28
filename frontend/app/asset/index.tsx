@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -10,9 +11,17 @@ import {
 import { useRouter } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { getTtsMessage } from '@/utils/errorHandler';
+import { apiClient, ApiResponse } from '@/utils/api';
+import { useAuthStore } from '@/store/authStore';
 
-declare const process: { env: { EXPO_PUBLIC_API_BASE_URL?: string } };
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+interface AccountItem {
+  account_id: string;
+  bank_name: string;
+  account_type: string;
+  alias: string | null;
+  balance: number;
+  is_primary: boolean;
+}
 
 function formatAmount(amount: number): string {
   if (amount >= 100000000) {
@@ -29,19 +38,25 @@ function formatAmount(amount: number): string {
 export default function AssetScreen() {
   const router = useRouter();
   const [isListening, setIsListening] = useState(false);
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [totalAsset, setTotalAsset] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/asset/summary`)
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success) {
-          setAccounts(json.data.accounts);
-          setTotalAsset(json.data.total_asset);
+    const token = useAuthStore.getState().token;
+    if (!token) {
+      Alert.alert('로그인 필요', getTtsMessage('UNAUTHORIZED'));
+      router.push('/login');
+      return;
+    }
+
+    apiClient.get<ApiResponse<{ accounts: AccountItem[]; total_asset: number }>>('/api/asset/summary')
+      .then((res) => {
+        if (res.data.success && res.data.data) {
+          setAccounts(res.data.data.accounts);
+          setTotalAsset(res.data.data.total_asset);
         } else {
-          console.warn('[asset/summary]', getTtsMessage(json.code));
+          console.warn('[asset/summary]', getTtsMessage(res.data.code));
         }
       })
       .catch(() => console.warn('[asset/summary]', getTtsMessage('NETWORK_ERROR')))

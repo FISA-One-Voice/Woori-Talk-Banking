@@ -32,12 +32,17 @@ def get_asset_summary(
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ) -> dict:
-    """
-    전체 계좌 목록과 총 자산을 조회합니다.
+    """전체 계좌 목록과 총 자산을 조회합니다.
 
-    GET /api/asset/summary
-    성공: {"success": true, "data": {"total_asset": int, "accounts": [...]}}
-    실패: {"success": false, "code": "ACCOUNT_NOT_FOUND"}
+    Args:
+        db: 데이터베이스 세션.
+        user_id: JWT에서 추출한 인증 사용자 ID.
+
+    Returns:
+        total_asset(int)과 accounts 목록을 포함한 성공 응답 dict.
+
+    Raises:
+        AccountError: 조회할 계좌가 없는 경우 (ACCOUNT_NOT_FOUND).
     """
     accounts = service.get_asset_summary(db, user_id)
     total_asset = sum(a.balance for a in accounts)
@@ -70,12 +75,18 @@ def get_account_balance(
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ) -> dict:
-    """
-    특정 계좌의 잔액을 조회합니다.
+    """특정 계좌의 잔액을 조회합니다.
 
-    GET /api/asset/balance/{account_id}
-    성공: {"success": true, "data": {...}}
-    실패: {"success": false, "code": "ACCOUNT_NOT_FOUND"}
+    Args:
+        account_id: 조회할 계좌 ID.
+        db: 데이터베이스 세션.
+        user_id: JWT에서 추출한 인증 사용자 ID.
+
+    Returns:
+        계좌 잔액 정보를 포함한 성공 응답 dict.
+
+    Raises:
+        AccountError: 해당 계좌를 찾을 수 없는 경우 (ACCOUNT_NOT_FOUND).
     """
     account = service.get_account_balance(db, user_id, account_id)
 
@@ -103,14 +114,20 @@ def get_transaction_history(
     days: int | None = None,
     category: str | None = None,
 ) -> dict:
-    """
-    거래 내역을 조회합니다. 필터: account_id, days, category.
+    """거래 내역을 조회합니다.
 
-    GET /api/asset/history?days=7&category=식비
-    성공: {"success": true, "data": {"transactions": [...], "total_count": int}}
-    실패: {"success": false, "code": "TX_NOT_FOUND"}
+    Args:
+        db: 데이터베이스 세션.
+        user_id: JWT에서 추출한 인증 사용자 ID.
+        account_id: 특정 계좌로 필터링. None이면 전체 계좌 조회.
+        days: 조회 기간(일수). None이면 전체 기간 조회.
+        category: 거래 카테고리로 필터링. None이면 전체 카테고리 조회.
 
-    프론트엔드는 code 값으로 분기해야 합니다. message 로 분기하면 안 됩니다.
+    Returns:
+        transactions 목록과 total_count를 포함한 성공 응답 dict.
+
+    Raises:
+        AccountError: 거래 내역을 찾을 수 없는 경우 (TX_NOT_FOUND).
     """
     transactions = service.get_transaction_history(
         db, user_id, account_id, days, category

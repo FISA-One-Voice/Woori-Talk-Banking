@@ -18,8 +18,8 @@ def login(db: Session, req: JwtLoginRequest) -> JwtTokenResponse:
         발급된 JWT 토큰 정보(accessToken, refreshToken, userId)를 포함한 응답 객체.
 
     Raises:
-        HTTPException: 가입되지 않은 전화번호인 경우(USER_NOT_FOUND).
-        HTTPException: PIN 번호가 틀린 경우(INVALID_PIN).
+        AuthError: 가입되지 않은 전화번호인 경우 (USER_NOT_FOUND).
+        AuthError: PIN 번호가 틀린 경우 (UNAUTHORIZED).
     """
     user = db.query(User).filter(User.phone == req.phone).first()
     if not user:
@@ -58,7 +58,7 @@ def refresh_tokens(refresh_token_str: str) -> JwtTokenResponse:
         새로 발급된 Access Token과 기존 Refresh Token을 포함한 응답 객체.
 
     Raises:
-        HTTPException: 토큰이 유효하지 않거나 만료된 경우(TOKEN_INVALID).
+        AuthError: 토큰이 유효하지 않거나 만료된 경우 (TOKEN_INVALID).
     """
     payload = decode_token(refresh_token_str)
     if not payload or "sub" not in payload:

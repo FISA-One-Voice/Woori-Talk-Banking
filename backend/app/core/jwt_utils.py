@@ -68,7 +68,14 @@ def create_refresh_token(data: dict) -> str:
 
 
 def decode_token(token: str) -> dict | None:
-    """토큰을 디코딩하고 검증합니다. 만료되었거나 유효하지 않으면 None을 반환합니다."""
+    """JWT 토큰을 디코딩하고 서명을 검증합니다.
+
+    Args:
+        token: 검증할 JWT 문자열.
+
+    Returns:
+        유효한 토큰이면 payload dict, 만료되었거나 유효하지 않으면 None.
+    """
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         return payload
@@ -79,10 +86,18 @@ def decode_token(token: str) -> dict | None:
 
 
 def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
-    """
-    [FastAPI 의존성 주입]
-    요청 헤더의 Bearer 토큰을 검증하고, 유효한 경우 user_id(sub)를 반환합니다.
-    API 라우터에서 매개변수로 "Depends(get_current_user_id)" 와 같이 사용합니다.
+    """요청 헤더의 Bearer 토큰을 검증하고 user_id를 반환합니다.
+
+    FastAPI 의존성 주입용 함수. 라우터에서 Depends(get_current_user_id)로 사용합니다.
+
+    Args:
+        credentials: FastAPI HTTPBearer가 추출한 Bearer 토큰 정보.
+
+    Returns:
+        토큰 payload의 sub 필드값 (user_id 문자열).
+
+    Raises:
+        AuthError: 토큰이 위변조되었거나 유효하지 않은 경우 (TOKEN_INVALID).
     """
     token = credentials.credentials
     payload = decode_token(token)

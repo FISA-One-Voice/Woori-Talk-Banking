@@ -95,6 +95,7 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
+    """AppError 및 모든 서브클래스를 표준 ApiResponse 형식으로 변환합니다."""
     return JSONResponse(
         status_code=exc.status_code,
         content={

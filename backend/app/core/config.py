@@ -21,8 +21,7 @@ _ENV_FILE = str(Path(__file__).resolve().parents[3] / ".env")
 
 
 class Settings(BaseSettings):
-    """
-    앱 설정 클래스.
+    """앱 설정 클래스.
 
     BaseSettings 가 .env 파일과 os.environ 을 자동으로 읽어
     각 필드에 타입 변환 후 매핑합니다.
