@@ -22,7 +22,7 @@ export default function DevLoginScreen() {
 
   const handleLogin = async (pinValue: string) => {
     try {
-      const response = await apiClient.post<ApiResponse<{ accessToken: string; hasVoiceRegistered: boolean }>>('/users/login', { 
+      const response = await apiClient.post<ApiResponse<{ accessToken: string; refreshToken: string; hasVoiceRegistered: boolean }>>('/users/login', { 
         phone, 
         pin: pinValue 
       });
@@ -30,7 +30,8 @@ export default function DevLoginScreen() {
       const result = response.data;
 
       if (result.success && result.data) {
-        useAuthStore.getState().setToken(result.data.accessToken);
+        // 새로 만든 setTokens를 통해 Access, Refresh 토큰 모두 저장
+        useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken);
         
         if (result.data.hasVoiceRegistered) {
           router.replace('/home');

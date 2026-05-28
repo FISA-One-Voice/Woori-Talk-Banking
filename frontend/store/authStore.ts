@@ -11,18 +11,21 @@ import { create } from 'zustand';
 interface AuthState {
   /** JWT accessToken. 없으면 null. */
   token: string | null;
+  /** JWT refreshToken. 없으면 null. */
+  refreshToken: string | null;
 
-  /** 토큰 저장 (로그인 성공 시 호출) */
-  setToken: (token: string) => void;
+  /** 토큰 쌍 저장 (로그인 성공 및 토큰 갱신 시 호출) */
+  setTokens: (accessToken: string, refreshToken: string) => void;
 
-  /** 토큰 삭제 (로그아웃 시 호출) */
-  clearToken: () => void;
+  /** 모든 토큰 삭제 (로그아웃 시 호출) */
+  clearTokens: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   token: null,
+  refreshToken: null,
 
-  setToken: (token) => set({ token }),
+  setTokens: (token, refreshToken) => set({ token, refreshToken }),
 
-  clearToken: () => set({ token: null }),
+  clearTokens: () => set({ token: null, refreshToken: null }),
 }));
