@@ -52,6 +52,7 @@ app = FastAPI(
 
 # ── 응답 스키마 (인라인 Pydantic 모델) ─────────────────────────────────────
 
+
 class EnrollResponse(BaseModel):
     """POST /enroll 응답 스키마."""
 
@@ -81,6 +82,7 @@ class HealthResponse(BaseModel):
 
 # ── 헬퍼 ────────────────────────────────────────────────────────────────────
 
+
 def _require_model() -> ASVModel:
     """모델이 로딩되어 있지 않으면 503을 반환합니다.
 
@@ -99,6 +101,7 @@ def _require_model() -> ASVModel:
 
 
 # ── 엔드포인트 ──────────────────────────────────────────────────────────────
+
 
 @app.get("/health", response_model=HealthResponse, tags=["monitoring"])
 async def health_check() -> HealthResponse:
@@ -196,8 +199,7 @@ async def verify(
         raise HTTPException(
             status_code=400,
             detail=(
-                f"reference_embedding must have 192 dimensions, "
-                f"got {len(ref_emb)}"
+                f"reference_embedding must have 192 dimensions, got {len(ref_emb)}"
             ),
         )
 

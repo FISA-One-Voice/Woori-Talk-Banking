@@ -39,6 +39,7 @@ TEST_PIN = "123456"
 
 # ── 헬퍼 함수 ─────────────────────────────────────────────────────────────────
 
+
 def _create_test_user(db: Session) -> User:
     """테스트용 사용자를 DB에 직접 삽입합니다.
 
@@ -73,6 +74,7 @@ def _delete_test_user(phone: str) -> None:
 
 
 # ── 픽스처 ────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(autouse=True)
 def cleanup():
@@ -112,9 +114,9 @@ class TestLogin:
 
         # 응답 데이터에 세 가지 키가 모두 있어야 합니다
         data = body["data"]
-        assert "accessToken" in data,  "accessToken이 없습니다"
+        assert "accessToken" in data, "accessToken이 없습니다"
         assert "refreshToken" in data, "refreshToken이 없습니다"
-        assert "userId" in data,       "userId가 없습니다"
+        assert "userId" in data, "userId가 없습니다"
 
         # 각 값이 비어있지 않아야 합니다
         assert len(data["accessToken"]) > 0

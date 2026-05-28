@@ -49,7 +49,7 @@ def db() -> Generator[Session, None, None]:
     try:
         yield session
     finally:
-        session.close() 
+        session.close()
 
 
 # ── TestClient ─────────────────────────────────────────────────────────────────
