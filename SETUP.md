@@ -51,9 +51,6 @@ npm --version    # 11.x.x
 
 ### 3. 패키지 설치 및 앱 실행
 
-**⚠️ 중요: 클론 직후 반드시 `npm install`을 먼저 실행해야 합니다!**
-(만약 패키지 설치를 건너뛰고 바로 `npm start`를 실행하면, 로컬 `dotenv-cli`를 찾지 못하고 시스템에 설치된 파이썬용 `dotenv`가 실행되어 `ENOENT`나 `Invalid value for '-e'` 같은 엉뚱한 에러가 발생합니다.)
-
 ```bash
 npm install
 npm start
