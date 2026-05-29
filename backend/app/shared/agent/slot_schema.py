@@ -8,8 +8,8 @@ Design Ref (Issue #21):
 # key: pending_action 값 (intent_node가 설정)
 # value: 슬롯 이름 목록 (각 슬롯명은 service.py 파라미터명과 일치)
 SLOT_SCHEMA: dict[str, list[str]] = {
-    "transfer": ["alias", "amount"],
-    "auto_transfer": ["alias", "amount", "cycle", "scheduled_day"],
+    "transfer": ["recipient", "amount"],
+    "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
 }
 
 # ── intent → 프론트엔드 화면 이름 매핑 ────────────────────────────────────────────
@@ -24,7 +24,7 @@ SCREEN_MAP: dict[str, str] = {
 }
 
 # ── 수취인 검증이 필요한 액션 ────────────────────────────────────────────────────
-# alias 슬롯이 채워지는 즉시 resolve_node를 통해 수취인 존재 여부를 확인한다.
+# recipient 슬롯이 채워지는 즉시 resolve_node를 통해 수취인 존재 여부를 확인한다.
 RECIPIENT_REQUIRED_ACTIONS: set[str] = {"transfer", "auto_transfer"}
 
 # ── ASV 음성 인증이 필요한 액션 ─────────────────────────────────────────────────
@@ -38,7 +38,7 @@ ASV_REQUIRED_ACTIONS: set[str] = {
 # ── 슬롯별 TTS 질문 템플릿 ────────────────────────────────────────────────────────
 # slot_fill_node에서 첫 번째 누락 슬롯의 질문을 TTS로 반환한다.
 SLOT_QUESTIONS: dict[str, str] = {
-    "alias": "누구에게 보낼까요? 별명이나 이름을 말씀해 주세요.",
+    "recipient": "누구에게 보낼까요? 별명이나 이름을 말씀해 주세요.",
     "amount": "얼마를 보낼까요?",
     "cycle": "매월 또는 매주 중 어떤 주기로 보낼까요?",
     "scheduled_day": "매월 며칠에 이체할까요?",

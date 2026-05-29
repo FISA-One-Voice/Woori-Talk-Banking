@@ -71,21 +71,21 @@ def mock_get_history(user_id: str, days: int = 7, category: str = "") -> str:
 
 
 @tool
-def mock_execute_transfer(alias: str, amount: int) -> str:
+def mock_execute_transfer(recipient: str, amount: int) -> str:
     """등록된 수취인에게 금액을 이체합니다.
 
     슬롯이 모두 수집되고 사용자가 확인('네')한 뒤 execute_node에서 호출됩니다.
-    SLOT_SCHEMA["transfer"]의 슬롯("alias", "amount")과 파라미터가 일치해야 합니다.
+    SLOT_SCHEMA["transfer"]의 슬롯("recipient", "amount")과 파라미터가 일치해야 합니다.
 
     Args:
-        alias: 수취인 별명 (예: "엄마", "회사"). SLOT_SCHEMA의 "alias"와 일치.
+        recipient: 수취인 이름 (resolve_node 정규화 값). SLOT_SCHEMA의 "recipient"와 일치.
         amount: 이체 금액 (원 단위). SLOT_SCHEMA의 "amount"와 일치.
 
     Returns:
         TTS 친화적 이체 완료 안내 문자열.
     """
     formatted = _format_amount(amount)
-    return f"{alias}에게 {formatted} 이체가 완료되었습니다."
+    return f"{recipient}에게 {formatted} 이체가 완료되었습니다."
 
 
 # ── 자동이체 등록 ─────────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ def mock_execute_transfer(alias: str, amount: int) -> str:
 
 @tool
 def mock_register_auto_transfer(
-    alias: str,
+    recipient: str,
     amount: int,
     cycle: str,
     scheduled_day: int,
@@ -104,7 +104,7 @@ def mock_register_auto_transfer(
     SLOT_SCHEMA["auto_transfer"]의 슬롯과 파라미터가 일치해야 합니다.
 
     Args:
-        alias: 수취인 별명. SLOT_SCHEMA의 "alias"와 일치.
+        recipient: 수취인 이름 (resolve_node 정규화 값). SLOT_SCHEMA의 "recipient"와 일치.
         amount: 이체 금액 (원 단위). SLOT_SCHEMA의 "amount"와 일치.
         cycle: 주기 ("monthly" 또는 "weekly"). SLOT_SCHEMA의 "cycle"와 일치.
         scheduled_day: 이체일 (1~31). SLOT_SCHEMA의 "scheduled_day"와 일치.
@@ -115,7 +115,7 @@ def mock_register_auto_transfer(
     formatted = _format_amount(amount)
     freq_label = "매월" if cycle == "monthly" else "매주"
     return (
-        f"{alias}에게 {freq_label} {scheduled_day}일 {formatted} "
+        f"{recipient}에게 {freq_label} {scheduled_day}일 {formatted} "
         "자동이체가 등록되었습니다."
     )
 

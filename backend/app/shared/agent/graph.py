@@ -95,13 +95,13 @@ def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
     action_label = ACTION_LABELS.get(pending_action, pending_action)
     parts: list[str] = []
 
-    alias = collected_slots.get("alias")
+    recipient = collected_slots.get("recipient")
     amount = collected_slots.get("amount")
     cycle = collected_slots.get("cycle")
     scheduled_day = collected_slots.get("scheduled_day")
 
-    if alias:
-        parts.append(f"{alias}에게")
+    if recipient:
+        parts.append(f"{recipient}에게")
     if cycle:
         freq_label = "매월" if cycle == "monthly" else "매주"
         parts.append(freq_label)
@@ -274,7 +274,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "- extracted_slots: 발화에서 파악한 슬롯 값 (없으면 {})."
             " 금액 슬롯 키는 'amount', 값은 원화 정수 문자열"
             " (예: '3만원'→'30000', '오만원'→'50000')."
-            " 수신자 슬롯 키는 'alias'.",
+            " 수신자 슬롯 키는 'recipient'.",
             "- user_confirmed: '네', '맞아요', '그렇게 해줘' 등 확인 발화 시 true",
             "- user_cancelled: '취소', '아니오', '됐어', '하지 마' 등 취소 발화 시 true",
             "- direct_response: 비금융 챗봇 답변(영업시간, 상품 안내 등)에만 사용.",
@@ -380,7 +380,15 @@ def build_graph(tools: list) -> CompiledStateGraph:
         missing = _missing_slots(pending, slots)
 
         if missing:
-            question = SLOT_QUESTIONS.get(missing[0], f"{missing[0]}을 말씀해 주세요.")
+            slot_name = missing[0]
+            if slot_name == "scheduled_day" and slots.get("cycle") == "weekly":
+                question = (
+                    "매주 무슨 요일에 이체할까요? 월요일부터 일요일 중 말씀해 주세요."
+                )
+            else:
+                question = SLOT_QUESTIONS.get(
+                    slot_name, f"{slot_name}을 말씀해 주세요."
+                )
         else:
             question = "정보가 모두 수집되었습니다."
 
@@ -404,13 +412,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
         }
 
     def resolve_node(state: VoiceState) -> dict:
-        """alias 슬롯이 채워진 즉시 수취인 존재 여부를 검증한다.
+        """recipient 슬롯이 채워진 즉시 수취인 존재 여부를 검증한다.
 
         lookup_recipient 툴 미등록 시(mock 환경) 검증을 생략하고 통과시킨다.
-        성공 시 recipient_validated=True, 실패 시 alias 슬롯 초기화 후 재수집 유도.
+        성공 시 recipient_validated=True, 실패 시 recipient 슬롯 초기화 후 재수집 유도.
         """
         slots = dict(state.get("collected_slots", {}))
-        alias = slots.get("alias", "")
+        recipient_input = slots.get("recipient", "")
         user_id = state.get("user_id", "")
 
         resolver = tool_registry.get("lookup_recipient") or tool_registry.get(
@@ -423,25 +431,28 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         try:
             canonical_name: str | None = resolver.invoke(
-                {"user_id": user_id, "alias": alias}
+                {"user_id": user_id, "alias": recipient_input}
             )
         except Exception as e:
             logger.error("resolve_node 수취인 조회 실패: %s", e)
             canonical_name = None
 
         if canonical_name is None:
-            slots["alias"] = None
+            slots["recipient"] = None
             return {
                 "collected_slots": slots,
                 "recipient_validated": False,
                 "messages": [
                     AIMessage(
-                        content=f"'{alias}'을(를) 찾을 수 없습니다. 다시 알려주세요."
+                        content=(
+                            f"'{recipient_input}'을(를) 찾을 수 없습니다."
+                            " 다시 알려주세요."
+                        )
                     )
                 ],
             }
 
-        slots["alias"] = canonical_name
+        slots["recipient"] = canonical_name
         return {
             "collected_slots": slots,
             "recipient_validated": True,
@@ -450,7 +461,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
     def route_after_resolve(state: VoiceState) -> str:
         """resolve_node 결과에 따라 다음 노드를 결정한다."""
         slots = state.get("collected_slots", {})
-        if not slots.get("alias"):
+        if not slots.get("recipient"):
             return "slot_fill_node"
         pending = state.get("pending_action", "")
         if _missing_slots(pending, slots):
@@ -520,10 +531,10 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         slots = state.get("collected_slots", {})
 
-        # alias 슬롯이 채워졌지만 아직 검증하지 않았으면 즉시 resolve_node로
+        # recipient 슬롯이 채워졌지만 아직 검증하지 않았으면 즉시 resolve_node로
         if (
             pending in RECIPIENT_REQUIRED_ACTIONS
-            and slots.get("alias")
+            and slots.get("recipient")
             and not state.get("recipient_validated")
         ):
             return "resolve_node"
