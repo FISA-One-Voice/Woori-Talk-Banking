@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { getTtsMessage } from '@/utils/errorHandler';
@@ -27,6 +28,8 @@ export default function RootLayout() {
 
   const handleResponse = useCallback(
     (data: VoiceResponseData) => {
+      useVoiceResponseStore.getState().setLastResponse(data);
+
       if (data.audio) {
         playBase64Audio(data.audio).catch(() => undefined);
       }

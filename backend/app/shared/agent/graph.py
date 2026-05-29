@@ -34,6 +34,8 @@ from app.shared.agent.prompts import SYSTEM_PROMPT
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
     ASV_REQUIRED_ACTIONS,
+    COMPLETE_SCREEN_MAP,
+    RECIPIENT_REQUIRED_ACTIONS,
     SCREEN_MAP,
     SLOT_QUESTIONS,
     SLOT_SCHEMA,
@@ -95,16 +97,16 @@ def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
 
     alias = collected_slots.get("alias")
     amount = collected_slots.get("amount")
-    schedule_date = collected_slots.get("schedule_date")
-    frequency = collected_slots.get("frequency")
+    cycle = collected_slots.get("cycle")
+    scheduled_day = collected_slots.get("scheduled_day")
 
     if alias:
         parts.append(f"{alias}에게")
-    if frequency:
-        freq_label = "매월" if frequency == "monthly" else "매주"
+    if cycle:
+        freq_label = "매월" if cycle == "monthly" else "매주"
         parts.append(freq_label)
-    if schedule_date:
-        parts.append(f"{schedule_date}일")
+    if scheduled_day:
+        parts.append(f"{scheduled_day}일")
     if amount:
         try:
             parts.append(_amount_to_korean(int(amount)))
@@ -323,6 +325,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "asv_retry_count": 0,
                 "navigate_to": None,
                 "execution_ready": False,
+                "recipient_validated": False,
                 "messages": [
                     AIMessage(content=result.direct_response or "취소되었습니다.")
                 ],
@@ -353,6 +356,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             updates["pending_action"] = result.intent
             updates["navigate_to"] = SCREEN_MAP.get(result.intent)
             updates["collected_slots"] = new_slots
+            updates["recipient_validated"] = False
             # navigate_to 설정 후 reset (다음 턴에서는 None)
             # (slot_fill_node나 confirm_node에서 None으로 설정)
 
@@ -399,6 +403,60 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "messages": [AIMessage(content=confirm_msg)],
         }
 
+    def resolve_node(state: VoiceState) -> dict:
+        """alias 슬롯이 채워진 즉시 수취인 존재 여부를 검증한다.
+
+        lookup_recipient 툴 미등록 시(mock 환경) 검증을 생략하고 통과시킨다.
+        성공 시 recipient_validated=True, 실패 시 alias 슬롯 초기화 후 재수집 유도.
+        """
+        slots = dict(state.get("collected_slots", {}))
+        alias = slots.get("alias", "")
+        user_id = state.get("user_id", "")
+
+        resolver = tool_registry.get("lookup_recipient") or tool_registry.get(
+            "mock_lookup_recipient"
+        )
+
+        if resolver is None:
+            logger.warning("resolve_node: lookup_recipient 툴 미등록, 검증 생략")
+            return {"recipient_validated": True}
+
+        try:
+            canonical_name: str | None = resolver.invoke(
+                {"user_id": user_id, "alias": alias}
+            )
+        except Exception as e:
+            logger.error("resolve_node 수취인 조회 실패: %s", e)
+            canonical_name = None
+
+        if canonical_name is None:
+            slots["alias"] = None
+            return {
+                "collected_slots": slots,
+                "recipient_validated": False,
+                "messages": [
+                    AIMessage(
+                        content=f"'{alias}'을(를) 찾을 수 없습니다. 다시 알려주세요."
+                    )
+                ],
+            }
+
+        slots["alias"] = canonical_name
+        return {
+            "collected_slots": slots,
+            "recipient_validated": True,
+        }
+
+    def route_after_resolve(state: VoiceState) -> str:
+        """resolve_node 결과에 따라 다음 노드를 결정한다."""
+        slots = state.get("collected_slots", {})
+        if not slots.get("alias"):
+            return "slot_fill_node"
+        pending = state.get("pending_action", "")
+        if _missing_slots(pending, slots):
+            return "slot_fill_node"
+        return "confirm_node"
+
     def execute_node(state: VoiceState) -> dict:
         """수집된 슬롯으로 tool을 직접 호출하고 결과를 TTS 응답으로 추가한다.
 
@@ -429,16 +487,19 @@ def build_graph(tools: list) -> CompiledStateGraph:
                     "처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
                 )
 
-        return {
+        updates: dict = {
             "pending_action": None,
             "collected_slots": {},
             "awaiting_confirmation": False,
             "awaiting_asv_audio": False,
             "execution_ready": False,
-            # navigate_to는 intent_node가 설정한 값을 보존한다.
-            # (단순 조회 시 navigate_to="balance" 등 프론트엔드에 전달되어야 함)
             "messages": [AIMessage(content=response_text)],
         }
+        # transfer/auto_transfer 등 완료 화면이 있는 액션만 navigate_to 덮어씀.
+        # balance처럼 COMPLETE_SCREEN_MAP에 없는 액션은 intent_node가 설정한 값 보존.
+        if pending in COMPLETE_SCREEN_MAP:
+            updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
+        return updates
 
     # ── 조건부 라우팅 ─────────────────────────────────────────────────────────────
 
@@ -458,6 +519,15 @@ def build_graph(tools: list) -> CompiledStateGraph:
             return END
 
         slots = state.get("collected_slots", {})
+
+        # alias 슬롯이 채워졌지만 아직 검증하지 않았으면 즉시 resolve_node로
+        if (
+            pending in RECIPIENT_REQUIRED_ACTIONS
+            and slots.get("alias")
+            and not state.get("recipient_validated")
+        ):
+            return "resolve_node"
+
         missing = _missing_slots(pending, slots)
 
         if missing:
@@ -481,11 +551,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         builder.add_node("intent_node", intent_node)
         builder.add_node("slot_fill_node", slot_fill_node)
+        builder.add_node("resolve_node", resolve_node)
         builder.add_node("confirm_node", confirm_node)
         builder.add_node("execute_node", execute_node)
 
         builder.set_entry_point("intent_node")
         builder.add_conditional_edges("intent_node", route_after_intent)
+        builder.add_conditional_edges("resolve_node", route_after_resolve)
         builder.add_edge("slot_fill_node", END)
         builder.add_edge("confirm_node", END)
         builder.add_edge("execute_node", END)

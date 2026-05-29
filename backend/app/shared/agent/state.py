@@ -33,6 +33,8 @@ class VoiceState(TypedDict):
             intent 첫 감지 시에만 설정되고, 이후 턴에서는 None.
         execution_ready: True이면 사용자 확인 완료 + ASV 불필요 → execute_node로 즉시 실행.
             intent_node에서 "네" 수신 후 설정. execute_node 완료 후 False로 초기화.
+        recipient_validated: True이면 alias 슬롯이 resolve_node를 통과한 상태.
+            새 인텐트 감지 또는 취소 시 False로 초기화.
     """
 
     messages: Annotated[list, add_messages]
@@ -44,3 +46,4 @@ class VoiceState(TypedDict):
     asv_retry_count: int
     navigate_to: str | None
     execution_ready: bool
+    recipient_validated: bool

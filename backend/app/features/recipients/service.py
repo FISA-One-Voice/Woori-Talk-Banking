@@ -12,6 +12,7 @@
     )
 """
 
+import re
 import uuid
 
 from sqlalchemy.orm import Session
@@ -196,3 +197,60 @@ def match_by_name(
         .order_by(RegisteredRecipient.created_at.desc())
         .all()
     )
+
+
+def classify_recipient_input(value: str) -> str:
+    """음성에서 추출한 수취인 입력값의 형식을 분류합니다.
+
+    Args:
+        value: alias 슬롯 값 ("엄마", "01012345678", "110-123-456789" 등).
+
+    Returns:
+        "phone" | "account" | "name"
+    """
+    cleaned = value.replace("-", "").replace(" ", "")
+    if re.fullmatch(r"01[0-9]{8,9}", cleaned):
+        return "phone"
+    if re.fullmatch(r"\d{10,14}", cleaned):
+        return "account"
+    return "name"
+
+
+def lookup_recipient_by_voice(
+    db: Session,
+    user_uuid: uuid.UUID,
+    alias: str,
+) -> ResolvedRecipient | None:
+    """음성 발화에서 추출한 수취인 정보를 분류하고 조회합니다.
+
+    classify_recipient_input()으로 입력 형식을 판별한 뒤
+    형식에 맞는 서비스 함수를 호출합니다.
+    동명이인이 여러 명이거나 조회에 실패하면 None을 반환합니다.
+
+    Args:
+        db: 데이터베이스 세션.
+        user_uuid: 요청 사용자 UUID.
+        alias: alias 슬롯 값 (이름, 전화번호, 계좌번호 모두 허용).
+
+    Returns:
+        ResolvedRecipient (찾은 경우), None (못 찾은 경우).
+    """
+    kind = classify_recipient_input(alias)
+
+    if kind == "phone":
+        try:
+            return resolve_by_phone(db, alias)
+        except RecipientError:
+            return None
+
+    if kind == "account":
+        # 계좌번호 직접 이체는 은행명 슬롯 별도 수집이 필요하므로 현재 미지원.
+        # 이름/별명 재입력 유도.
+        return None
+
+    # kind == "name": alias 또는 실명으로 검색
+    matches = match_by_name(db, user_uuid, alias)
+    if len(matches) != 1:
+        # 0명 또는 동명이인 → None (재입력 유도)
+        return None
+    return resolve_by_id(db, user_uuid, str(matches[0].recipient_id))

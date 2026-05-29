@@ -87,8 +87,8 @@ class TestSlotSchema:
         assert set(SLOT_SCHEMA["auto_transfer"]) == {
             "alias",
             "amount",
-            "schedule_date",
-            "frequency",
+            "cycle",
+            "scheduled_day",
         }
 
     def test_screen_map_has_all_intents(self):
@@ -134,8 +134,8 @@ class TestMockTools:
             {
                 "alias": "엄마",
                 "amount": 100000,
-                "schedule_date": 15,
-                "frequency": "monthly",
+                "cycle": "monthly",
+                "scheduled_day": 15,
             }
         )
         assert isinstance(result, str)
@@ -350,6 +350,8 @@ class TestStateTransitionLogic:
                 "asv_retry_count": 0,
                 "navigate_to": None,
                 "execution_ready": False,
+                # resolve_node는 별도 테스트에서 검증. 여기서는 confirm_node만 테스트.
+                "recipient_validated": True,
             }
             result = g.invoke(state_with_alias, config=config)
 

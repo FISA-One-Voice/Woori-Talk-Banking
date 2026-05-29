@@ -8,6 +8,7 @@ DB, 외부 API 없이도 StateGraph 흐름을 검증할 수 있다.
     실제 배포: 화면 담당자가 실제 tool을 완성하면 USE_MOCK_TOOLS=false로 전환
 
 담당자별 교체 대상:
+    공통        (공통): mock_lookup_recipient → features/transfer/tools (또는 recipients)
     balance  담당자 (B): mock_get_balance → features/balance/tools
     history  담당자 (B): mock_get_history → features/history/tools
     transfer 담당자 (C): mock_execute_transfer → features/transfer/tools
@@ -94,8 +95,8 @@ def mock_execute_transfer(alias: str, amount: int) -> str:
 def mock_register_auto_transfer(
     alias: str,
     amount: int,
-    schedule_date: int,
-    frequency: str,
+    cycle: str,
+    scheduled_day: int,
 ) -> str:
     """자동이체를 등록합니다.
 
@@ -105,18 +106,44 @@ def mock_register_auto_transfer(
     Args:
         alias: 수취인 별명. SLOT_SCHEMA의 "alias"와 일치.
         amount: 이체 금액 (원 단위). SLOT_SCHEMA의 "amount"와 일치.
-        schedule_date: 이체일 (1~31). SLOT_SCHEMA의 "schedule_date"와 일치.
-        frequency: 주기 ("monthly" 또는 "weekly"). SLOT_SCHEMA의 "frequency"와 일치.
+        cycle: 주기 ("monthly" 또는 "weekly"). SLOT_SCHEMA의 "cycle"와 일치.
+        scheduled_day: 이체일 (1~31). SLOT_SCHEMA의 "scheduled_day"와 일치.
 
     Returns:
         TTS 친화적 자동이체 등록 완료 안내 문자열.
     """
     formatted = _format_amount(amount)
-    freq_label = "매월" if frequency == "monthly" else "매주"
+    freq_label = "매월" if cycle == "monthly" else "매주"
     return (
-        f"{alias}에게 {freq_label} {schedule_date}일 {formatted} "
+        f"{alias}에게 {freq_label} {scheduled_day}일 {formatted} "
         "자동이체가 등록되었습니다."
     )
+
+
+# ── 수취인 조회 (resolve_node용) ─────────────────────────────────────────────
+
+
+@tool
+def mock_lookup_recipient(user_id: str, alias: str) -> str | None:
+    """수취인 별명·이름으로 등록된 수취인을 조회합니다 (mock).
+
+    실제 툴 등록 전까지 하드코딩된 mock DB를 사용합니다.
+    transfer/auto_transfer 담당자가 실제 lookup_recipient 툴로 교체합니다.
+
+    Args:
+        user_id: 요청 사용자 ID.
+        alias: alias 슬롯 값 (이름, 전화번호, 계좌번호 모두 허용).
+
+    Returns:
+        정규화된 수취인 이름 문자열 (찾은 경우), None (없는 경우).
+    """
+    mock_db: dict[str, str] = {
+        "엄마": "홍어머니",
+        "아빠": "홍아버지",
+        "친구": "김철수",
+        "회사": "우리회사",
+    }
+    return mock_db.get(alias)
 
 
 # ── 이벤트 조회 ────────────────────────────────────────────────────────────────

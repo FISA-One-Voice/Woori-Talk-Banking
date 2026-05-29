@@ -20,6 +20,7 @@ from app.shared.agent.tools.mock_tools import (
     mock_get_balance,
     mock_get_events,
     mock_get_history,
+    mock_lookup_recipient,
     mock_register_auto_transfer,
 )
 
@@ -27,6 +28,7 @@ from app.shared.agent.tools.mock_tools import (
 # Phase 2 실제 tool 완성 전까지 사용하는 mock 구현체.
 # 화면 담당자가 실제 tool을 완성하면 _REAL_TOOLS로 이동.
 MOCK_TOOLS: list = [
+    mock_lookup_recipient,
     mock_get_balance,
     mock_get_history,
     mock_execute_transfer,
