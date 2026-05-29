@@ -31,7 +31,7 @@ def convert_to_wav_with_ffmpeg(audio_bytes: bytes) -> bytes:
             "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "1",
             temp_out_path
         ]
-        subprocess.run(cmd, check=True, capture_output=True, timeout=10)
+        subprocess.run(cmd, check=True, capture_output=True, timeout=30)
         
         with open(temp_out_path, "rb") as f:
             wav_bytes = f.read()
@@ -59,7 +59,20 @@ def convert_to_wav_with_ffmpeg(audio_bytes: bytes) -> bytes:
 async def extract_voice_vector(
     filename: str, audio_bytes: bytes, content_type: str
 ) -> list[float]:
-    """ASV 서버에 오디오 파일을 전송하여 192차원 음성 임베딩 벡터를 추출합니다."""
+    """ASV 서버에 오디오 파일을 전송하여 192차원 음성 임베딩 벡터를 추출합니다.
+
+    Args:
+        filename: 프론트엔드에서 전달받은 원본 오디오 파일명.
+        audio_bytes: 원본 오디오 파일의 바이너리 데이터.
+        content_type: 원본 파일의 MIME 타입 (예: audio/m4a).
+
+    Returns:
+        ASV 서버가 추출한 192차원 실수(float) 배열.
+
+    Raises:
+        VoiceServiceError: 외부 ASV 서버 통신 실패, 내부 오디오 변환 실패,
+                           또는 반환된 벡터가 192차원이 아닌 경우 발생.
+    """
     
     # 1. AWS 및 모든 환경에서 안전한 범용 변환 로직 통과
     audio_bytes = convert_to_wav_with_ffmpeg(audio_bytes)
@@ -70,7 +83,7 @@ async def extract_voice_vector(
         async with httpx.AsyncClient() as client:
             files = {"file": (filename, audio_bytes, content_type)}
             response = await client.post(
-                f"{settings.ASV_SERVER_URL}/enroll", files=files, timeout=10.0
+                f"{settings.ASV_SERVER_URL}/enroll", files=files, timeout=30.0
             )
             response.raise_for_status()
 

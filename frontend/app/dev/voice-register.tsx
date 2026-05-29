@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { SafeAreaView, StyleSheet, Text, View, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, View, Pressable, ActivityIndicator, Alert, Vibration } from 'react-native';
 import { router } from 'expo-router';
 import { TopBar } from '@/components/layout';
 import VoiceWaveAnimation from '@/components/feedback/VoiceWaveAnimation';
@@ -8,54 +8,99 @@ import { Ionicons } from '@expo/vector-icons';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { useAuthStore } from '@/store/authStore';
 import { Audio } from 'expo-av';
+import * as Speech from 'expo-speech';
 
 type Step = 'TUTORIAL' | 'READY' | 'RECORDING' | 'SUCCESS' | 'FAIL';
 
 export default function DevVoiceRegisterScreen() {
   const [step, setStep] = useState<Step>('TUTORIAL');
-  const [recordCount, setRecordCount] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(-160);
+  const [timeLeft, setTimeLeft] = useState(10);
   
   const recordingRef = useRef<Audio.Recording | null>(null);
 
-  // Ready -> Recording 자동 전환
+  // 화면 단계에 따른 TTS(음성 읽어주기) 및 자동 전환 제어
   useEffect(() => {
-    if (step === 'READY') {
-      const timer = setTimeout(() => {
-        setStep('RECORDING');
-      }, 1500);
-      return () => clearTimeout(timer);
+    Speech.stop();
+
+    if (step === 'TUTORIAL') {
+      Speech.speak("목소리 등록을 시작합니다. 주의사항. 1. 조용한 환경에서 진행해 주세요. 2. 진동이 울리면 문장을 천천히 세 번 연속으로 읽어주세요. 3. 총 10초동안 녹음됩니다. 준비가 되셨다면 화면 하단의 시작하기 버튼을 눌러주세요.", { language: 'ko-KR', rate: 0.9 });
+    } else if (step === 'READY') {
+      const message = "진동이 울리면, 내 목소리가 나의 비밀번호입니다 라는 문장을 천천히 세 번 연속으로 말씀해 주세요.";
+      
+      Speech.speak(message, {
+        language: 'ko-KR',
+        rate: 0.9,
+        onDone: () => {
+          setTimeout(() => {
+            Vibration.vibrate(400); // 400ms 동안 확실하게 진동 트리거
+            
+            // 진동이 완전히 끝날 때까지 0.5초 기다린 후에 마이크를 켭니다.
+            // (마이크가 켜지는 순간 OS가 진동을 강제로 끊어버리기 때문)
+            setTimeout(() => {
+              setStep('RECORDING');
+            }, 500);
+          }, 1500);
+        },
+        onError: () => {
+          setTimeout(() => {
+            Vibration.vibrate(400);
+            setTimeout(() => {
+              setStep('RECORDING');
+            }, 500);
+          }, 1500);
+        }
+      });
+    } else if (step === 'SUCCESS') {
+      Speech.speak("성공적으로 등록되었습니다. 이제 목소리로 간편하게 인증할 수 있습니다.", { language: 'ko-KR', rate: 0.9 });
+    } else if (step === 'FAIL') {
+      Speech.speak("목소리 인식에 실패했습니다. 조용한 곳에서 다시 시도해 주세요.", { language: 'ko-KR', rate: 0.9 });
     }
+
+    return () => {
+      Speech.stop();
+    };
   }, [step]);
 
-  // 첫 녹음 단계 진입 시 실제 디바이스 마이크 녹음 시작
+  // 녹음 단계 진입 시 마이크 켜기 & 15초 카운트다운
   useEffect(() => {
-    if (step === 'RECORDING' && recordCount === 1) {
-      startRecording();
-    }
-  }, [step, recordCount]);
+    let timerInterval: NodeJS.Timeout;
+    let timeout: NodeJS.Timeout;
 
-  // Recording 중 3초 뒤에 다음 횟수나 성공 화면으로 전환
-  useEffect(() => {
     if (step === 'RECORDING') {
-      const timer = setTimeout(async () => {
-        if (recordCount < 3) {
-          setRecordCount((prev) => prev + 1);
-          setStep('READY');
-        } else {
-          // 3회 완료 시 녹음 종료 및 서버 전송
-          const uri = await stopRecording();
-          if (uri) {
-            await handleRegisterVoice(uri);
-          } else {
-            setStep('FAIL');
+      setTimeLeft(10);
+      startRecording();
+
+      // 1초마다 남은 시간 업데이트
+      timerInterval = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timerInterval);
+            return 0;
           }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // 15초 뒤 무조건 마이크 끄고 전송
+      timeout = setTimeout(async () => {
+        clearInterval(timerInterval);
+        const uri = await stopRecording();
+        
+        if (uri) {
+          await handleRegisterVoice(uri);
+        } else {
+          setStep('FAIL');
         }
-      }, 3000); // 3초 대기
-      
-      return () => clearTimeout(timer);
+      }, 10000);
     }
-  }, [step, recordCount]);
+
+    return () => {
+      if (timerInterval) clearInterval(timerInterval);
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [step]);
 
   const startRecording = async () => {
     try {
@@ -92,6 +137,15 @@ export default function DevVoiceRegisterScreen() {
       };
 
       const { recording } = await Audio.Recording.createAsync(WAV_RECORDING_OPTIONS);
+
+      // 마이크 입력 레벨(볼륨)을 100ms 간격으로 가져와서 애니메이션에 전달
+      recording.setOnRecordingStatusUpdate((status) => {
+        if (status.isRecording && status.metering !== undefined) {
+          setAudioLevel(status.metering);
+        }
+      });
+      recording.setProgressUpdateInterval(100);
+
       recordingRef.current = recording;
     } catch (err) {
       console.error('Failed to start recording', err);
@@ -136,6 +190,7 @@ export default function DevVoiceRegisterScreen() {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 60000, // 백엔드 로직이 완전히 끝날 때까지 기다리도록 60초로 대폭 연장
       });
       
       const result = response.data;
@@ -168,13 +223,13 @@ export default function DevVoiceRegisterScreen() {
           
           {step === 'TUTORIAL' && (
             <View style={styles.stepContainer}>
-              {renderInfoBox('음성 안내', '처음 오셨군요!\n목소리 등록을 시작합니다')}
+              {renderInfoBox('음성 등록', '내 목소리가 나의 \n비밀번호입니다.\n안전한 뱅킹을 위해 등록해 주세요')}
               
               <View style={styles.listContainer}>
                 {[
-                  '조용한 환경에서 진행해\n주세요',
-                  '삐- 소리 후 말씀해 주세\n요',
-                  '총 3회 반복합니다'
+                  '조용한 환경에서 진행해 주세요',
+                  '진동이 울리면 세 번 연속으로 읽어주세요',
+                  '총 10초 동안 넉넉하게 녹음됩니다'
                 ].map((text, idx) => (
                   <View key={idx} style={styles.listItem}>
                     <View style={styles.listNumber}>
@@ -195,27 +250,33 @@ export default function DevVoiceRegisterScreen() {
 
           {step === 'READY' && (
             <View style={styles.stepContainer}>
-              {renderInfoBox('음성 안내', '삐- 소리 후\n말씀해 주세요')}
+              {renderInfoBox('준비해 주세요', '잠시 후 녹음이 시작됩니다.\n아래 문장을 읽을 준비를 해 주세요.')}
               <View style={styles.centerAction}>
-                <View style={styles.micCircle}>
-                  <Ionicons name="mic-outline" size={48} color={COLORS.highlightYellow} />
+                <View style={[styles.micCircle, { borderColor: COLORS.grayMedium }]}>
+                  <Ionicons name="mic-outline" size={48} color={COLORS.grayMedium} />
                 </View>
-                <Text style={styles.actionText}>대기 중</Text>
+                <Text style={[styles.actionText, { fontSize: 24, fontWeight: 'bold', color: COLORS.highlightYellow, marginTop: 20 }]}>
+                  "내 목소리가 나의 비밀번호입니다"
+                </Text>
               </View>
             </View>
           )}
 
           {step === 'RECORDING' && (
             <View style={styles.stepContainer}>
-              {renderInfoBox('음성 안내', `지금 말씀해 주세요\n(${recordCount}/3회)`)}
+              {renderInfoBox(`녹음 진행 중 (남은 시간: ${timeLeft}초)`, `화면의 문장을 천천히 3번\n읽어주세요!`)}
               <View style={styles.centerAction}>
                 <View style={styles.recordingBadge}>
                   <View style={styles.recordingDot} />
                   <Text style={styles.recordingBadgeText}>녹음 중</Text>
                 </View>
-                {/* 오디오 파형 애니메이션 (공통 컴포넌트) */}
-                <VoiceWaveAnimation isActive={step === 'RECORDING'} />
-                <Text style={styles.actionSubText}>{recordCount - 1}회 완료 - {4 - recordCount}회 남음</Text>
+                
+                <Text style={[styles.actionText, { fontSize: 28, fontWeight: 'bold', color: COLORS.highlightYellow, marginBottom: 40 }]}>
+                  "내 목소리가 나의 비밀번호입니다"
+                </Text>
+
+                {/* 실제 음성 크기(audioLevel)에 실시간으로 반응하는 애니메이션 */}
+                <VoiceWaveAnimation isActive={step === 'RECORDING'} audioLevel={audioLevel} />
               </View>
             </View>
           )}
@@ -229,11 +290,11 @@ export default function DevVoiceRegisterScreen() {
                 <Text style={styles.successTitleText}>등록 완료</Text>
               </View>
               
-              {renderInfoBox('음성 안내', '목소리 등록 완료!\n로그인으로 이동합니다')}
+              {renderInfoBox('등록 완료', '성공적으로 등록되었습니다!\n이제 목소리로 간편하게 인증하세요.')}
               
               <View style={{ flex: 1, justifyContent: 'flex-end' }}>
                 <Pressable style={styles.button} onPress={() => router.push('/dev')}>
-                  <Text style={styles.buttonText}>로그인 화면으로 이동</Text>
+                  <Text style={styles.buttonText}>홈 화면으로 이동</Text>
                 </Pressable>
               </View>
             </View>
@@ -249,12 +310,12 @@ export default function DevVoiceRegisterScreen() {
               </View>
               
               <View style={[styles.infoBox, { backgroundColor: '#3f1a1a', borderColor: '#5c2222' }]}>
-                <Text style={[styles.infoLabel, { color: '#F87171' }]}>오류</Text>
-                <Text style={styles.infoDesc}>소음이 감지되었습니다.\n다시 시도해 주세요</Text>
+                <Text style={[styles.infoLabel, { color: '#F87171' }]}>인증 오류</Text>
+                <Text style={styles.infoDesc}>{"소음이 크거나 목소리가 \n작습니다. 조용한 곳에서 다시 \n시도해 주세요."}</Text>
               </View>
               
               <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-                <Pressable style={[styles.button, { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.grayMedium }]} onPress={() => { setRecordCount(1); setStep('TUTORIAL'); }}>
+                <Pressable style={[styles.button, { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.grayMedium }]} onPress={() => { setStep('TUTORIAL'); }}>
                   <Text style={[styles.buttonText, { color: COLORS.textMain }]}>처음부터 다시 시도하기</Text>
                 </Pressable>
               </View>
