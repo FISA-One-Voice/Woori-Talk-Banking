@@ -22,6 +22,29 @@ export async function fetchAssetSummary(): Promise<AssetSummary> {
   return res.data.data;
 }
 
+export interface TransactionItem {
+  tx_id: string;
+  from_account_id: string;
+  to_bank_name: string;
+  to_name: string | null;
+  amount: number;
+  tx_type: string;
+  status: string;
+  category: string | null;
+  memo: string | null;
+  created_at: string;
+}
+
+export async function fetchTransactionHistory(days: number): Promise<TransactionItem[]> {
+  const res = await apiClient.get<ApiResponse<{ transactions: TransactionItem[] }>>(
+    `/api/asset/history?days=${days}`
+  );
+  if (!res.data.success || !res.data.data) {
+    throw new Error(res.data.code ?? 'INTERNAL_ERROR');
+  }
+  return res.data.data.transactions;
+}
+
 export interface CategoryItem {
   category: string;
   amount: number;

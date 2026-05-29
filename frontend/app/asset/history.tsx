@@ -11,8 +11,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { getTtsMessage } from '@/utils/errorHandler';
-import { apiClient, ApiResponse } from '@/utils/api';
-import { fetchExpenseSummary, CategoryItem } from '@/services/assetService';
+import { fetchExpenseSummary, fetchTransactionHistory, CategoryItem, TransactionItem } from '@/services/assetService';
 
 type Step = 'slot' | 'result' | 'history' | 'error';
 
@@ -29,41 +28,30 @@ export default function HistoryScreen() {
 
   const [step, setStep] = useState<Step>(type === 'history' ? 'history' : 'slot');
   const [period, setPeriod] = useState('이번달');
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [topCategories, setTopCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   const income = transactions.filter((t) => t.category === '수입').reduce((s, t) => s + t.amount, 0);
   const expense = transactions.filter((t) => t.category !== '수입').reduce((s, t) => s + t.amount, 0);
 
-  // 거래내역 API 호출
   const fetchHistory = async (days: number) => {
     setLoading(true);
-    try {
-      const response = await apiClient.get<ApiResponse<{ transactions: any[] }>>(
-        `/api/asset/history?days=${days}`
-      );
-      if (response.data.success) {
-        setTransactions(response.data.data?.transactions ?? []);
-      } else {
-        Alert.alert('안내', getTtsMessage(response.data.code));
+    fetchTransactionHistory(days)
+      .then(setTransactions)
+      .catch((err: Error) => {
+        Alert.alert('안내', getTtsMessage(err.message));
         setTransactions([]);
-      }
-    } catch {
-      Alert.alert('안내', getTtsMessage('NETWORK_ERROR'));
-    } finally {
-      setLoading(false);
-    }
+      })
+      .finally(() => setLoading(false));
   };
 
-  // 거래내역 화면 진입 시 자동 호출
   useEffect(() => {
     if (step === 'history') {
       fetchHistory(30);
     }
   }, [step]);
 
-  // ── 슬롯 요청 화면 (SCR005-F03)
   if (step === 'slot') {
     return (
       <SafeAreaView style={styles.root}>
@@ -117,7 +105,6 @@ export default function HistoryScreen() {
     );
   }
 
-  // ── 지출·수입 결과 화면 (SCR005-F04)
   if (step === 'result') {
     return (
       <SafeAreaView style={styles.root}>
@@ -173,7 +160,6 @@ export default function HistoryScreen() {
     );
   }
 
-  // ── 거래내역 목록 화면 (SCR005-F05)
   if (step === 'history') {
     return (
       <SafeAreaView style={styles.root}>
@@ -218,7 +204,6 @@ export default function HistoryScreen() {
     );
   }
 
-  // ── 2회 연속 실패 화면 (SCR005-E01)
   return (
     <SafeAreaView style={styles.root}>
       <View style={[styles.container, styles.errorContainer]}>

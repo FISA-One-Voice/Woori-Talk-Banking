@@ -9,6 +9,7 @@
 # GET /api/asset/summary              → 전체 계좌 잔액 조회
 # GET /api/asset/balance/{account_id} → 계좌별 잔액 조회
 # GET /api/asset/history              → 거래 내역 조회 (필터 지원)
+# GET /api/asset/expense-summary      → 지출 요약 조회 (총액 + 카테고리 Top 5)
 # =============================================================================
 
 from fastapi import APIRouter, Depends
