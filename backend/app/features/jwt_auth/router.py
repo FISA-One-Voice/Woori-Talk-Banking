@@ -9,6 +9,7 @@ from app.features.jwt_auth.schema import JwtLoginRequest, JwtRefreshRequest
 router = APIRouter(prefix="/api/users", tags=["Users Auth"])
 
 
+
 @router.post("/login", response_model=dict)
 def login(req: JwtLoginRequest, db: Session = Depends(get_db)):
     """사용자 로그인을 처리하고 JWT 토큰을 발급합니다.

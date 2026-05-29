@@ -14,6 +14,7 @@ SUPPORTED_CONTENT_TYPES = frozenset(
         "audio/mpeg",
         "audio/mp4",
         "audio/m4a",
+        "audio/x-m4a",  # Apple 구형 MIME 변형 (React Native iOS가 전송하는 타입)
         "audio/aac",
         "audio/flac",
         "audio/ogg",
@@ -55,9 +56,9 @@ async def transcribe_audio(
                 content=audio_bytes,
                 headers={
                     "X-CLOVASPEECH-API-KEY": settings.CLOVA_SECRET_KEY,
-                    # 이 계정은 application/octet-stream 만 허용
                     "Content-Type": "application/octet-stream",
                 },
+                params={"lang": "Kor"},
             )
     except httpx.TimeoutException as exc:
         raise STTError(
@@ -73,7 +74,7 @@ async def transcribe_audio(
     if response.status_code != 200:
         raise STTError(
             code="STT_FAILED",
-            message=f"Clova Speech API 오류: status={response.status_code}",
+            message=f"Clova Speech API 오류: status={response.status_code}, body={response.text}",
         )
 
     payload = response.json()
