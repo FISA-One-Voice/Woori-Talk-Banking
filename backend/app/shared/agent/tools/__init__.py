@@ -15,10 +15,10 @@ Phase 2 담당자가 실제 tool 완성 시 USE_MOCK_TOOLS=false 로 전환.
 """
 
 from app.core.config import settings
+from app.shared.agent.tools.event import get_event_list
 from app.shared.agent.tools.mock_tools import (
     mock_execute_transfer,
     mock_get_balance,
-    mock_get_events,
     mock_get_history,
     mock_lookup_recipient,
     mock_register_auto_transfer,
@@ -27,13 +27,14 @@ from app.shared.agent.tools.mock_tools import (
 # ── Mock tool 목록 ─────────────────────────────────────────────────────────────
 # Phase 2 실제 tool 완성 전까지 사용하는 mock 구현체.
 # 화면 담당자가 실제 tool을 완성하면 _REAL_TOOLS로 이동.
+# get_event_list는 실제 DB 구현 완료 — mock 교체.
 MOCK_TOOLS: list = [
     mock_lookup_recipient,
     mock_get_balance,
     mock_get_history,
     mock_execute_transfer,
     mock_register_auto_transfer,
-    mock_get_events,
+    get_event_list,
 ]
 
 # ── 실제 tool 목록 ─────────────────────────────────────────────────────────────
