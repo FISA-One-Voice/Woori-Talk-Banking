@@ -25,9 +25,12 @@ from fastapi.responses import JSONResponse
 
 from app.core.database import Base, engine
 from app.core.exception import AppError
+from app.features.event.router import router as event_router
 from app.core.opensearch import create_indices_if_not_exists
+# from app.features.event.router import router as event_router  # TODO: event 기능 재구현 후 주석 해제
 from app.features.jwt_auth.router import router as jwt_auth_router
-from app.features.asset.router import router as asset_router
+from app.features.voice.router import router as voice_register_router
+from app.features.recipients.router import router as recipients_router
 from app.shared.voice.router import router as voice_router
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
@@ -115,6 +118,9 @@ Base.metadata.create_all(bind=engine)
 app.include_router(voice_router)
 app.include_router(jwt_auth_router)
 app.include_router(asset_router)  # 자산 화면 — 잔액 조회 + 거래 내역 조회
+app.include_router(event_router)
+app.include_router(voice_register_router)
+app.include_router(recipients_router)
 
 
 # ── 헬스체크 ────────────────────────────────────────────────────────────────────

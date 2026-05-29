@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, String
@@ -19,7 +19,7 @@ _KST = timezone(timedelta(hours=9))
 
 
 def _now() -> datetime:
-    return datetime.now(_KST).replace(tzinfo=None)
+    return (datetime.now(timezone.utc) + timedelta(hours=9)).replace(tzinfo=None)
 
 
 class Transaction(Base):

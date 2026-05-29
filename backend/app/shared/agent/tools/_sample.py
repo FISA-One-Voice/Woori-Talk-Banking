@@ -6,12 +6,12 @@
     참고할 수 있는 패턴과 주석을 제공합니다.
 
     실제 tool 파일은 tools/ 디렉터리에 별도 파일로 작성하고
-    tools/__init__.py 의 ALL_TOOLS 리스트에 등록하십시오.
+    tools/__init__.py 의 _REAL_TOOLS 리스트에 등록하십시오.
 
 tool이 에이전트와 연결되는 흐름:
     1. features/balance/service.py 에 비즈니스 로직 작성 (TTS 문자열 반환)
     2. tools/balance.py 에서 service 함수를 import 하고 @tool 로 래핑
-    3. tools/__init__.py 의 ALL_TOOLS 에 추가
+    3. tools/__init__.py 의 _REAL_TOOLS 에 추가
     4. 에이전트가 사용자 발화를 분석해 적절한 tool 자동 선택·실행
 """
 
@@ -45,7 +45,7 @@ def sample_get_balance(user_id: str) -> str:  # noqa: D401
          예: '잔액 얼마야', '돈 얼마 있어', '통장 잔액 알려줘' 등
 
     Args:
-        user_id: JWT에서 추출한 사용자 ID. voice/router.py 가 주입합니다.
+        user_id: JWT에서 추출한 사용자 ID. execute_node 가 주입합니다.
                  이 파라미터는 모든 tool에 포함되어야 합니다 (인증 검증용).
 
     Returns:
@@ -91,5 +91,5 @@ def sample_get_balance(user_id: str) -> str:  # noqa: D401
 # [ ] Args: user_id 파라미터 포함 (db 는 tool 파라미터로 선언하지 않음)
 # [ ] Returns: TTS 친화 자연어 (마크다운 없음, 숫자 한국어)
 # [ ] Raises: AppError 서브클래스만 사용
-# [ ] tools/__init__.py 의 ALL_TOOLS 에 추가 완료
+# [ ] tools/__init__.py 의 _REAL_TOOLS 에 추가 완료
 # [ ] pytest 테스트 작성 완료

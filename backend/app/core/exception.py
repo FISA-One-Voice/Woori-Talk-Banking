@@ -82,11 +82,35 @@ class OpenSearchIndexError(OpenSearchError):
     pass
 
 
+class RecipientError(AppError):
+    """수취인 조회·등록 관련 에러"""
+
+    pass
+
+
 class AgentError(AppError):
     """LangGraph 에이전트 초기화·실행 중 발생하는 예외.
     shared/agent/ 모듈 전담. 주요 발생 시점:
         - build_graph() — ChatOpenAI 설정 오류, create_react_agent 초기화 실패
         - Phase 2 이후 — tool 호출 중 예외 (AgentInvokeError 등 서브클래스 추가 예정)
     """
+
+    pass
+
+
+class EventError(AppError):
+    """이벤트 기능(features/event/) 관련 커스텀 에러 기반 클래스."""
+
+    pass
+
+
+class EventNotFoundError(EventError):
+    """이벤트를 찾을 수 없을 때 발생합니다."""
+
+    pass
+
+
+class AlreadyParticipatedError(EventError):
+    """이미 참여한 이벤트에 다시 참여할 때 발생합니다."""
 
     pass

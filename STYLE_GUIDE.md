@@ -328,7 +328,7 @@ class VoiceAuthService:
         db: 데이터베이스 세션.
         s3_client: S3 클라이언트 인스턴스.
     """
-```
+``
 
 ### 7.4 Common Mistakes
 

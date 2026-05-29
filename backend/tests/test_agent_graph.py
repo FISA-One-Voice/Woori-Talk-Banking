@@ -115,9 +115,20 @@ class TestSystemPrompt:
 
 
 class TestAllTools:
-    """tools/__init__.py 의 ALL_TOOLS 초기 상태 검증."""
+    """tools/__init__.py 의 ALL_TOOLS 상태 검증."""
 
-    def test_all_tools_is_list(self) -> None:
-        """TC-09: ALL_TOOLS 는 list 타입이며 tool 이 등록되어 있어야 한다."""
+    def test_all_tools_contains_event_tool(self) -> None:
+        """TC-09: Phase 2 에서 ALL_TOOLS 는 get_event_list tool 을 포함해야 한다.
+
+        Phase 1 에는 빈 리스트였으나, 이벤트 기능(Issue #event) 구현으로
+        get_event_list 가 등록되었습니다.
+        이후 다른 화면 tool 이 추가될 때마다 이 테스트도 함께 업데이트합니다.
+        """
+        from app.shared.agent.tools.event import get_event_list
+
         assert isinstance(ALL_TOOLS, list), "ALL_TOOLS 가 list 타입이 아닙니다."
-        assert len(ALL_TOOLS) > 0, "ALL_TOOLS 에 tool 이 하나도 없습니다."
+        assert len(ALL_TOOLS) > 0, "Phase 2 이상에서 ALL_TOOLS 는 비어 있으면 안 됩니다."
+        tool_names = [t.name for t in ALL_TOOLS]
+        assert "get_event_list" in tool_names, (
+            f"ALL_TOOLS 에 get_event_list 가 없습니다. (현재: {tool_names})"
+        )

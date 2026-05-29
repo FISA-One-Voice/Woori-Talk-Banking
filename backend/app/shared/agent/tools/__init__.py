@@ -1,4 +1,3 @@
-# Design Ref: §3.3 — Phase 2 tool 집합 포인트. 이 파일만 수정하면 에이전트에 연결.
 """에이전트 tool 등록 포인트.
 Phase 1 상태: ALL_TOOLS = [] (빈 리스트)
 Phase 2에서 각 화면 담당자가 아래 패턴으로 tool을 추가합니다.
@@ -27,5 +26,10 @@ ALL_TOOLS: list = [
     get_category_history,
     get_monthly_expense,
 ]
+
+from app.shared.agent.tools.event import get_event_list
+
+# Plan SC: build_graph([]) 호출 시 오류 없이 초기화 (Issue #5 완료 조건)
+ALL_TOOLS: list = [get_event_list]
 
 __all__ = ["ALL_TOOLS"]

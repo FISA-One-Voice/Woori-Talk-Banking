@@ -57,7 +57,7 @@ def seed() -> None:
             resident_number="900101-1234567",
             disability_type="전맹",
             tts_speed=1.0,
-            pin_hash=_hash_pin("1234"),  # 실제 bcrypt 해시
+            pin_hash="$2b$12$dummy_hash_for_seed",
             embedding_vector=[0.1] * 192,
         )
         db.add(user)
@@ -229,7 +229,9 @@ def seed() -> None:
             db.query(RegisteredRecipient).filter_by(user_id=user_id, alias="엄마").one()
         )
         assert found.recipient_name == "김순자"
-        print(f"  alias 검색 → {found.recipient_name} ✅")
+        print(
+            f"  alias 검색 (WHERE user_id=? AND alias='엄마') → {found.recipient_name} ✅"
+        )
 
         # ── UPDATE ────────────────────────────────────────────────
         print("\n[UPDATE] 잔액 업데이트 검증...")
@@ -242,8 +244,8 @@ def seed() -> None:
         assert loaded_account.balance == 900_000
         print(f"  balance 1,000,000 → 900,000 ✅")
 
-        # ── DELETE ────────────────────────────────────────────────
-        print("\n[DELETE] standing_order 취소 검증...")
+        # ── DELETE ────────────────────────────────────────────────────────────
+        print("\n[DELETE] standing_order 취소 (status=cancelled) 검증...")
         loaded_so = (
             db.query(StandingOrder).filter_by(order_id=standing_order.order_id).first()
         )

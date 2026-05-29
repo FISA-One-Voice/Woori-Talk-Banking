@@ -55,7 +55,7 @@ apiClient.interceptors.response.use(
       if (refreshToken) {
         try {
           // 백엔드에 리프레시 토큰을 보내서 새 토큰 발급 요청 (axios 날것으로 호출)
-          const response = await axios.post(`${BASE_URL}/users/refresh`, {
+          const response = await axios.post(`${BASE_URL}/api/users/refresh`, {
             refreshToken: refreshToken
           });
           
