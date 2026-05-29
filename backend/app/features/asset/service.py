@@ -117,3 +117,54 @@ def get_transaction_history(
         )
 
     return transactions
+
+
+def get_expense_summary(db: Session, user_id: str, days: int = 30) -> dict:
+    """지출 요약을 반환합니다 (총액 및 카테고리 Top 5).
+
+    Args:
+        db: DB 세션.
+        user_id: 사용자 UUID 문자열.
+        days: 조회 기간(일수). 기본 30일.
+
+    Returns:
+        total(int), days(int), top_categories(list) 를 포함한 dict.
+
+    Raises:
+        HistoryError: 지출 거래 내역이 없을 때.
+    """
+    since = datetime.now(timezone(timedelta(hours=9))).replace(tzinfo=None) - timedelta(
+        days=days
+    )
+    transactions = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == uuid.UUID(user_id),
+            Transaction.created_at >= since,
+            Transaction.category != "수입",
+            Transaction.status == "completed",
+        )
+        .all()
+    )
+
+    if not transactions:
+        raise HistoryError(
+            code="TX_NOT_FOUND",
+            message="해당 기간에 지출 내역이 없습니다.",
+            status_code=404,
+        )
+
+    total = sum(t.amount for t in transactions)
+
+    category_totals: dict[str, int] = {}
+    for t in transactions:
+        cat = t.category or "기타"
+        category_totals[cat] = category_totals.get(cat, 0) + t.amount
+
+    top5 = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    return {
+        "total": total,
+        "days": days,
+        "top_categories": [{"category": k, "amount": v} for k, v in top5],
+    }

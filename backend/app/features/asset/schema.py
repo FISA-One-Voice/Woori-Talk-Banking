@@ -58,3 +58,18 @@ class TransactionListResponse(BaseModel):
 
     transactions: list[TransactionItem]
     total_count: int
+
+
+class CategoryItem(BaseModel):
+    """카테고리별 지출 단건."""
+
+    category: str
+    amount: int
+
+
+class ExpenseSummaryResponse(BaseModel):
+    """지출 요약 응답 (총액 + 카테고리 Top 5)."""
+
+    total: int
+    days: int
+    top_categories: list[CategoryItem]

@@ -11,7 +11,7 @@ tool이 에이전트에 연결되는 방식:
 from langchain_core.tools import tool
 
 from app.core.database import get_db
-from app.features.asset.service import get_transaction_history
+from app.features.asset.service import get_expense_summary, get_transaction_history
 from app.core.exception import HistoryError
 
 
@@ -68,5 +68,32 @@ def get_category_history(user_id: str, category: str, days: int = 30) -> str:  #
         return (
             f"{days}일간 {category} 지출은 총 {len(transactions)}건, {total:,}원입니다."
         )
+    finally:
+        db.close()
+
+
+@tool
+def get_monthly_expense(user_id: str, days: int = 30) -> str:  # noqa: D401
+    """지난 달 총 지출과 카테고리별 지출 현황을 조회합니다.
+
+    "지난 달 돈 얼마 썼어", "이번 달 소비 내역 알려줘", "최근 한달 지출 요약해줘" 같은 발화에 사용됩니다.
+
+    Args:
+        user_id: JWT에서 추출된 사용자 ID.
+        days: 조회할 기간 (기본 30일).
+
+    Returns:
+        TTS로 읽을 문자열. 예: "30일간 총 지출은 50만 원입니다. 식비 20만 원, 교통비 10만 원 등 지출하였습니다."
+
+    Raises:
+        HistoryError: 지출 거래 내역이 없을 때.
+    """
+    db = next(get_db())
+    try:
+        summary = get_expense_summary(db, user_id, days)
+        total = summary["total"]
+        top = summary["top_categories"]
+        cat_text = ", ".join(f"{c['category']} {c['amount']:,}원" for c in top)
+        return f"{days}일간 총 지출은 {total:,}원입니다. {cat_text} 등 지출하였습니다."
     finally:
         db.close()

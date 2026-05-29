@@ -11,6 +11,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { getTtsMessage } from '@/utils/errorHandler';
 import { apiClient, ApiResponse } from '@/utils/api';
+import { fetchExpenseSummary, CategoryItem } from '@/services/assetService';
 
 type Step = 'slot' | 'result' | 'history' | 'error';
 
@@ -28,6 +29,7 @@ export default function HistoryScreen() {
   const [step, setStep] = useState<Step>(type === 'history' ? 'history' : 'slot');
   const [period, setPeriod] = useState('이번달');
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [topCategories, setTopCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   const income = transactions.filter((t) => t.category === '수입').reduce((s, t) => s + t.amount, 0);
@@ -98,6 +100,9 @@ export default function HistoryScreen() {
               onPress={() => {
                 setPeriod(p);
                 fetchHistory(periodToDays(p));
+                fetchExpenseSummary(periodToDays(p))
+                  .then((s) => setTopCategories(s.top_categories))
+                  .catch(() => setTopCategories([]));
                 setStep('result');
               }}
             >
@@ -150,6 +155,18 @@ export default function HistoryScreen() {
               </Text>
             </View>
           </View>
+
+          {topCategories.length > 0 && (
+            <View style={styles.categoryCard}>
+              <Text style={styles.categoryTitle}>카테고리별 지출 Top 5</Text>
+              {topCategories.map((item) => (
+                <View key={item.category} style={styles.categoryRow}>
+                  <Text style={styles.categoryName}>{item.category}</Text>
+                  <Text style={styles.categoryAmount}>{item.amount.toLocaleString()}원</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -358,4 +375,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   homeBtnText: { fontSize: FONT_SIZES.body, color: COLORS.textMain },
+  categoryCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: LAYOUT.cardRadius,
+    padding: 20,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  categoryTitle: {
+    fontSize: FONT_SIZES.body,
+    color: COLORS.textMain,
+    fontWeight: 'bold',
+  },
+  categoryRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  categoryName: { fontSize: FONT_SIZES.body, color: COLORS.textMain },
+  categoryAmount: { fontSize: FONT_SIZES.body, color: COLORS.error, fontWeight: 'bold' },
 });

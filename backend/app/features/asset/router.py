@@ -20,6 +20,8 @@ from app.features.asset import service
 from app.features.asset.schema import (
     AccountBalanceItem,
     AssetSummaryResponse,
+    CategoryItem,
+    ExpenseSummaryResponse,
     TransactionItem,
     TransactionListResponse,
 )
@@ -156,4 +158,41 @@ def get_transaction_history(
         "success": True,
         "data": data,
         "message": f"거래 내역 {len(transactions)}건을 불러왔습니다.",
+    }
+
+
+@router.get("/expense-summary")
+def get_expense_summary(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> dict:
+    """지출 요약을 조회합니다 (총액 및 카테고리 Top 5).
+
+    Args:
+        days: 조회 기간(일수). 기본 30일.
+        db: 데이터베이스 세션.
+        user_id: JWT에서 추출한 인증 사용자 ID.
+
+    Returns:
+        total, days, top_categories 를 포함한 성공 응답 dict.
+
+    Raises:
+        HistoryError: 지출 내역이 없는 경우 (TX_NOT_FOUND).
+    """
+    summary = service.get_expense_summary(db, user_id, days)
+
+    data = ExpenseSummaryResponse(
+        total=summary["total"],
+        days=summary["days"],
+        top_categories=[
+            CategoryItem(category=c["category"], amount=c["amount"])
+            for c in summary["top_categories"]
+        ],
+    )
+
+    return {
+        "success": True,
+        "data": data,
+        "message": f"최근 {days}일 지출 요약입니다.",
     }

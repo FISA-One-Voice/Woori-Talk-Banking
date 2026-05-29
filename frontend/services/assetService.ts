@@ -21,3 +21,24 @@ export async function fetchAssetSummary(): Promise<AssetSummary> {
   }
   return res.data.data;
 }
+
+export interface CategoryItem {
+  category: string;
+  amount: number;
+}
+
+export interface ExpenseSummary {
+  total: number;
+  days: number;
+  top_categories: CategoryItem[];
+}
+
+export async function fetchExpenseSummary(days = 30): Promise<ExpenseSummary> {
+  const res = await apiClient.get<ApiResponse<ExpenseSummary>>(
+    `/api/asset/expense-summary?days=${days}`
+  );
+  if (!res.data.success || !res.data.data) {
+    throw new Error(res.data.code ?? 'INTERNAL_ERROR');
+  }
+  return res.data.data;
+}
