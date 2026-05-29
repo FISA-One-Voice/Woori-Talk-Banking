@@ -28,7 +28,7 @@ def convert_to_wav_with_ffmpeg(audio_bytes: bytes) -> bytes:
     try:
         cmd = [
             "ffmpeg", "-y", "-i", temp_in_path,
-            "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "1",
+            "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
             temp_out_path
         ]
         subprocess.run(cmd, check=True, capture_output=True, timeout=30)
