@@ -8,20 +8,11 @@
 // [BASE_URL 설정 방법]
 // frontend/.env 파일에 아래 항목을 추가하세요:
 //   EXPO_PUBLIC_API_BASE_URL=http://본인_로컬IP:8000
-//
-// expo start 실행 시 Expo 가 자동으로 읽습니다. (SDK 49+ 기본 지원)
-// frontend/.env 는 .gitignore 에 포함되어 있어 커밋되지 않습니다.
-//
-// IP 확인:
-//   Windows  → PowerShell: ipconfig   (IPv4 주소)
-//   Mac/Linux → 터미널: ipconfig getifaddr en0
 // =============================================================================
 
 import axios from 'axios';
 import { useAuthStore } from '@/store/authStore';
 
-// EXPO_PUBLIC_API_BASE_URL 이 없으면 경고를 출력하고 localhost 를 사용합니다.
-// Expo Go(모바일)에서는 localhost 가 동작하지 않으므로 반드시 .env 를 설정하세요.
 if (__DEV__ && !process.env['EXPO_PUBLIC_API_BASE_URL']) {
   console.warn(
     '[api.ts] EXPO_PUBLIC_API_BASE_URL 환경변수가 설정되지 않았습니다.\n' +
@@ -39,16 +30,61 @@ export const apiClient = axios.create({
   },
 });
 
-// 요청 인터셉터: 모든 API 요청에 authStore 토큰 자동 첨부
-// 각 스토어/화면에서 토큰을 직접 꺼내 헤더에 넣을 필요 없습니다.
+// ✅ 토큰 인터셉터 추가 (Zustand authStore 연동)
+// 1. Request 인터셉터: 나가는 요청 헤더에 톨게이트처럼 토큰 부착
 apiClient.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  const { token } = useAuthStore.getState();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 
+// 2. Response 인터셉터: 만료된 토큰(401) 응답을 가로채서 새 토큰으로 자동 재요청 (Silent Refresh)
+apiClient.interceptors.response.use(
+  (response) => response, // 성공한 응답은 그대로 패스
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // 백엔드에서 401(Unauthorized) 에러를 뱉었고, 아직 재요청을 시도하지 않은 상태라면?
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true; // 무한 루프 방지용 플래그
+      
+      const { refreshToken, setTokens, clearTokens } = useAuthStore.getState();
+      
+      if (refreshToken) {
+        try {
+          // 백엔드에 리프레시 토큰을 보내서 새 토큰 발급 요청 (axios 날것으로 호출)
+          const response = await axios.post(`${BASE_URL}/api/users/refresh`, {
+            refreshToken: refreshToken
+          });
+          
+          if (response.data.success) {
+            const newAccessToken = response.data.data.accessToken;
+            const newRefreshToken = response.data.data.refreshToken || refreshToken;
+            
+            // 새로 발급받은 토큰들을 전역 금고에 갱신
+            setTokens(newAccessToken, newRefreshToken);
+            
+            // 실패했던 원래 요청의 헤더를 새 토큰으로 교체하고 다시 전송! (마치 에러가 없었던 것처럼)
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            return apiClient(originalRequest);
+          }
+        } catch (refreshError) {
+          // 리프레시 토큰마저 만료되었거나 에러가 났다면 강제 로그아웃
+          clearTokens();
+        }
+      } else {
+        clearTokens();
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
 /** 백엔드 표준 API 응답 형식 */
-export interface ApiResponse<T> {
+export interface ApiResponse<T = any> {
   success: boolean;
   data: T | null;
   message: string;

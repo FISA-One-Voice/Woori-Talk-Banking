@@ -28,6 +28,7 @@ THRESHOLD: float = 0.75
 
 # ── 픽스처 ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="module")
 def real_model() -> ASVModel:
     """실제 ASVModel 인스턴스 (모듈 스코프 — 모델 로딩은 1회만).
@@ -72,19 +73,20 @@ def wav_bytes() -> bytes:
     fmt_chunk = struct.pack(
         "<4sIHHIIHH",
         b"fmt ",
-        16,           # chunk size
-        1,            # PCM format
-        1,            # 모노
+        16,  # chunk size
+        1,  # PCM format
+        1,  # 모노
         sample_rate,
         sample_rate * 2,  # byte rate
-        2,            # block align
-        16,           # bits per sample
+        2,  # block align
+        16,  # bits per sample
     )
     data_chunk = struct.pack("<4sI", b"data", data_size) + pcm_data
     return header + fmt_chunk + data_chunk
 
 
 # ── TestExtractEmbedding ─────────────────────────────────────────────────────
+
 
 class TestExtractEmbedding:
     """ASVModel.extract_embedding 실제 모델 동작 검증."""
@@ -99,11 +101,16 @@ class TestExtractEmbedding:
         result = real_model.extract_embedding(wav_bytes)
 
         assert isinstance(result, list), "반환값이 list여야 합니다"
-        assert len(result) == EMBEDDING_DIM, f"192차원이어야 합니다. 실제: {len(result)}"
-        assert all(isinstance(v, float) for v in result), "모든 원소가 float이어야 합니다"
+        assert len(result) == EMBEDDING_DIM, (
+            f"192차원이어야 합니다. 실제: {len(result)}"
+        )
+        assert all(isinstance(v, float) for v in result), (
+            "모든 원소가 float이어야 합니다"
+        )
 
 
 # ── TestCosineSimilarity ─────────────────────────────────────────────────────
+
 
 class TestCosineSimilarity:
     """ASVModel.cosine_similarity 수학적 검증 (staticmethod — 모델 불필요)."""
@@ -137,6 +144,7 @@ class TestCosineSimilarity:
 
 # ── TestHealthEndpoint ───────────────────────────────────────────────────────
 
+
 class TestHealthEndpoint:
     """GET /health 엔드포인트 테스트.
 
@@ -157,6 +165,7 @@ class TestHealthEndpoint:
 
 
 # ── TestEnrollEndpoint ───────────────────────────────────────────────────────
+
 
 class TestEnrollEndpoint:
     """POST /enroll 엔드포인트 테스트.
@@ -201,6 +210,7 @@ class TestEnrollEndpoint:
 
 
 # ── TestVerifyEndpoint ───────────────────────────────────────────────────────
+
 
 class TestVerifyEndpoint:
     """POST /verify 엔드포인트 테스트.

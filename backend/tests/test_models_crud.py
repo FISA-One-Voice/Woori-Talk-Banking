@@ -36,6 +36,7 @@ def _now() -> datetime:
 # ── fixtures ──────────────────────────────────────────────────────────────────
 # db 픽스처는 conftest.py에서 제공합니다.
 
+
 @pytest.fixture(scope="module")
 def test_user(db):
     """테스트 전용 사용자 1명. 모듈 종료 시 CASCADE로 연관 데이터 모두 삭제."""
@@ -63,13 +64,20 @@ def test_user(db):
 
 # ── 테이블 생성 확인 ───────────────────────────────────────────────────────────
 
+
 def test_all_tables_exist():
     """uvicorn 기동 시 모든 테이블이 오류 없이 생성되는지 확인."""
     from sqlalchemy import inspect
+
     inspector = inspect(engine)
     expected = {
-        "users", "accounts", "registered_recipients",
-        "standing_orders", "transactions", "events", "event_participations",
+        "users",
+        "accounts",
+        "registered_recipients",
+        "standing_orders",
+        "transactions",
+        "events",
+        "event_participations",
     }
     existing = set(inspector.get_table_names())
     missing = expected - existing
@@ -77,6 +85,7 @@ def test_all_tables_exist():
 
 
 # ── User CRUD ─────────────────────────────────────────────────────────────────
+
 
 def test_user_create(test_user):
     """users 테이블 CREATE 확인."""
@@ -111,6 +120,7 @@ def test_user_delete_is_soft(db, test_user):
 
 
 # ── Account CRUD ──────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def test_account(db, test_user):
@@ -154,15 +164,14 @@ def test_account_update_balance(db, test_account):
 def test_account_is_primary_flag(db, test_user, test_account):
     """is_primary=True 계좌 단건 조회 (transfer 서비스 시나리오)."""
     primary = (
-        db.query(Account)
-        .filter_by(user_id=test_user.user_id, is_primary=True)
-        .first()
+        db.query(Account).filter_by(user_id=test_user.user_id, is_primary=True).first()
     )
     assert primary is not None
     assert primary.account_id == test_account.account_id
 
 
 # ── RegisteredRecipient CRUD + UniqueConstraint ────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def test_recipient(db, test_user):
@@ -219,6 +228,7 @@ def test_recipient_update(db, test_recipient):
 
 # ── StandingOrder CRUD ────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="module")
 def test_standing_order(db, test_user, test_account, test_recipient):
     order = StandingOrder(
@@ -254,6 +264,7 @@ def test_standing_order_cancel(db, test_standing_order):
 
 
 # ── Transaction CRUD ──────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def test_transaction(db, test_user, test_account, test_recipient):
@@ -317,6 +328,7 @@ def test_transaction_nullable_recipient(db, test_user, test_account):
 
 
 # ── Event + EventParticipation ────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def test_event(db):

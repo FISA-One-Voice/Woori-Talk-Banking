@@ -117,9 +117,7 @@ class ASVModel:
 
             # 7. 임베딩 추출: output_emb=True 시 {"embs": ndarray[N, 192], "outputs": ...}
             if isinstance(result, dict) and "embs" in result:
-                embedding: list[float] = (
-                    np.array(result["embs"]).flatten().tolist()
-                )
+                embedding: list[float] = np.array(result["embs"]).flatten().tolist()
             elif isinstance(result, dict) and "spk_embedding" in result:
                 # 일부 버전 호환성 유지
                 embedding = np.array(result["spk_embedding"]).flatten().tolist()

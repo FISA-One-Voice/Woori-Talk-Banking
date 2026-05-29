@@ -39,6 +39,7 @@ TEST_PIN = "123456"
 
 # ── 헬퍼 함수 ─────────────────────────────────────────────────────────────────
 
+
 def _create_test_user(db: Session) -> User:
     """테스트용 사용자를 DB에 직접 삽입합니다.
 
@@ -74,6 +75,7 @@ def _delete_test_user(phone: str) -> None:
 
 # ── 픽스처 ────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(autouse=True)
 def cleanup():
     """각 테스트 함수 실행 후 테스트 사용자를 삭제합니다.
@@ -95,12 +97,12 @@ def test_user(db: Session) -> User:
 
 
 class TestLogin:
-    """POST /jwt-auth/login 테스트"""
+    """POST /users/login 테스트"""
 
     def test_login_success(self, client: TestClient, test_user: User):
         """정상적인 전화번호 + PIN으로 로그인하면 토큰이 반환됩니다."""
         res = client.post(
-            "/jwt-auth/login",
+            "/users/login",
             json={"phone": TEST_PHONE, "pin": TEST_PIN},
         )
 
@@ -112,9 +114,9 @@ class TestLogin:
 
         # 응답 데이터에 세 가지 키가 모두 있어야 합니다
         data = body["data"]
-        assert "accessToken" in data,  "accessToken이 없습니다"
+        assert "accessToken" in data, "accessToken이 없습니다"
         assert "refreshToken" in data, "refreshToken이 없습니다"
-        assert "userId" in data,       "userId가 없습니다"
+        assert "userId" in data, "userId가 없습니다"
 
         # 각 값이 비어있지 않아야 합니다
         assert len(data["accessToken"]) > 0
@@ -124,7 +126,7 @@ class TestLogin:
     def test_login_unknown_phone(self, client: TestClient):
         """가입되지 않은 전화번호로 로그인하면 USER_NOT_FOUND 오류가 반환됩니다."""
         res = client.post(
-            "/jwt-auth/login",
+            "/users/login",
             json={"phone": "010-9999-9999", "pin": TEST_PIN},
         )
 
@@ -139,7 +141,7 @@ class TestLogin:
         """올바른 전화번호지만 틀린 PIN → UNAUTHORIZED 오류가 반환됩니다."""
         _ = test_user  # DB에 사용자가 존재해야 "잘못된 PIN" 케이스를 테스트할 수 있음
         res = client.post(
-            "/jwt-auth/login",
+            "/users/login",
             json={"phone": TEST_PHONE, "pin": "000000"},  # 틀린 PIN
         )
 
@@ -151,13 +153,13 @@ class TestLogin:
 
 
 class TestRefreshToken:
-    """POST /jwt-auth/refresh 테스트"""
+    """POST /users/refresh 테스트"""
 
     def test_refresh_success(self, client: TestClient, test_user: User):
         """유효한 refresh token으로 새 access token을 발급받을 수 있습니다."""
         # 1단계: 로그인해서 refresh token 획득
         login_res = client.post(
-            "/jwt-auth/login",
+            "/users/login",
             json={"phone": TEST_PHONE, "pin": TEST_PIN},
         )
         refresh_token = login_res.json()["data"]["refreshToken"]
@@ -167,7 +169,7 @@ class TestRefreshToken:
         # exp 값이 동일해 완전히 같은 토큰이 생성됩니다.
         time.sleep(1)
         res = client.post(
-            "/jwt-auth/refresh",
+            "/users/refresh",
             json={"refreshToken": refresh_token},
         )
 
@@ -183,7 +185,7 @@ class TestRefreshToken:
     def test_refresh_with_invalid_token(self, client: TestClient):
         """위조된 refresh token은 TOKEN_INVALID 오류를 반환합니다."""
         res = client.post(
-            "/jwt-auth/refresh",
+            "/users/refresh",
             json={"refreshToken": "this.is.a.fake.token"},
         )
 
@@ -196,7 +198,7 @@ class TestRefreshToken:
     def test_refresh_with_empty_token(self, client: TestClient):
         """빈 문자열 refresh token도 TOKEN_INVALID 오류를 반환합니다."""
         res = client.post(
-            "/jwt-auth/refresh",
+            "/users/refresh",
             json={"refreshToken": ""},
         )
 
@@ -208,13 +210,13 @@ class TestRefreshToken:
 
 
 class TestLogout:
-    """PUT /jwt-auth/logout 테스트"""
+    """PUT /users/logout 테스트"""
 
     def test_logout_success(self, client: TestClient, test_user: User):
         """유효한 access token으로 로그아웃하면 userId가 반환됩니다."""
         # 1단계: 로그인해서 access token 획득
         login_res = client.post(
-            "/jwt-auth/login",
+            "/users/login",
             json={"phone": TEST_PHONE, "pin": TEST_PIN},
         )
         data = login_res.json()["data"]
@@ -223,7 +225,7 @@ class TestLogout:
 
         # 2단계: 로그아웃 요청
         res = client.put(
-            "/jwt-auth/logout",
+            "/users/logout",
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
@@ -239,7 +241,7 @@ class TestLogout:
 
         HTTPBearer는 토큰이 없으면 403 Not authenticated를 반환합니다.
         """
-        res = client.put("/jwt-auth/logout")  # 헤더 없음
+        res = client.put("/users/logout")  # 헤더 없음
 
         # 이 서비스는 토큰 없는 요청에 401을 반환합니다
         assert res.status_code == 401
@@ -247,7 +249,7 @@ class TestLogout:
     def test_logout_with_invalid_token(self, client: TestClient):
         """위조된 access token으로 logout을 시도하면 401이 반환됩니다."""
         res = client.put(
-            "/jwt-auth/logout",
+            "/users/logout",
             headers={"Authorization": "Bearer fake.access.token"},
         )
 
