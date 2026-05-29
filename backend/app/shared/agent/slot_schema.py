@@ -21,6 +21,7 @@ SCREEN_MAP: dict[str, str] = {
     "balance": "balance",
     "history": "balance",  # 자산 화면에 통합 (Issue #9)
     "event": "event",
+    "home": "home",
 }
 
 # ── 수취인 검증이 필요한 액션 ────────────────────────────────────────────────────
@@ -38,7 +39,7 @@ ASV_REQUIRED_ACTIONS: set[str] = {
 # ── 슬롯별 TTS 질문 템플릿 ────────────────────────────────────────────────────────
 # slot_fill_node에서 첫 번째 누락 슬롯의 질문을 TTS로 반환한다.
 SLOT_QUESTIONS: dict[str, str] = {
-    "recipient": "누구에게 보낼까요? 별명이나 이름을 말씀해 주세요.",
+    "recipient": "누구에게 보낼까요? 별명이나 이름, 계좌번호를 말씀해 주세요.",
     "amount": "얼마를 보낼까요?",
     "cycle": "매월 또는 매주 중 어떤 주기로 보낼까요?",
     "scheduled_day": "매월 며칠에 이체할까요?",
@@ -47,7 +48,7 @@ SLOT_QUESTIONS: dict[str, str] = {
 # ── 실행 완료 화면 경로 ────────────────────────────────────────────────────────────
 # execute_node 실행 후 navigate_to에 설정되어 프론트엔드 완료 화면으로 이동한다.
 COMPLETE_SCREEN_MAP: dict[str, str] = {
-    "transfer":      "transfer/complete",
+    "transfer": "transfer/complete",
     "auto_transfer": "auto-transfer/complete",
 }
 

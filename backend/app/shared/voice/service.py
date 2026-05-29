@@ -95,6 +95,12 @@ async def process_voice_pipeline(
         if state_snapshot.values
         else False
     )
+    logger.info(
+        "[Pipeline] user_id=%s awaiting_asv=%s state_values=%s",
+        user_id,
+        awaiting_asv,
+        state_snapshot.values if state_snapshot.values else "EMPTY",
+    )
 
     if awaiting_asv:
         return await _handle_asv_flow(audio_bytes, user_id, config, db, graph)
@@ -191,6 +197,14 @@ async def _handle_asv_flow(
     # DB에서 사용자 음성 임베딩 조회 (ASV /verify 호출에 필요)
     reference_embedding = _get_user_embedding(user_id, db)
 
+    logger.info(
+        "[ASV] _call_asv_ec2 호출 직전: url=%s/verify "
+        "embedding_len=%d audio_bytes=%d",
+        settings.ASV_SERVER_URL,
+        len(reference_embedding),
+        len(audio_bytes),
+    )
+
     # ASV + anti-spoofing 병렬 호출
     asv_result, spoof_result = await asyncio.gather(
         _call_asv_ec2(audio_bytes, reference_embedding),
@@ -239,13 +253,12 @@ async def _handle_asv_flow(
                 "pending_action": None,
                 "collected_slots": {},
                 "asv_retry_count": 0,
-                "navigate_to": None,
+                "navigate_to": "home",
             },
             as_node="intent_node",
         )
         tts_text = (
-            "본인 확인에 세 번 실패하여 작업이 취소되었습니다. "
-            "처음부터 다시 말씀해 주세요."
+            "본인 확인에 세 번 실패하여 작업이 취소되었습니다. 홈 화면으로 이동합니다."
         )
         awaiting_asv_next = False
     else:
@@ -351,15 +364,16 @@ def _get_user_embedding(user_id_str: str, db: Session) -> list[float]:
         )
 
     user: User | None = db.get(User, user_uuid)
-    if user is None or not user.embedding_vector:
+    if user is None or user.embedding_vector is None:
         raise ASVError(
             code="ASV_NOT_ENROLLED",
             message="음성 등록이 필요합니다. 앱에서 음성 등록을 먼저 진행해 주세요.",
             status_code=422,
         )
 
-    # pgvector는 list 또는 numpy array 반환. list[float]로 변환
-    return list(user.embedding_vector)
+    # pgvector는 numpy array를 반환. float32 → Python float으로 변환해야
+    # json.dumps가 가능하다.
+    return [float(v) for v in user.embedding_vector]
 
 
 # ── 외부 EC2 서버 호출 ──────────────────────────────────────────────────────────

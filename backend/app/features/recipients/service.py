@@ -17,6 +17,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.core.database import get_db
 from app.core.exception import RecipientError
 from app.features.recipients.schema import ResolvedRecipient
 from app.models.account import Account
@@ -254,3 +255,27 @@ def lookup_recipient_by_voice(
         # 0명 또는 동명이인 → None (재입력 유도)
         return None
     return resolve_by_id(db, user_uuid, str(matches[0].recipient_id))
+
+
+def find_recipient_by_voice(user_id: str, recipient: str) -> str | None:
+    """음성 발화 수취인 조회 — DB 세션을 내부에서 관리하는 에이전트용 래퍼.
+
+    graph.py의 resolve_node에서 호출한다.
+    DB 세션 생명주기를 service 레이어에서 캡슐화하여
+    graph.py가 인프라 코드에 직접 의존하지 않도록 한다.
+
+    Args:
+        user_id: 요청 사용자 UUID 문자열.
+        recipient: 수취인 이름·별명·전화번호.
+
+    Returns:
+        정규화된 수취인 실명 (찾은 경우), None (없는 경우).
+    """
+    db = next(get_db())
+    try:
+        resolved = lookup_recipient_by_voice(db, uuid.UUID(user_id), recipient)
+        return resolved.recipient_name if resolved else None
+    except Exception:
+        return None
+    finally:
+        db.close()

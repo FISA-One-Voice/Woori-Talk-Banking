@@ -30,6 +30,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exception import AgentError
+from app.features.recipients.service import find_recipient_by_voice
 from app.shared.agent.prompts import SYSTEM_PROMPT
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
@@ -276,10 +277,11 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "",
             "규칙:",
             f"- 유효한 인텐트 목록: {list(VALID_INTENTS)}",
-            "- intent: 금융 작업 유형이 파악되면 슬롯 유무와 무관하게 반드시 설정."
-            " 슬롯 채우기 진행 중이면 null.",
+            "- intent: 금융 작업 또는 화면 이동 유형이 파악되면 슬롯 유무와 무관하게"
+            " 반드시 설정. 슬롯 채우기 진행 중이면 null.",
             "  예) '이체해줘' → intent='transfer' (슬롯 없어도 설정)",
             "  예) '잔액 얼마야' → intent='balance'",
+            "  예) '홈 화면', '처음으로', '홈으로 가줘' → intent='home'",
             "- extracted_slots: 발화에서 파악한 슬롯 값 (없으면 {})."
             " 금액 슬롯 키는 'amount', 값은 원화 정수 문자열"
             " (예: '3만원'→'30000', '오만원'→'50000')."
@@ -360,15 +362,38 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 }
             return updates
 
+        # ── 홈 이동 처리 ─────────────────────────────────────────────────────────
+        # 진행 중인 모든 액션 상태를 초기화하고 홈으로 이동
+        if result.intent == "home":
+            return {
+                "pending_action": None,
+                "collected_slots": {},
+                "awaiting_confirmation": False,
+                "awaiting_asv_audio": False,
+                "execution_ready": False,
+                "recipient_validated": False,
+                "asv_retry_count": 0,
+                "navigate_to": "home",
+                "messages": [AIMessage(content="홈 화면으로 이동합니다.")],
+            }
+
         # ── 새 인텐트 감지 ──────────────────────────────────────────────────────
-        if result.intent and result.intent in VALID_INTENTS and not pending:
-            new_slots = dict(result.extracted_slots)
-            updates["pending_action"] = result.intent
-            updates["navigate_to"] = SCREEN_MAP.get(result.intent)
-            updates["collected_slots"] = new_slots
-            updates["recipient_validated"] = False
-            # navigate_to 설정 후 reset (다음 턴에서는 None)
-            # (slot_fill_node나 confirm_node에서 None으로 설정)
+        # pending과 다른 인텐트가 들어오면 기존 슬롯·상태를 초기화하고 새로 시작
+        if (
+            result.intent
+            and result.intent in VALID_INTENTS
+            and result.intent != pending
+        ):
+            updates = {
+                "pending_action": result.intent,
+                "navigate_to": SCREEN_MAP.get(result.intent),
+                "collected_slots": dict(result.extracted_slots),
+                "recipient_validated": False,
+                "awaiting_confirmation": False,
+                "awaiting_asv_audio": False,
+                "execution_ready": False,
+                "asv_retry_count": 0,
+            }
 
         # ── 슬롯 보충 ──────────────────────────────────────────────────────────
         elif result.extracted_slots and pending:
@@ -428,7 +453,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
     def resolve_node(state: VoiceState) -> dict:
         """recipient 슬롯이 채워진 즉시 수취인 존재 여부를 검증한다.
 
-        lookup_recipient 툴 미등록 시(mock 환경) 검증을 생략하고 통과시킨다.
         성공 시 recipient_validated=True, 실패 시 recipient 슬롯 초기화 후 재수집 유도.
         """
         slots = dict(state.get("collected_slots", {}))
@@ -438,23 +462,10 @@ def build_graph(tools: list) -> CompiledStateGraph:
             recipient_input,
             state.get("user_id"),
         )
-        user_id = state.get("user_id", "")
 
-        resolver = tool_registry.get("lookup_recipient") or tool_registry.get(
-            "mock_lookup_recipient"
+        canonical_name: str | None = find_recipient_by_voice(
+            state.get("user_id", ""), recipient_input
         )
-
-        if resolver is None:
-            logger.warning("resolve_node: lookup_recipient 툴 미등록, 검증 생략")
-            return {"recipient_validated": True}
-
-        try:
-            canonical_name: str | None = resolver.invoke(
-                {"user_id": user_id, "recipient": recipient_input}
-            )
-        except Exception as e:
-            logger.error("resolve_node 수취인 조회 실패: %s", e)
-            canonical_name = None
 
         if canonical_name is None:
             slots["recipient"] = None
@@ -509,12 +520,27 @@ def build_graph(tools: list) -> CompiledStateGraph:
         tool_obj = _find_tool_for_action(pending)
 
         if tool_obj is None:
-            response_text = (
-                "해당 기능을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요."
-            )
             logger.warning(
                 "execute_node: '%s' 액션에 대한 tool을 찾을 수 없습니다.", pending
             )
+            return {
+                "pending_action": None,
+                "collected_slots": {},
+                "awaiting_confirmation": False,
+                "awaiting_asv_audio": False,
+                "execution_ready": False,
+                "recipient_validated": False,
+                "asv_retry_count": 0,
+                "navigate_to": "home",
+                "messages": [
+                    AIMessage(
+                        content=(
+                            "해당 기능을 아직 사용할 수 없습니다."
+                            " 홈 화면으로 이동합니다."
+                        )
+                    )
+                ],
+            }
         else:
             # user_id를 슬롯에 추가 (service 호출에 필요)
             invoke_args = {"user_id": state.get("user_id", ""), **slots}

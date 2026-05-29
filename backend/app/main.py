@@ -20,6 +20,11 @@
 
 import logging
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -136,6 +141,9 @@ create_indices_if_not_exists()
 # 새 화면(feature)을 추가할 때마다 이 파일에 두 줄씩 추가합니다:
 # from app.features.{name}.router import router as {name}_router
 # app.include_router({name}_router)
+from app.core.config import settings as _settings
+logger.info("[Startup] ASV_SERVER_URL = %s", _settings.ASV_SERVER_URL)
+
 app.include_router(voice_router)
 app.include_router(jwt_auth_router)
 app.include_router(event_router)

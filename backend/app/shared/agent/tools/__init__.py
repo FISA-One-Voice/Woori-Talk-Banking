@@ -25,9 +25,8 @@ from app.shared.agent.tools.mock_tools import (
 )
 
 # ── Mock tool 목록 ─────────────────────────────────────────────────────────────
-# Phase 2 실제 tool 완성 전까지 사용하는 mock 구현체.
+# 실제 tool 완성 전까지 사용하는 mock 구현체.
 # 화면 담당자가 실제 tool을 완성하면 _REAL_TOOLS로 이동.
-# get_event_list는 실제 DB 구현 완료 — mock 교체.
 MOCK_TOOLS: list = [
     mock_lookup_recipient,
     mock_get_balance,
@@ -39,14 +38,26 @@ MOCK_TOOLS: list = [
 
 # ── 실제 tool 목록 ─────────────────────────────────────────────────────────────
 # Phase 2 담당자가 완성한 실제 tool을 여기에 추가한다.
-# 예:
-#   from app.shared.agent.tools.balance import get_balance_tool
-#   _REAL_TOOLS = [get_balance_tool, ...]
-_REAL_TOOLS: list = []
+#
+# 추가 순서 (담당자별):
+#   공통:          from app.shared.agent.tools.lookup_recipient import lookup_recipient
+#   balance  (B):  from app.shared.agent.tools.balance import execute_balance
+#   history  (B):  from app.shared.agent.tools.history import execute_history
+#   transfer (C):  from app.shared.agent.tools.transfer import execute_transfer
+#   auto_transfer (D): from app.shared.agent.tools.auto_transfer import (
+#                          register_auto_transfer)
+_REAL_TOOLS: list = [
+    get_event_list,  # event 담당자 완료
+    # lookup_recipient,   # 공통 — tools/lookup_recipient.py 완성 후 주석 해제
+    # execute_balance,    # balance 담당자 — tools/balance.py 완성 후 주석 해제
+    # execute_history,    # history 담당자 — tools/history.py 완성 후 주석 해제
+    # execute_transfer,   # transfer 담당자 — tools/transfer.py 완성 후 주석 해제
+    # register_auto_transfer,  # auto_transfer 담당자 — auto_transfer.py 완성 후 해제
+]
 
 # ── 활성 tool 목록 ─────────────────────────────────────────────────────────────
-# USE_MOCK_TOOLS=true  (기본값) → MOCK_TOOLS 사용 (개발/테스트 환경)
-# USE_MOCK_TOOLS=false           → 실제 tool 사용 (Phase 2 완료 후)
+# USE_MOCK_TOOLS=true  → MOCK_TOOLS 사용 (개발/테스트 환경)
+# USE_MOCK_TOOLS=false → 실제 tool 사용 (Phase 2 완료 후)
 ALL_TOOLS: list = MOCK_TOOLS if settings.USE_MOCK_TOOLS else _REAL_TOOLS
 
 __all__ = ["ALL_TOOLS", "MOCK_TOOLS"]

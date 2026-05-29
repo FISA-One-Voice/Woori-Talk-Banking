@@ -35,7 +35,11 @@ export default function RootLayout() {
       }
 
       if (data.navigate_to) {
-        router.push(`/${data.navigate_to}`);
+        if (data.navigate_to === 'home') {
+          router.replace('/home');
+        } else {
+          router.push(`/${data.navigate_to}`);
+        }
       }
 
       if (data.awaiting_asv_audio) {
