@@ -25,7 +25,7 @@ export default function DevVoiceRegisterScreen() {
     Speech.stop();
 
     if (step === 'TUTORIAL') {
-      Speech.speak("목소리 등록을 시작합니다. 주의사항. 1. 조용한 환경에서 진행해 주세요. 2. 진동이 울리면 문장을 천천히 세 번 연속으로 읽어주세요. 3. 총 10초동안 녹음됩니다. 준비가 되셨다면 화면 하단의 시작하기 버튼을 눌러주세요.", { language: 'ko-KR', rate: 0.9 });
+      Speech.speak("고객님의 목소리 등록을 시작합니다. 준비사항. 1. 조용한 환경에서 진행해 주세요. 2. 진동이 울리면 문장을 천천히 세 번 연속으로 읽어주세요. 3. 총 10초동안 녹음됩니다. 준비가 되셨다면 화면 하단의 시작하기 버튼을 눌러주세요.", { language: 'ko-KR', rate: 0.9 });
     } else if (step === 'READY') {
       const message = "진동이 울리면, 내 목소리가 나의 비밀번호입니다 라는 문장을 천천히 세 번 연속으로 말씀해 주세요.";
       
@@ -104,6 +104,14 @@ export default function DevVoiceRegisterScreen() {
 
   const startRecording = async () => {
     try {
+      // 기존에 덜 닫힌 녹음 세션이 있다면 확실하게 해제(Clean-up)합니다.
+      if (recordingRef.current) {
+        try {
+          await recordingRef.current.stopAndUnloadAsync();
+        } catch (e) {}
+        recordingRef.current = null;
+      }
+
       await Audio.requestPermissionsAsync();
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -229,7 +237,7 @@ export default function DevVoiceRegisterScreen() {
                 {[
                   '조용한 환경에서 진행해 주세요',
                   '진동이 울리면 세 번 연속으로 읽어주세요',
-                  '총 10초 동안 넉넉하게 녹음됩니다'
+                  '총 10초 동안 녹음됩니다'
                 ].map((text, idx) => (
                   <View key={idx} style={styles.listItem}>
                     <View style={styles.listNumber}>

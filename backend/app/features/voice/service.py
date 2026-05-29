@@ -82,8 +82,10 @@ async def extract_voice_vector(
     try:
         async with httpx.AsyncClient() as client:
             files = {"file": (filename, audio_bytes, content_type)}
+            # .env에 등록된 URL의 끝에 '/'가 있으면 제거하여 중복 슬래시(//) 방지
+            base_url = settings.ASV_SERVER_URL.rstrip('/')
             response = await client.post(
-                f"{settings.ASV_SERVER_URL}/enroll", files=files, timeout=30.0
+                f"{base_url}/enroll", files=files, timeout=30.0
             )
             response.raise_for_status()
 
