@@ -82,3 +82,29 @@ class TestTransactionHistory:
         response = client.get("/api/asset/history")
         data = response.json()
         assert "success" in data
+
+
+class TestExpenseSummary:
+    """GET /api/asset/expense-summary 테스트"""
+
+    def test_expense_summary_requires_auth(self):
+        """위조된 토큰이면 401 반환 확인."""
+        response = client.get(
+            "/api/asset/expense-summary",
+            headers={"Authorization": "Bearer invalid.token"},
+        )
+        assert response.status_code == 401
+
+    def test_expense_summary_with_days_param(self):
+        """위조된 토큰으로 days 파라미터 요청 시 401 반환 확인."""
+        response = client.get(
+            "/api/asset/expense-summary?days=7",
+            headers={"Authorization": "Bearer invalid.token"},
+        )
+        assert response.status_code == 401
+
+    def test_expense_summary_response_format(self):
+        """응답 형식이 표준 ApiResponse 형태인지 확인."""
+        response = client.get("/api/asset/expense-summary")
+        data = response.json()
+        assert "success" in data
