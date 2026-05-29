@@ -132,7 +132,7 @@ export default function EventListScreen() {
     <View style={styles.root}>
       <View style={styles.body}>
         <TopBar variant="back" title="이벤트" onBack={() => router.replace('/home' as never)} />
-        <TtsBubble message={ttsMessage} autoPlay />
+        <TtsBubble message={ttsMessage} autoPlay={screen !== 'loading'} />
 
         {screen === 'loading' && (
           <View style={styles.center}>
