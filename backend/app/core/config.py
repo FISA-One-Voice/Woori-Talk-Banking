@@ -13,12 +13,8 @@
 # 그 다음:       settings.DATABASE_URL  로 값을 읽습니다.
 # =============================================================================
 
-from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-# config.py 기준으로 3단계 상위(Woori-Talk-Banking/) 에서 .env 탐색
-_ENV_FILE = str(Path(__file__).resolve().parents[3] / ".env")
 
 
 class Settings(BaseSettings):
@@ -114,7 +110,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
+    model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
 
 
 # 싱글턴 패턴: 이 모듈을 import 하는 모든 파일이 같은 객체를 공유합니다.
