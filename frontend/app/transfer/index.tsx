@@ -6,6 +6,7 @@ import { TtsBubble, StatusBadge, FingerprintIcon } from '@/components/feedback';
 import { SummaryBox, RecipientList, ActionButton } from '@/components/display';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { useTransferStore } from '@/store/transferStore';
+import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { fetchRecentRecipients, executeTransfer } from '@/services/transferService';
 import type { RecipientItem } from '@/components/display';
 
@@ -23,9 +24,41 @@ export default function TransferScreen() {
 
   useEffect(() => {
     fetchRecentRecipients()
-      .then(setRecentList)
+      .then((list) => {
+        setRecentList(list);
+        syncFromAgentSlots(list);
+      })
       .catch(() => undefined);
   }, []);
+
+  function syncFromAgentSlots(list: RecipientItem[]) {
+    const lastResponse = useVoiceResponseStore.getState().lastResponse;
+    if (!lastResponse) return;
+
+    const { collected_slots, awaiting_asv_audio } = lastResponse;
+    const slotRecipient = (collected_slots?.recipient as string) ?? null;
+    const slotAmount = collected_slots?.amount ? Number(collected_slots.amount) : null;
+
+    if (slotRecipient) {
+      const matched = list.find((r) => r.toName === slotRecipient);
+      if (matched) {
+        setSelected(matched);
+        setSelectedRecipient(matched);
+      }
+    }
+    if (slotAmount) {
+      setSelectedAmount(slotAmount);
+      setAmount(slotAmount);
+    }
+
+    if (awaiting_asv_audio) {
+      setStep('asv');
+    } else if (slotRecipient && slotAmount) {
+      setStep('confirm');
+    } else if (slotRecipient) {
+      setStep('amount');
+    }
+  }
 
   const handleSelectRecipient = (item: RecipientItem) => {
     setSelected(item);
@@ -126,6 +159,7 @@ export default function TransferScreen() {
                   label="[개발] 인증 건너뛰기"
                   variant="outline"
                   onPress={handleAsvSkip}
+                  disabled={loading}
                 />
               )}
             </>

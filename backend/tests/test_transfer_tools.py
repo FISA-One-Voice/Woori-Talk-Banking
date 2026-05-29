@@ -18,8 +18,7 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-from app.features.transfer.tools import add_note, execute_transfer
+from backend.app.shared.agent.tools.transfer import add_note, execute_transfer
 
 # ── 공통 상수 ──────────────────────────────────────────────────────────────────
 _USER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
