@@ -1,8 +1,3 @@
-import { Audio } from 'expo-av';
-import { Stack, useRouter } from 'expo-router';
-import * as Speech from 'expo-speech';
-import { useCallback, useRef } from 'react';
-import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
 import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
@@ -10,7 +5,11 @@ import type { VoiceResponseData } from '@/types/voice';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { getTtsMessage } from '@/utils/errorHandler';
 import { registerSound, stopAllTts } from '@/utils/ttsManager';
-import { useState } from 'react';
+import { Audio } from 'expo-av';
+import { Stack, useRouter } from 'expo-router';
+import * as Speech from 'expo-speech';
+import { useCallback, useRef, useState } from 'react';
+import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
 
 // ── Azure TTS(base64) 재생 ────────────────────────────────────────────────────
 // 재생이 완전히 끝날 때 resolve 한다 (navigate 전에 await 해서 TTS 겹침 방지).
@@ -52,9 +51,9 @@ function isVGesture(pts: Array<{ x: number; y: number }>): boolean {
   const ratio = bottomIdx / (pts.length - 1);
   if (ratio < 0.2 || ratio > 0.8) return false;
 
-  const startY  = pts[0].y;
+  const startY = pts[0].y;
   const bottomY = pts[bottomIdx].y;
-  const endY    = pts[pts.length - 1].y;
+  const endY = pts[pts.length - 1].y;
 
   // 아래로 80px 이상 내려가야 한다
   if (bottomY - startY < 80) return false;
@@ -75,10 +74,12 @@ export default function RootLayout() {
   const touchPts = useRef<Array<{ x: number; y: number }>>([]);
 
   function handleTouchStart(e: GestureResponderEvent): void {
-    touchPts.current = [{
-      x: e.nativeEvent.locationX,
-      y: e.nativeEvent.locationY,
-    }];
+    touchPts.current = [
+      {
+        x: e.nativeEvent.locationX,
+        y: e.nativeEvent.locationY,
+      },
+    ];
   }
 
   function handleTouchMove(e: GestureResponderEvent): void {

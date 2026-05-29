@@ -49,7 +49,7 @@ def _create_user(db: Session, phone: str | None = None) -> User:
 
 def _login(client: TestClient, phone: str) -> str:
     """로그인하여 access token을 반환합니다."""
-    res = client.post("/jwt-auth/login", json={"phone": phone, "pin": _TEST_PIN})
+    res = client.post("/api/users/login", json={"phone": phone, "pin": _TEST_PIN})
     assert res.status_code == 200, f"로그인 실패: {res.json()}"
     return res.json()["data"]["accessToken"]
 

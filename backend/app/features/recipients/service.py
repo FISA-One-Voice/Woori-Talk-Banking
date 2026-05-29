@@ -128,7 +128,6 @@ def resolve_by_phone(
     )
 
 
-
 def create_recipient(
     db: Session,
     user_uuid: uuid.UUID,

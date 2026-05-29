@@ -13,10 +13,11 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
 
   // React Native의 FormData는 런타임에 {uri, type, name} 객체를 File처럼 처리하지만
   // TypeScript 타입 서명은 Blob을 요구하므로 unknown을 경유해 캐스팅합니다.
-  formData.append(
-    'audio',
-    { uri: audioUri, type: 'audio/m4a', name: 'recording.m4a' } as unknown as Blob,
-  );
+  formData.append('audio', {
+    uri: audioUri,
+    type: 'audio/m4a',
+    name: 'recording.m4a',
+  } as unknown as Blob);
 
   const { data } = await apiClient.post<ApiResponse<VoiceResponseData>>(
     '/api/voice/voice',
@@ -30,7 +31,11 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
 
   if (__DEV__) {
     console.log('[STT]', data.data.transcript ?? '(인식 결과 없음)');
-    console.log('[Agent] navigate_to=%s slots=%o', data.data.navigate_to, data.data.collected_slots);
+    console.log(
+      '[Agent] navigate_to=%s slots=%o',
+      data.data.navigate_to,
+      data.data.collected_slots,
+    );
   }
 
   return data.data;
