@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SafeAreaView, StyleSheet, Text, View, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { TopBar } from '@/components/layout';
@@ -7,6 +7,7 @@ import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { useAuthStore } from '@/store/authStore';
+import { Audio } from 'expo-av';
 
 type Step = 'TUTORIAL' | 'READY' | 'RECORDING' | 'SUCCESS' | 'FAIL';
 
@@ -14,6 +15,8 @@ export default function DevVoiceRegisterScreen() {
   const [step, setStep] = useState<Step>('TUTORIAL');
   const [recordCount, setRecordCount] = useState(1);
   const [loading, setLoading] = useState(false);
+  
+  const recordingRef = useRef<Audio.Recording | null>(null);
 
   // Ready -> Recording 자동 전환
   useEffect(() => {
@@ -25,16 +28,28 @@ export default function DevVoiceRegisterScreen() {
     }
   }, [step]);
 
-  // Recording 중 3초 뒤에 다음 횟수나 성공 화면으로 전환 (Mock)
+  // 첫 녹음 단계 진입 시 실제 디바이스 마이크 녹음 시작
+  useEffect(() => {
+    if (step === 'RECORDING' && recordCount === 1) {
+      startRecording();
+    }
+  }, [step, recordCount]);
+
+  // Recording 중 3초 뒤에 다음 횟수나 성공 화면으로 전환
   useEffect(() => {
     if (step === 'RECORDING') {
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         if (recordCount < 3) {
           setRecordCount((prev) => prev + 1);
           setStep('READY');
         } else {
-          // 3회 완료 시 서버 전송
-          handleRegisterVoice();
+          // 3회 완료 시 녹음 종료 및 서버 전송
+          const uri = await stopRecording();
+          if (uri) {
+            await handleRegisterVoice(uri);
+          } else {
+            setStep('FAIL');
+          }
         }
       }, 3000); // 3초 대기
       
@@ -42,7 +57,62 @@ export default function DevVoiceRegisterScreen() {
     }
   }, [step, recordCount]);
 
-  const handleRegisterVoice = async () => {
+  const startRecording = async () => {
+    try {
+      await Audio.requestPermissionsAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const WAV_RECORDING_OPTIONS: Audio.RecordingOptions = {
+        isMeteringEnabled: true,
+        android: {
+          extension: '.m4a',
+          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+          audioEncoder: Audio.AndroidAudioEncoder.AAC,
+          sampleRate: 44100,
+          numberOfChannels: 1,
+          bitRate: 128000,
+        },
+        ios: {
+          extension: '.wav',
+          audioQuality: Audio.IOSAudioQuality.HIGH,
+          sampleRate: 44100,
+          numberOfChannels: 1,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+        web: {
+          mimeType: 'audio/webm',
+          bitsPerSecond: 128000,
+        },
+      };
+
+      const { recording } = await Audio.Recording.createAsync(WAV_RECORDING_OPTIONS);
+      recordingRef.current = recording;
+    } catch (err) {
+      console.error('Failed to start recording', err);
+      Alert.alert('오류', '마이크 접근 권한이 필요합니다.');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recordingRef.current) return null;
+    try {
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
+      return uri;
+    } catch (err) {
+      console.error('Failed to stop recording', err);
+      return null;
+    }
+  };
+
+  const handleRegisterVoice = async (uri: string) => {
     // apiClient 인터셉터가 토큰을 자동 첨부하지만, 클라이언트 단에서 1차 방어
     const token = useAuthStore.getState().token;
     if (!token) {
@@ -53,9 +123,19 @@ export default function DevVoiceRegisterScreen() {
     
     setLoading(true);
     try {
-      const dummyVector = Array(192).fill(0.1);
-      const response = await apiClient.post<ApiResponse>('/api/voice/register', { 
-        embedding_vector: dummyVector 
+      const formData = new FormData();
+      // iOS에서는 .wav로 녹음되므로, 확장자를 동적으로 처리하거나 .wav로 기본 전송합니다.
+      const isWav = uri.endsWith('.wav');
+      formData.append('file', {
+        uri: uri,
+        name: isWav ? 'voice.wav' : 'voice.m4a',
+        type: isWav ? 'audio/wav' : 'audio/m4a'
+      } as any);
+
+      const response = await apiClient.post<ApiResponse>('/api/voice/register', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
       
       const result = response.data;
@@ -65,6 +145,7 @@ export default function DevVoiceRegisterScreen() {
         setStep('FAIL');
       }
     } catch (error) {
+      console.error('Voice registration error:', error);
       setStep('FAIL');
     } finally {
       setLoading(false);
