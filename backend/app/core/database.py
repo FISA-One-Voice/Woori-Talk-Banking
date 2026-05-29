@@ -13,6 +13,7 @@
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.pool import NullPool, StaticPool
 
 from app.core.config import settings
 
@@ -20,16 +21,29 @@ from app.core.config import settings
 # SQLite 전용 옵션: SQLite 는 기본적으로 멀티스레드를 허용하지 않습니다.
 # check_same_thread=False 로 이 제한을 해제해야 FastAPI 가 정상 작동합니다.
 # PostgreSQL 사용 시에는 이 옵션이 자동으로 무시되니 그냥 두어도 됩니다.
-connect_args = (
-    {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-)
+is_sqlite = settings.database_url.startswith("sqlite")
+connect_args = {"check_same_thread": False} if is_sqlite else {}
 
 # DB 엔진: 실제 데이터베이스에 연결하는 핵심 객체
 # DATABASE_URL 하나만 바꾸면 SQLite ↔ PostgreSQL 전환이 됩니다.
-# pool_pre_ping=True: Aiven 등 클라우드 DB에서 유휴 연결을 강제로 끊었을 때 발생하는 OperationalError 방지
-engine = create_engine(
-    settings.database_url, connect_args=connect_args, pool_pre_ping=True
-)
+#
+# [풀링 전략]
+# - SQLite (테스트/로컬): StaticPool — 인메모리 DB 단일 연결 공유
+# - PostgreSQL (Aiven 클라우드): NullPool — 요청마다 연결 생성 후 즉시 해제
+#   → Aiven 무료 티어는 동시 커넥션 수가 매우 제한적(비슈퍼유저 슬롯 부족)
+#   → 기본 pool_size=5 를 쓰면 유휴 연결이 슬롯을 점유하다 "remaining connection slots" 오류 발생
+#   → NullPool 은 요청이 끝나는 즉시 연결을 닫아 슬롯을 반환한다
+if is_sqlite:
+    engine = create_engine(
+        settings.database_url,
+        connect_args=connect_args,
+        poolclass=StaticPool,
+    )
+else:
+    engine = create_engine(
+        settings.database_url,
+        poolclass=NullPool,
+    )
 
 # 세션 팩토리: DB 연결(세션)을 생성하는 틀(공장)
 # autocommit=False → db.commit() 을 직접 호출해야만 DB에 반영됩니다. (실수 방지)
