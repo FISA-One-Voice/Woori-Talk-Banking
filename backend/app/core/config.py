@@ -13,6 +13,8 @@
 # 그 다음:       settings.DATABASE_URL  로 값을 읽습니다.
 # =============================================================================
 
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -128,7 +130,26 @@ class Settings(BaseSettings):
     ANTI_SPOOFING_EC2_URL: str = "http://localhost:8003"
     USE_ANTI_SPOOFING: bool = False
 
+    # ── LangSmith 트레이싱 (개발 전용 — 프로덕션에서는 미설정) ────────────────────────
+    # .env에 LANGSMITH_* 형식으로 설정한다.
+    # LangChain/LangGraph는 os.environ을 직접 읽으므로 model_post_init에서 반영한다.
+    LANGSMITH_TRACING: str = ""
+    LANGSMITH_API_KEY: str = ""
+    LANGSMITH_PROJECT: str = ""
+    LANGSMITH_ENDPOINT: str = ""
+
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
+
+    def model_post_init(self, __context: object) -> None:
+        """LangSmith가 직접 읽는 환경변수를 os.environ에 반영한다."""
+        if self.LANGSMITH_TRACING:
+            os.environ["LANGSMITH_TRACING"] = self.LANGSMITH_TRACING
+        if self.LANGSMITH_API_KEY:
+            os.environ["LANGSMITH_API_KEY"] = self.LANGSMITH_API_KEY
+        if self.LANGSMITH_PROJECT:
+            os.environ["LANGSMITH_PROJECT"] = self.LANGSMITH_PROJECT
+        if self.LANGSMITH_ENDPOINT:
+            os.environ["LANGSMITH_ENDPOINT"] = self.LANGSMITH_ENDPOINT
 
 
 # 싱글턴 패턴: 이 모듈을 import 하는 모든 파일이 같은 객체를 공유합니다.
