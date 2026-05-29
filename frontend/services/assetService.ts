@@ -1,0 +1,23 @@
+import { apiClient, ApiResponse } from '@/utils/api';
+
+export interface AccountItem {
+  account_id: string;
+  bank_name: string;
+  account_type: string;
+  alias: string | null;
+  balance: number;
+  is_primary: boolean;
+}
+
+export interface AssetSummary {
+  accounts: AccountItem[];
+  total_asset: number;
+}
+
+export async function fetchAssetSummary(): Promise<AssetSummary> {
+  const res = await apiClient.get<ApiResponse<AssetSummary>>('/api/asset/summary');
+  if (!res.data.success || !res.data.data) {
+    throw new Error(res.data.code ?? 'INTERNAL_ERROR');
+  }
+  return res.data.data;
+}

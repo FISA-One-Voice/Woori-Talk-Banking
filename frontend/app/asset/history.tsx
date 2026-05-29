@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import {
-  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -12,7 +11,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { getTtsMessage } from '@/utils/errorHandler';
 import { apiClient, ApiResponse } from '@/utils/api';
-import { useAuthStore } from '@/store/authStore';
 
 type Step = 'slot' | 'result' | 'history' | 'error';
 
@@ -37,13 +35,6 @@ export default function HistoryScreen() {
 
   // 거래내역 API 호출
   const fetchHistory = async (days: number) => {
-    const token = useAuthStore.getState().token;
-    if (!token) {
-      Alert.alert('로그인 필요', '이 기능을 사용하려면 로그인해주세요.');
-      router.push('/login');
-      return;
-    }
-
     setLoading(true);
     try {
       const response = await apiClient.get<ApiResponse<{ transactions: any[] }>>(

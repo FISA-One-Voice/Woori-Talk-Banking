@@ -11,17 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { getTtsMessage } from '@/utils/errorHandler';
-import { apiClient, ApiResponse } from '@/utils/api';
-import { useAuthStore } from '@/store/authStore';
-
-interface AccountItem {
-  account_id: string;
-  bank_name: string;
-  account_type: string;
-  alias: string | null;
-  balance: number;
-  is_primary: boolean;
-}
+import { fetchAssetSummary, AccountItem } from '@/services/assetService';
 
 function formatAmount(amount: number): string {
   if (amount >= 100000000) {
@@ -29,10 +19,20 @@ function formatAmount(amount: number): string {
     const man = Math.floor((amount % 100000000) / 10000);
     return man > 0 ? `${eok}억 ${man.toLocaleString()}만원` : `${eok}억원`;
   }
-  if (amount >= 10000) {
-    return `${Math.floor(amount / 10000).toLocaleString()}만원`;
-  }
+  if (amount >= 10000) return `${Math.floor(amount / 10000).toLocaleString()}만원`;
   return `${amount.toLocaleString()}원`;
+}
+
+function AccountCard({ account }: { account: AccountItem }) {
+  return (
+    <View style={styles.accountCard}>
+      <View style={styles.accountInfo}>
+        <Text style={styles.accountBank}>{account.bank_name}</Text>
+        <Text style={styles.accountAlias}>{account.alias ?? account.account_type}</Text>
+      </View>
+      <Text style={styles.accountBalance}>{account.balance.toLocaleString()}원</Text>
+    </View>
+  );
 }
 
 export default function AssetScreen() {
@@ -43,31 +43,18 @@ export default function AssetScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = useAuthStore.getState().token;
-    if (!token) {
-      Alert.alert('로그인 필요', getTtsMessage('UNAUTHORIZED'));
-      router.push('/login');
-      return;
-    }
-
-    apiClient.get<ApiResponse<{ accounts: AccountItem[]; total_asset: number }>>('/api/asset/summary')
-      .then((res) => {
-        if (res.data.success && res.data.data) {
-          setAccounts(res.data.data.accounts);
-          setTotalAsset(res.data.data.total_asset);
-        } else {
-          console.warn('[asset/summary]', getTtsMessage(res.data.code));
-        }
+    fetchAssetSummary()
+      .then(({ accounts, total_asset }) => {
+        setAccounts(accounts);
+        setTotalAsset(total_asset);
       })
-      .catch(() => console.warn('[asset/summary]', getTtsMessage('NETWORK_ERROR')))
+      .catch((err: Error) => Alert.alert('안내', getTtsMessage(err.message)))
       .finally(() => setLoading(false));
   }, []);
 
   return (
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll}>
-
-        {/* 헤더 */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Text style={styles.backIcon}>←</Text>
@@ -75,8 +62,6 @@ export default function AssetScreen() {
           <Text style={styles.headerTitle}>내 자산</Text>
           <View style={styles.headerRight} />
         </View>
-
-        {/* TTS 버블 */}
         <View style={styles.ttsBubble}>
           <Text style={styles.ttsLabel}>음성 안내</Text>
           <Text style={styles.ttsText}>
@@ -84,31 +69,16 @@ export default function AssetScreen() {
             지출·수입 / 거래내역
           </Text>
         </View>
-
-        {/* 총 자산 카드 */}
         <View style={styles.totalCard}>
           <Text style={styles.totalLabel}>총 자산</Text>
           <Text style={styles.totalAmount}>{totalAsset.toLocaleString()}원</Text>
-          <TouchableOpacity
-            style={styles.listenBtn}
-            onPress={() => setIsListening((v) => !v)}
-          >
-            <Text style={styles.listenBtnText}>● 듣고 있어요</Text>
+          <TouchableOpacity style={styles.listenBtn} onPress={() => setIsListening((v) => !v)}>
+            <Text style={styles.listenBtnText}>{isListening ? '● 듣고 있어요' : '○ 듣기 시작'}</Text>
           </TouchableOpacity>
         </View>
-
-        {/* 계좌 목록 */}
         {accounts.map((account) => (
-          <View key={account.account_id} style={styles.accountCard}>
-            <View style={styles.accountInfo}>
-              <Text style={styles.accountBank}>{account.bank_name}</Text>
-              <Text style={styles.accountAlias}>{account.alias ?? account.account_type}</Text>
-            </View>
-            <Text style={styles.accountBalance}>{account.balance.toLocaleString()}원</Text>
-          </View>
+          <AccountCard key={account.account_id} account={account} />
         ))}
-
-        {/* 하단 버튼 */}
         <View style={styles.bottomBtns}>
           <TouchableOpacity
             style={styles.actionBtn}
@@ -123,7 +93,6 @@ export default function AssetScreen() {
             <Text style={styles.actionBtnText}>거래내역</Text>
           </TouchableOpacity>
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
