@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 from app.core.database import Base, engine
 from app.core.exception import AppError
+from app.features.event.router import router as event_router
 from app.core.opensearch import create_indices_if_not_exists
 
 # from app.features.event.router import router as event_router  # TODO: event 기능 재구현 후 주석 해제
@@ -139,6 +140,7 @@ create_indices_if_not_exists()
 # app.include_router({name}_router)
 app.include_router(voice_router)
 app.include_router(jwt_auth_router)
+app.include_router(event_router)
 app.include_router(voice_register_router)
 app.include_router(recipients_router)
 

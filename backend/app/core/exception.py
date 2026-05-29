@@ -90,3 +90,21 @@ class AgentError(AppError):
     """
 
     pass
+
+
+class EventError(AppError):
+    """이벤트 기능(features/event/) 관련 커스텀 에러 기반 클래스."""
+
+    pass
+
+
+class EventNotFoundError(EventError):
+    """이벤트를 찾을 수 없을 때 발생합니다."""
+
+    pass
+
+
+class AlreadyParticipatedError(EventError):
+    """이미 참여한 이벤트에 다시 참여할 때 발생합니다."""
+
+    pass
