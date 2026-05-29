@@ -12,10 +12,9 @@
 # =============================================================================
 
 from langchain_core.tools import tool
-from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.features.event.service import get_active_events
+from app.features.event.service import get_events_tts_text
 
 
 @tool
@@ -37,39 +36,9 @@ def get_event_list(user_id: str) -> str:  # noqa: D401
         반드시 마크다운 없이, 숫자는 한국어로 작성하십시오.
         예: "현재 진행 중인 이벤트는 두 개입니다. 첫 번째, 봄맞이 이벤트. 두 번째, 신규 가입 혜택."
 
-    Raises:
-        EventNotFoundError: 이벤트 조회 중 오류가 발생한 경우.
-        (AppError 서브클래스만 raise — main.py 핸들러가 처리)
     """
-    db: Session = next(get_db())
+    db = next(get_db())
     try:
-        result = get_active_events(db)
-        events = result.events
-
-        if not events:
-            return "현재 진행 중인 이벤트가 없습니다."
-
-        count = len(events)
-        count_kor = _to_korean_count(count)
-        titles = [f"{_ordinal(i + 1)}, {e.title}" for i, e in enumerate(events)]
-        titles_str = ". ".join(titles)
-
-        return f"현재 진행 중인 이벤트는 {count_kor}입니다. {titles_str}."
+        return get_events_tts_text(db)
     finally:
         db.close()
-
-
-def _to_korean_count(n: int) -> str:
-    """숫자를 '~개' 형태의 한국어로 변환합니다."""
-    korean = ["", "한", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열"]
-    if 1 <= n <= 10:
-        return f"{korean[n]} 개"
-    return f"{n}개"
-
-
-def _ordinal(n: int) -> str:
-    """순서를 한국어로 변환합니다."""
-    ordinals = ["", "첫 번째", "두 번째", "세 번째", "네 번째", "다섯 번째"]
-    if 1 <= n <= 5:
-        return ordinals[n]
-    return f"{n}번째"

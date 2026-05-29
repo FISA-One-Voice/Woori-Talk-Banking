@@ -179,3 +179,43 @@ def participate_event(db: Session, event_id: str, user_id: str) -> dict:
     db.refresh(participation)
 
     return {"participation_id": participation.participation_id}
+
+
+def get_events_tts_text(db: Session) -> str:
+    """이벤트 목록을 TTS 친화적 문자열로 반환합니다.
+
+    AI 에이전트 tool에서 호출합니다. 마크다운 없이 한국어 자연어로 반환합니다.
+
+    Args:
+        db: SQLAlchemy DB 세션.
+
+    Returns:
+        TTS로 읽힐 자연어 문자열.
+    """
+    result = get_active_events(db)
+    events = result.events
+
+    if not events:
+        return "현재 진행 중인 이벤트가 없습니다."
+
+    count_kor = _to_korean_count(len(events))
+    titles = [f"{_ordinal(i + 1)}, {e.title}" for i, e in enumerate(events)]
+    titles_str = ". ".join(titles)
+
+    return f"현재 진행 중인 이벤트는 {count_kor}입니다. {titles_str}."
+
+
+def _to_korean_count(n: int) -> str:
+    """숫자를 '~개' 형태의 한국어로 변환합니다."""
+    korean = ["", "한", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열"]
+    if 1 <= n <= 10:
+        return f"{korean[n]} 개"
+    return f"{n}개"
+
+
+def _ordinal(n: int) -> str:
+    """순서를 한국어로 변환합니다."""
+    ordinals = ["", "첫 번째", "두 번째", "세 번째", "네 번째", "다섯 번째"]
+    if 1 <= n <= 5:
+        return ordinals[n]
+    return f"{n}번째"
