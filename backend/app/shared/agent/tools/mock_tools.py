@@ -124,7 +124,7 @@ def mock_register_auto_transfer(
 
 
 @tool
-def mock_lookup_recipient(user_id: str, alias: str) -> str | None:
+def mock_lookup_recipient(user_id: str, recipient: str) -> str | None:
     """수취인 별명·이름으로 등록된 수취인을 조회합니다 (mock).
 
     실제 툴 등록 전까지 하드코딩된 mock DB를 사용합니다.
@@ -132,7 +132,7 @@ def mock_lookup_recipient(user_id: str, alias: str) -> str | None:
 
     Args:
         user_id: 요청 사용자 ID.
-        alias: alias 슬롯 값 (이름, 전화번호, 계좌번호 모두 허용).
+        recipient: recipient 슬롯 값 (이름, 별명, 전화번호 모두 허용).
 
     Returns:
         정규화된 수취인 이름 문자열 (찾은 경우), None (없는 경우).
@@ -143,7 +143,7 @@ def mock_lookup_recipient(user_id: str, alias: str) -> str | None:
         "친구": "김철수",
         "회사": "우리회사",
     }
-    return mock_db.get(alias)
+    return mock_db.get(recipient)
 
 
 # ── 이벤트 조회 ────────────────────────────────────────────────────────────────

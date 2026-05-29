@@ -233,6 +233,15 @@ def build_graph(tools: list) -> CompiledStateGraph:
         5. 슬롯 채우기 → collected_slots 업데이트
         6. 일반 챗봇 질의 → direct_response를 AIMessage로 추가
         """
+        logger.info(
+            "[Graph →intent_node] pending=%s slots=%s"
+            " await_confirm=%s await_asv=%s exec_ready=%s",
+            state.get("pending_action"),
+            state.get("collected_slots", {}),
+            state.get("awaiting_confirmation", False),
+            state.get("awaiting_asv_audio", False),
+            state.get("execution_ready", False),
+        )
         # 현재 상태 컨텍스트를 시스템 프롬프트에 추가
         context_lines = [
             SYSTEM_PROMPT,
@@ -274,7 +283,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "- extracted_slots: 발화에서 파악한 슬롯 값 (없으면 {})."
             " 금액 슬롯 키는 'amount', 값은 원화 정수 문자열"
             " (예: '3만원'→'30000', '오만원'→'50000')."
-            " 수신자 슬롯 키는 'recipient'.",
+            " 수신자 슬롯 키는 'recipient', 값은 발화에서 언급한 이름·별명 그대로"
+            " (예: '엄마에게'→recipient='엄마', '친구한테'→recipient='친구').",
             "- user_confirmed: '네', '맞아요', '그렇게 해줘' 등 확인 발화 시 true",
             "- user_cancelled: '취소', '아니오', '됐어', '하지 마' 등 취소 발화 시 true",
             "- direct_response: 비금융 챗봇 답변(영업시간, 상품 안내 등)에만 사용.",
@@ -378,6 +388,9 @@ def build_graph(tools: list) -> CompiledStateGraph:
         pending = state.get("pending_action", "")
         slots = state.get("collected_slots", {})
         missing = _missing_slots(pending, slots)
+        logger.info(
+            "[Graph →slot_fill_node] pending=%s missing=%s", pending, missing
+        )
 
         if missing:
             slot_name = missing[0]
@@ -403,6 +416,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
         """슬롯이 완전히 수집되면 확인 메시지를 생성하고 awaiting_confirmation을 설정한다."""
         pending = state.get("pending_action", "")
         slots = state.get("collected_slots", {})
+        logger.info("[Graph →confirm_node] pending=%s slots=%s", pending, slots)
         confirm_msg = _format_confirm_message(pending, slots)
 
         return {
@@ -419,6 +433,11 @@ def build_graph(tools: list) -> CompiledStateGraph:
         """
         slots = dict(state.get("collected_slots", {}))
         recipient_input = slots.get("recipient", "")
+        logger.info(
+            "[Graph →resolve_node] recipient=%s user_id=%s",
+            recipient_input,
+            state.get("user_id"),
+        )
         user_id = state.get("user_id", "")
 
         resolver = tool_registry.get("lookup_recipient") or tool_registry.get(
@@ -431,7 +450,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         try:
             canonical_name: str | None = resolver.invoke(
-                {"user_id": user_id, "alias": recipient_input}
+                {"user_id": user_id, "recipient": recipient_input}
             )
         except Exception as e:
             logger.error("resolve_node 수취인 조회 실패: %s", e)
@@ -462,10 +481,18 @@ def build_graph(tools: list) -> CompiledStateGraph:
         """resolve_node 결과에 따라 다음 노드를 결정한다."""
         slots = state.get("collected_slots", {})
         if not slots.get("recipient"):
+            logger.info(
+                "[Graph route] resolve_node → slot_fill_node (recipient invalid)"
+            )
             return "slot_fill_node"
         pending = state.get("pending_action", "")
         if _missing_slots(pending, slots):
+            logger.info(
+                "[Graph route] resolve_node → slot_fill_node (missing=%s)",
+                _missing_slots(pending, slots),
+            )
             return "slot_fill_node"
+        logger.info("[Graph route] resolve_node → confirm_node")
         return "confirm_node"
 
     def execute_node(state: VoiceState) -> dict:
@@ -476,6 +503,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
         """
         pending = state.get("pending_action", "")
         slots = dict(state.get("collected_slots", {}))
+        logger.info("[Graph →execute_node] pending=%s slots=%s", pending, slots)
 
         # tool 탐색
         tool_obj = _find_tool_for_action(pending)
@@ -518,15 +546,18 @@ def build_graph(tools: list) -> CompiledStateGraph:
         """intent_node 처리 후 다음 노드를 결정한다."""
         # ASV 대기 중 → END (다음 요청은 router.py가 ASV 분기 처리)
         if state.get("awaiting_asv_audio"):
+            logger.info("[Graph route] intent_node → END (awaiting_asv_audio)")
             return END
 
         # 확인 완료 + 즉시 실행 가능 → execute_node
         if state.get("execution_ready"):
+            logger.info("[Graph route] intent_node → execute_node (execution_ready)")
             return "execute_node"
 
         pending = state.get("pending_action")
         if not pending:
             # 인텐트 없음 → 챗봇 직답 (메시지는 이미 intent_node에서 추가됨)
+            logger.info("[Graph route] intent_node → END (no pending_action)")
             return END
 
         slots = state.get("collected_slots", {})
@@ -537,22 +568,35 @@ def build_graph(tools: list) -> CompiledStateGraph:
             and slots.get("recipient")
             and not state.get("recipient_validated")
         ):
+            logger.info(
+                "[Graph route] intent_node → resolve_node (recipient unvalidated)"
+            )
             return "resolve_node"
 
         missing = _missing_slots(pending, slots)
 
         if missing:
+            logger.info(
+                "[Graph route] intent_node → slot_fill_node (missing=%s)", missing
+            )
             return "slot_fill_node"
 
         # 슬롯 없는 단순 조회 액션 (balance, history, event) → 확인 없이 즉시 실행
         if pending not in SLOT_SCHEMA:
+            logger.info(
+                "[Graph route] intent_node → execute_node (no slots required)"
+            )
             return "execute_node"
 
         if not state.get("awaiting_confirmation"):
             # 슬롯 완전 수집, 아직 확인 안 받음 → 확인 요청
+            logger.info(
+                "[Graph route] intent_node → confirm_node (all slots filled)"
+            )
             return "confirm_node"
 
         # awaiting_confirmation=True → 사용자 응답 대기 중 → END
+        logger.info("[Graph route] intent_node → END (awaiting_confirmation)")
         return END
 
     # ── StateGraph 빌드 ────────────────────────────────────────────────────────

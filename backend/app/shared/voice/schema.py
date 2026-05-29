@@ -65,7 +65,7 @@ class VoiceResponseData(BaseModel):
         navigate_to: 프론트엔드 화면 이동 신호 (Expo Router 경로). 없으면 None.
             예: "transfer", "balance", "auto-transfer"
         collected_slots: 현재까지 수집된 슬롯 현황. 프론트엔드 단계 판단에 사용.
-            예: {"alias": "엄마", "amount": 100000}
+            예: {"recipient": "엄마", "amount": 100000}
         awaiting_confirmation: True이면 사용자의 "네/아니오" 텍스트 확인 대기 중.
         awaiting_asv_audio: True이면 다음 오디오 입력이 ASV 검증용임.
             프론트엔드는 "목소리로 인증해 주세요" 오버레이를 표시한다.
