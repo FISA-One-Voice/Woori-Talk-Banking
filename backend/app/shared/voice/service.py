@@ -284,6 +284,7 @@ async def _handle_asv_flow(
         tts_text = (
             "본인 확인에 세 번 실패하여 작업이 취소되었습니다. 홈 화면으로 이동합니다."
         )
+        navigate_to_next: str | None = "home"
         awaiting_asv_next = False
     else:
         # 재시도 기회 남음 → retry_count만 증가
@@ -297,12 +298,13 @@ async def _handle_asv_flow(
             f"본인 확인에 실패했습니다. {remaining}번 더 시도하실 수 있습니다. "
             "다시 한번 말씀해 주세요."
         )
+        navigate_to_next = None
         awaiting_asv_next = True
 
     audio_mp3 = await synthesize_speech(tts_text)
     return VoiceResponseData(
         audio=base64.b64encode(audio_mp3).decode(),
-        navigate_to=None,
+        navigate_to=navigate_to_next,
         collected_slots={},
         awaiting_confirmation=False,
         awaiting_asv_audio=awaiting_asv_next,
