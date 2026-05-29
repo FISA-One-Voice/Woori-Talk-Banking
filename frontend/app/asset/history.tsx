@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -45,11 +46,11 @@ export default function HistoryScreen() {
       if (response.data.success) {
         setTransactions(response.data.data?.transactions ?? []);
       } else {
-        console.warn('[asset/history]', getTtsMessage(response.data.code));
+        Alert.alert('안내', getTtsMessage(response.data.code));
         setTransactions([]);
       }
     } catch {
-      console.warn('[asset/history]', getTtsMessage('NETWORK_ERROR'));
+      Alert.alert('안내', getTtsMessage('NETWORK_ERROR'));
     } finally {
       setLoading(false);
     }

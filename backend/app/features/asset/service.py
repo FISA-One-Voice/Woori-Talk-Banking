@@ -3,6 +3,8 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from sqlalchemy import or_
+
 from app.core.exception import BalanceError, HistoryError
 from app.models.account import Account
 from app.models.transaction import Transaction
@@ -119,7 +121,9 @@ def get_transaction_history(
     return transactions
 
 
-def get_expense_summary(db: Session, user_id: str, days: int = 30) -> dict:
+def get_expense_summary(
+    db: Session, user_id: str, days: int = 30
+) -> dict[str, int | list[dict[str, str | int]]]:
     """지출 요약을 반환합니다 (총액 및 카테고리 Top 5).
 
     Args:
@@ -141,8 +145,11 @@ def get_expense_summary(db: Session, user_id: str, days: int = 30) -> dict:
         .filter(
             Transaction.user_id == uuid.UUID(user_id),
             Transaction.created_at >= since,
-            Transaction.category != "수입",
             Transaction.status == "completed",
+            or_(
+                Transaction.category.is_(None),
+                Transaction.category != "수입",
+            ),
         )
         .all()
     )
