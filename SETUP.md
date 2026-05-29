@@ -53,7 +53,7 @@ npm --version    # 11.x.x
 
 ```bash
 npm install
-npm start
+npx expo start
 ```
 
 Expo Go 앱(모바일)에서 QR 코드를 찍으면 바로 확인할 수 있습니다.
