@@ -14,6 +14,7 @@
 # =============================================================================
 
 from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # config.py 기준으로 3단계 상위(Woori-Talk-Banking/) 에서 .env 탐색
