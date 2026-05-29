@@ -12,6 +12,7 @@
     )
 """
 
+import logging
 import re
 import uuid
 
@@ -24,6 +25,8 @@ from app.models.account import Account
 from app.models.recipient import RegisteredRecipient
 from app.models.user import User
 from app.shared.crypto import decrypt, encrypt
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_by_id(
@@ -237,9 +240,18 @@ def lookup_recipient_by_voice(
     """
     kind = classify_recipient_input(alias)
 
+    logger.info("alias '%s' classified as '%s'", alias, kind)
+
     if kind == "phone":
         try:
-            return resolve_by_phone(db, alias)
+            cleaned = alias.replace("-", "").replace(" ", "")
+            if len(cleaned) == 11:
+                formatted = f"{cleaned[:3]}-{cleaned[3:7]}-{cleaned[7:]}"
+            elif len(cleaned) == 10:
+                formatted = f"{cleaned[:3]}-{cleaned[3:6]}-{cleaned[6:]}"
+            else:
+                formatted = cleaned
+            return resolve_by_phone(db, formatted)
         except RecipientError:
             return None
 

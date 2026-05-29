@@ -286,8 +286,10 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "- extracted_slots: 발화에서 파악한 슬롯 값 (없으면 {})."
             " 금액 슬롯 키는 'amount', 값은 원화 정수 문자열"
             " (예: '3만원'→'30000', '오만원'→'50000')."
-            " 수신자 슬롯 키는 'recipient', 값은 발화에서 언급한 이름·별명 그대로"
-            " (예: '엄마에게'→recipient='엄마', '친구한테'→recipient='친구').",
+            " 수신자 슬롯 키는 'recipient', 값은 발화에서 언급한"
+            " 이름·별명·전화번호 그대로"
+            " (예: '엄마에게'→recipient='엄마',"
+            " '010 1234 5678로'→recipient='010 1234 5678').",
             "- user_confirmed: '네', '맞아요', '그렇게 해줘' 등 확인 발화 시 true",
             "- user_cancelled: '취소', '아니오', '됐어', '하지 마' 등 취소 발화 시 true",
             "- direct_response: 비금융 챗봇 답변(영업시간, 상품 안내 등)에만 사용.",
