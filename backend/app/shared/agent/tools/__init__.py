@@ -39,11 +39,13 @@ MOCK_TOOLS: list = [
 # ── 실제 tool 목록 ─────────────────────────────────────────────────────────────
 # Phase 2 담당자가 완성한 실제 tool을 여기에 추가한다.
 from app.features.transfer.tools import add_note, execute_transfer
+from app.shared.agent.tools.event import get_event_list
 
 _REAL_TOOLS: list = [
     # lookup_recipient — recipients 담당자가 features/recipients/tools.py에 추가 예정
     execute_transfer,
     add_note,
+    get_event_list,
 ]
 
 # ── 활성 tool 목록 ─────────────────────────────────────────────────────────────

@@ -17,6 +17,8 @@ from pathlib import Path
 # backend/ 를 Python 경로에 추가 (app.* import 가능)
 sys.path.insert(0, str(Path(__file__).parent))
 
+import bcrypt  # noqa: E402
+
 from app.core.config import settings  # noqa: E402
 from app.core.database import SessionLocal  # noqa: E402
 from app.core.jwt_utils import create_access_token  # noqa: E402
@@ -27,8 +29,12 @@ from app.models.user import User  # noqa: E402
 # ── 고정 식별자 (재실행해도 동일한 데이터) ──────────────────────────────────────
 _USER_UUID = uuid.UUID("aaaabbbb-cccc-dddd-eeee-111122223333")
 _USER_ID = str(_USER_UUID)
+_TEST_PIN = "123456"
+_PIN_HASH = bcrypt.hashpw(_TEST_PIN.encode(), bcrypt.gensalt()).decode()
 _ACCOUNT_ID = "aaaabbbb-cccc-dddd-eeee-444455556666"
 _RECIPIENT_ID = "aaaabbbb-cccc-dddd-eeee-777788889999"
+_RECIPIENT_ID_2 = "aaaabbbb-cccc-dddd-eeee-aaabbbcccddd"
+_RECIPIENT_ID_3 = "aaaabbbb-cccc-dddd-eeee-eee111fff222"
 _INITIAL_BALANCE = 10_000_000  # 1천만원
 
 
@@ -39,13 +45,15 @@ def seed(db):
         user = User(
             user_id=_USER_UUID,
             name="이체테스터",
-            phone="01011112222",
-            pin_hash="test-only-not-real-hash",
+            phone="010-1111-2222",
+            pin_hash=_PIN_HASH,
         )
         db.add(user)
         print(f"  [생성] 유저: {_USER_ID}")
     else:
-        print(f"  [기존] 유저: {_USER_ID}")
+        user.pin_hash = _PIN_HASH
+        user.phone = "010-1111-2222"
+        print(f"  [기존] 유저: {_USER_ID} (PIN 해시 + phone 갱신)")
 
     # ── 2. 주계좌 ────────────────────────────────────────────────────────────────
     account = db.query(Account).filter(Account.account_id == _ACCOUNT_ID).first()
@@ -85,6 +93,46 @@ def seed(db):
         print(f"  [생성] 등록 수취인: {_RECIPIENT_ID} (김하나 / 하나은행)")
     else:
         print(f"  [기존] 등록 수취인: {_RECIPIENT_ID}")
+
+    # ── 4. 추가 수취인 2 ─────────────────────────────────────────────────────────
+    recipient2 = (
+        db.query(RegisteredRecipient)
+        .filter(RegisteredRecipient.recipient_id == _RECIPIENT_ID_2)
+        .first()
+    )
+    if recipient2 is None:
+        recipient2 = RegisteredRecipient(
+            recipient_id=_RECIPIENT_ID_2,
+            user_id=_USER_UUID,
+            alias="엄마",
+            bank_name="국민은행",
+            account_number="23456789012345",
+            recipient_name="박국민",
+        )
+        db.add(recipient2)
+        print(f"  [생성] 등록 수취인: {_RECIPIENT_ID_2} (박국민 / 국민은행)")
+    else:
+        print(f"  [기존] 등록 수취인: {_RECIPIENT_ID_2}")
+
+    # ── 5. 추가 수취인 3 ─────────────────────────────────────────────────────────
+    recipient3 = (
+        db.query(RegisteredRecipient)
+        .filter(RegisteredRecipient.recipient_id == _RECIPIENT_ID_3)
+        .first()
+    )
+    if recipient3 is None:
+        recipient3 = RegisteredRecipient(
+            recipient_id=_RECIPIENT_ID_3,
+            user_id=_USER_UUID,
+            alias="친구",
+            bank_name="신한은행",
+            account_number="34567890123456",
+            recipient_name="최신한",
+        )
+        db.add(recipient3)
+        print(f"  [생성] 등록 수취인: {_RECIPIENT_ID_3} (최신한 / 신한은행)")
+    else:
+        print(f"  [기존] 등록 수취인: {_RECIPIENT_ID_3}")
 
     db.commit()
 
