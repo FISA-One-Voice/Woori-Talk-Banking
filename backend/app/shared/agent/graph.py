@@ -195,12 +195,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
         ) from e
 
     # ── tool registry: 액션 이름 → tool 함수 매핑 ───────────────────────────────
-    # SLOT_SCHEMA에 정의된 액션과 tool 이름(함수명)으로 매핑한다.
-    # 실제 tool 이름은 "mock_execute_transfer" 또는 "execute_transfer" 패턴을 따른다.
     tool_registry: dict[str, object] = {t.name: t for t in tools}
 
-    # 액션 → tool 이름 매핑 (mock과 실제 tool 모두 지원)
-    # tool 이름 패턴: "mock_{action}" 또는 "{action}_tool"
     def _find_tool_for_action(action: str) -> object | None:
         """액션 이름에 해당하는 tool을 registry에서 찾는다."""
         candidates = [
@@ -214,7 +210,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
         for name in candidates:
             if name in tool_registry:
                 return tool_registry[name]
-        # 액션명으로 직접 탐색 (부분 일치)
         for name, tool_obj in tool_registry.items():
             if action in name:
                 return tool_obj
@@ -223,17 +218,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
     # ── 노드 정의 ────────────────────────────────────────────────────────────────
 
     def intent_node(state: VoiceState) -> dict:
-        """LLM으로 인텐트를 파악하고 슬롯을 추출한다.
-
-        처리 시나리오:
-        1. 취소 발화("취소", "아니오") → 상태 초기화
-        2. awaiting_confirmation=True + "네" + ASV 필요 → awaiting_asv_audio=True
-        3. awaiting_confirmation=True + "네" + ASV 불필요 → execution_ready=True
-        4. 새 인텐트 감지 → pending_action, navigate_to, 초기 슬롯 설정
-        5. 슬롯 채우기 → collected_slots 업데이트
-        6. 일반 챗봇 질의 → direct_response를 AIMessage로 추가
-        """
-        # 현재 상태 컨텍스트를 시스템 프롬프트에 추가
+        """LLM으로 인텐트를 파악하고 슬롯을 추출한다."""
         context_lines = [
             SYSTEM_PROMPT,
             "",
@@ -277,7 +262,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             " 수신자 슬롯 키는 'alias'.",
             "- user_confirmed: '네', '맞아요', '그렇게 해줘' 등 확인 발화 시 true",
             "- user_cancelled: '취소', '아니오', '됐어', '하지 마' 등 취소 발화 시 true",
-            "- direct_response: 비금융 챗봇 답변(영업시간, 상품 안내 등)에만 사용.",
+            "- direct_response: 비금융 챗봇 답변(영업시간, 상품 안내 등)에만 사용."
             "  ★ intent가 설정된 경우 반드시 빈 문자열('')로 설정할 것.",
             "  ★ 누락 슬롯 질문('누구에게?', '얼마?')을 절대 여기에 쓰지 말 것."
             " 슬롯 수집은 시스템이 자동으로 처리한다.",
@@ -286,14 +271,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         system_content = "\n".join(context_lines)
 
-        # 대화 이력 메시지 구성
         chat_messages: list = [{"role": "system", "content": system_content}]
         for msg in state.get("messages", []):
             if hasattr(msg, "type"):
                 role = "user" if msg.type == "human" else "assistant"
                 chat_messages.append({"role": role, "content": msg.content})
 
-        # LLM 호출 (structured output)
         try:
             result: IntentResult = llm_structured.invoke(chat_messages)
             logger.info(
@@ -336,14 +319,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
         if state.get("awaiting_confirmation") and result.user_confirmed:
             action = state.get("pending_action", "")
             if action in ASV_REQUIRED_ACTIONS:
-                # ASV 음성 인증 필요 → 다음 오디오를 ASV 검증으로 처리
                 updates = {
                     "awaiting_confirmation": False,
                     "awaiting_asv_audio": True,
                     "messages": [AIMessage(content="목소리로 인증해 주세요.")],
                 }
             else:
-                # ASV 불필요 → execute_node로 직행
                 updates = {
                     "awaiting_confirmation": False,
                     "execution_ready": True,
@@ -357,17 +338,15 @@ def build_graph(tools: list) -> CompiledStateGraph:
             updates["navigate_to"] = SCREEN_MAP.get(result.intent)
             updates["collected_slots"] = new_slots
             updates["recipient_validated"] = False
-            # navigate_to 설정 후 reset (다음 턴에서는 None)
-            # (slot_fill_node나 confirm_node에서 None으로 설정)
 
         # ── 슬롯 보충 ──────────────────────────────────────────────────────────
         elif result.extracted_slots and pending:
             existing = dict(state.get("collected_slots", {}))
             existing.update(result.extracted_slots)
             updates["collected_slots"] = existing
-            updates["navigate_to"] = None  # 슬롯 채우기 중 화면 이동 없음
+            updates["navigate_to"] = None
 
-        # ── 챗봇 직접 응답 (인텐트 없음) ───────────────────────────────────────
+        # ── 챗봇 직접 응답 ─────────────────────────────────────────────────────
         if result.direct_response:
             updates["messages"] = [AIMessage(content=result.direct_response)]
 
@@ -385,9 +364,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
             question = "정보가 모두 수집되었습니다."
 
         return {
-            # navigate_to는 intent_node가 이미 설정/초기화한다.
-            # - 새 intent 첫 감지 턴: intent_node가 SCREEN_MAP 값을 설정 → 보존
-            # - 슬롯 채우기 진행 턴: intent_node의 elif 분기가 None으로 초기화 → 보존
             "messages": [AIMessage(content=question)],
         }
 
@@ -399,16 +375,11 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         return {
             "awaiting_confirmation": True,
-            # navigate_to는 intent_node가 이미 초기화(None)했으므로 재설정 불필요
             "messages": [AIMessage(content=confirm_msg)],
         }
 
     def resolve_node(state: VoiceState) -> dict:
-        """alias 슬롯이 채워진 즉시 수취인 존재 여부를 검증한다.
-
-        lookup_recipient 툴 미등록 시(mock 환경) 검증을 생략하고 통과시킨다.
-        성공 시 recipient_validated=True, 실패 시 alias 슬롯 초기화 후 재수집 유도.
-        """
+        """alias 슬롯이 채워진 즉시 수취인 존재 여부를 검증한다."""
         slots = dict(state.get("collected_slots", {}))
         alias = slots.get("alias", "")
         user_id = state.get("user_id", "")
@@ -458,15 +429,10 @@ def build_graph(tools: list) -> CompiledStateGraph:
         return "confirm_node"
 
     def execute_node(state: VoiceState) -> dict:
-        """수집된 슬롯으로 tool을 직접 호출하고 결과를 TTS 응답으로 추가한다.
-
-        화면에 서비스 실행을 위임하지 않는다.
-        tool(mock 또는 실제)을 직접 invoke()한다.
-        """
+        """수집된 슬롯으로 tool을 직접 호출하고 결과를 TTS 응답으로 추가한다."""
         pending = state.get("pending_action", "")
         slots = dict(state.get("collected_slots", {}))
 
-        # tool 탐색
         tool_obj = _find_tool_for_action(pending)
 
         if tool_obj is None:
@@ -477,7 +443,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "execute_node: '%s' 액션에 대한 tool을 찾을 수 없습니다.", pending
             )
         else:
-            # user_id를 슬롯에 추가 (service 호출에 필요)
             invoke_args = {"user_id": state.get("user_id", ""), **slots}
             try:
                 response_text = tool_obj.invoke(invoke_args)
@@ -495,8 +460,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "execution_ready": False,
             "messages": [AIMessage(content=response_text)],
         }
-        # transfer/auto_transfer 등 완료 화면이 있는 액션만 navigate_to 덮어씀.
-        # balance처럼 COMPLETE_SCREEN_MAP에 없는 액션은 intent_node가 설정한 값 보존.
         if pending in COMPLETE_SCREEN_MAP:
             updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
         return updates
@@ -505,22 +468,18 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
     def route_after_intent(state: VoiceState) -> str:
         """intent_node 처리 후 다음 노드를 결정한다."""
-        # ASV 대기 중 → END (다음 요청은 router.py가 ASV 분기 처리)
         if state.get("awaiting_asv_audio"):
             return END
 
-        # 확인 완료 + 즉시 실행 가능 → execute_node
         if state.get("execution_ready"):
             return "execute_node"
 
         pending = state.get("pending_action")
         if not pending:
-            # 인텐트 없음 → 챗봇 직답 (메시지는 이미 intent_node에서 추가됨)
             return END
 
         slots = state.get("collected_slots", {})
 
-        # alias 슬롯이 채워졌지만 아직 검증하지 않았으면 즉시 resolve_node로
         if (
             pending in RECIPIENT_REQUIRED_ACTIONS
             and slots.get("alias")
@@ -533,15 +492,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
         if missing:
             return "slot_fill_node"
 
-        # 슬롯 없는 단순 조회 액션 (balance, history, event) → 확인 없이 즉시 실행
         if pending not in SLOT_SCHEMA:
             return "execute_node"
 
         if not state.get("awaiting_confirmation"):
-            # 슬롯 완전 수집, 아직 확인 안 받음 → 확인 요청
             return "confirm_node"
 
-        # awaiting_confirmation=True → 사용자 응답 대기 중 → END
         return END
 
     # ── StateGraph 빌드 ────────────────────────────────────────────────────────
