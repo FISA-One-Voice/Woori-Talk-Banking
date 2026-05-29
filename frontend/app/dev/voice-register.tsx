@@ -22,6 +22,13 @@ export default function DevVoiceRegisterScreen() {
 
   // 화면 단계에 따른 TTS(음성 읽어주기) 및 자동 전환 제어
   useEffect(() => {
+    // TTS 안내 음성이 메인 스피커로 크게 나오도록 녹음 모드 해제
+    Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      playThroughEarpieceAndroid: false,
+    });
+    
     Speech.stop();
 
     if (step === 'TUTORIAL') {
@@ -53,7 +60,7 @@ export default function DevVoiceRegisterScreen() {
         }
       });
     } else if (step === 'SUCCESS') {
-      Speech.speak("성공적으로 등록되었습니다. 이제 목소리로 간편하게 인증할 수 있습니다.", { language: 'ko-KR', rate: 0.9 });
+      Speech.speak("고객님의 목소리가 성공적으로 등록되었습니다. 이제 목소리로 간편하게 인증할 수 있습니다. 감사합니다.", { language: 'ko-KR', rate: 0.9 });
     } else if (step === 'FAIL') {
       Speech.speak("목소리 인식에 실패했습니다. 조용한 곳에서 다시 시도해 주세요.", { language: 'ko-KR', rate: 0.9 });
     }
@@ -167,6 +174,14 @@ export default function DevVoiceRegisterScreen() {
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
+      
+      // 녹음이 끝나면 다시 스피커 모드로 복구하여 다음 TTS가 크게 들리도록 조치
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        playThroughEarpieceAndroid: false,
+      });
+      
       return uri;
     } catch (err) {
       console.error('Failed to stop recording', err);
@@ -298,7 +313,7 @@ export default function DevVoiceRegisterScreen() {
                 <Text style={styles.successTitleText}>등록 완료</Text>
               </View>
               
-              {renderInfoBox('등록 완료', '성공적으로 등록되었습니다!\n이제 목소리로 간편하게 인증하세요.')}
+              {renderInfoBox('등록 완료', '성공적으로 등록되었습니다!\n이제 목소리로 간편하게 \n인증하세요.')}
               
               <View style={{ flex: 1, justifyContent: 'flex-end' }}>
                 <Pressable style={styles.button} onPress={() => router.push('/dev')}>
