@@ -64,3 +64,6 @@ develop/
 # Media / Keys
 *.wav
 *.pem
+
+# AI Agent
+.agent/
