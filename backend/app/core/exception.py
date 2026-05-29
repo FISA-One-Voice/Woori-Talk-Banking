@@ -108,3 +108,18 @@ class AlreadyParticipatedError(EventError):
     """이미 참여한 이벤트에 다시 참여할 때 발생합니다."""
 
     pass
+
+
+class TransferError(AppError):
+    """이체 처리 중 발생하는 에러.
+
+    코드 목록:
+        INVALID_ACCOUNT_FORMAT     계좌번호 형식 오류 (400)
+        TRANSFER_ACCOUNT_NOT_FOUND 출금 계좌 없음 (404)
+        TRANSFER_PENDING           동일 key 이체 진행 중 (409)
+        IDEMPOTENCY_KEY_USED       동일 key가 이미 실패 처리됨 (409)
+        INSUFFICIENT_BALANCE       잔액 부족 (400)
+        TRANSACTION_NOT_FOUND      트랜잭션 없음 (404)
+    """
+
+    pass

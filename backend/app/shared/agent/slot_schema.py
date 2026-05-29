@@ -10,6 +10,7 @@ Design Ref (Issue #21):
 SLOT_SCHEMA: dict[str, list[str]] = {
     "transfer": ["recipient", "amount"],
     "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
+    "add_note": ["memo"],
 }
 
 # ── intent → 프론트엔드 화면 이름 매핑 ────────────────────────────────────────────
@@ -42,6 +43,7 @@ SLOT_QUESTIONS: dict[str, str] = {
     "amount": "얼마를 보낼까요?",
     "cycle": "매월 또는 매주 중 어떤 주기로 보낼까요?",
     "scheduled_day": "매월 며칠에 이체할까요?",
+    "memo": "어떤 메모를 달까요?",
 }
 
 # ── 실행 완료 화면 경로 ────────────────────────────────────────────────────────────

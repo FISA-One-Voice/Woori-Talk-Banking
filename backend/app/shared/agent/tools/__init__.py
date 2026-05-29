@@ -38,10 +38,13 @@ MOCK_TOOLS: list = [
 
 # ── 실제 tool 목록 ─────────────────────────────────────────────────────────────
 # Phase 2 담당자가 완성한 실제 tool을 여기에 추가한다.
-# 예:
-#   from app.shared.agent.tools.balance import get_balance_tool
-#   _REAL_TOOLS = [get_balance_tool, ...]
-_REAL_TOOLS: list = []
+from app.features.transfer.tools import add_note, execute_transfer
+
+_REAL_TOOLS: list = [
+    # lookup_recipient — recipients 담당자가 features/recipients/tools.py에 추가 예정
+    execute_transfer,
+    add_note,
+]
 
 # ── 활성 tool 목록 ─────────────────────────────────────────────────────────────
 # USE_MOCK_TOOLS=true  (기본값) → MOCK_TOOLS 사용 (개발/테스트 환경)
