@@ -90,3 +90,9 @@ class AgentError(AppError):
     """
 
     pass
+
+
+class AutoTransferError(AppError):
+    """자동이체 등록·실행 중 발생하는 예외."""
+
+    pass
