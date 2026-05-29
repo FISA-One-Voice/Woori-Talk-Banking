@@ -19,11 +19,13 @@ Design Ref:
 
 import asyncio
 import base64
+import io
 import json
 import logging
 import uuid
 
 import httpx
+from pydub import AudioSegment
 from langchain_core.messages import HumanMessage
 from sqlalchemy.orm import Session
 
@@ -162,6 +164,24 @@ async def _handle_normal_flow(
 # ── ASV 인증 흐름 ───────────────────────────────────────────────────────────────
 
 
+def _to_wav_bytes(audio_bytes: bytes) -> bytes:
+    """m4a/AAC 등 임의 포맷 오디오 바이트를 WAV(PCM)로 변환한다.
+
+    ASV 서버의 soundfile은 m4a를 디코딩하지 못하므로 ASV 흐름 진입 시 호출한다.
+    ffmpeg이 시스템에 설치되어 있어야 한다.
+
+    Args:
+        audio_bytes: 변환할 원시 오디오 바이트 (m4a, AAC 등).
+
+    Returns:
+        WAV PCM 포맷 바이트.
+    """
+    audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
+    buf = io.BytesIO()
+    audio.export(buf, format="wav")
+    return buf.getvalue()
+
+
 async def _handle_asv_flow(
     audio_bytes: bytes,
     user_id: str,
@@ -197,18 +217,22 @@ async def _handle_asv_flow(
     # DB에서 사용자 음성 임베딩 조회 (ASV /verify 호출에 필요)
     reference_embedding = _get_user_embedding(user_id, db)
 
+    # m4a/AAC → WAV 변환 (soundfile은 m4a 디코딩 불가)
+    wav_bytes = _to_wav_bytes(audio_bytes)
+
     logger.info(
         "[ASV] _call_asv_ec2 호출 직전: url=%s/verify "
-        "embedding_len=%d audio_bytes=%d",
+        "embedding_len=%d audio_bytes=%d wav_bytes=%d",
         settings.ASV_SERVER_URL,
         len(reference_embedding),
         len(audio_bytes),
+        len(wav_bytes),
     )
 
     # ASV + anti-spoofing 병렬 호출
     asv_result, spoof_result = await asyncio.gather(
-        _call_asv_ec2(audio_bytes, reference_embedding),
-        _call_anti_spoofing_ec2(audio_bytes),
+        _call_asv_ec2(wav_bytes, reference_embedding),
+        _call_anti_spoofing_ec2(wav_bytes),
         return_exceptions=True,
     )
 
