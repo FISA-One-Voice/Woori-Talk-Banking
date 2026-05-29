@@ -55,35 +55,83 @@ def convert_to_wav_with_ffmpeg(audio_bytes: bytes) -> bytes:
         if os.path.exists(temp_out_path):
             os.remove(temp_out_path)
 
-
-async def extract_voice_vector(
-    filename: str, audio_bytes: bytes, content_type: str
-) -> list[float]:
-    """ASV 서버에 오디오 파일을 전송하여 192차원 음성 임베딩 벡터를 추출합니다.
+def merge_and_convert_with_ffmpeg(audio_bytes_list: list[bytes]) -> bytes:
+    """여러 개의 오디오 바이트 데이터를 하나로 병합한 뒤 16-bit PCM WAV로 변환합니다.
 
     Args:
-        filename: 프론트엔드에서 전달받은 원본 오디오 파일명.
-        audio_bytes: 원본 오디오 파일의 바이너리 데이터.
-        content_type: 원본 파일의 MIME 타입 (예: audio/m4a).
+        audio_bytes_list: 병합할 오디오 바이너리 데이터들의 리스트.
+
+    Returns:
+        병합 및 변환이 완료된 단일 WAV 파일의 바이너리 데이터.
+
+    Raises:
+        VoiceServiceError: ffmpeg 병합 및 변환 프로세스 중 오류가 발생한 경우.
+    """
+    temp_files = []
+    list_file_path = None
+    out_path = None
+    try:
+        for b in audio_bytes_list:
+            tf = tempfile.NamedTemporaryFile(delete=False, suffix=".m4a")
+            tf.write(b)
+            tf.close()
+            temp_files.append(tf.name)
+            
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode='w') as list_file:
+            for tf_name in temp_files:
+                list_file.write(f"file '{tf_name}'\n")
+            list_file_path = list_file.name
+        
+        out_path = list_file_path + "_out.wav"
+        cmd = [
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", list_file_path,
+            "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+            out_path
+        ]
+        subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+        
+        with open(out_path, "rb") as f:
+            wav_bytes = f.read()
+        return wav_bytes
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.decode('utf-8', errors='ignore')
+        raise VoiceServiceError(
+            code="VOICE_AUDIO_INVALID_FORMAT",
+            message=f"오디오 병합 실패(ffmpeg): {error_msg}",
+            status_code=500
+        )
+    finally:
+        for tf_name in temp_files:
+            if os.path.exists(tf_name): os.remove(tf_name)
+        if list_file_path and os.path.exists(list_file_path): os.remove(list_file_path)
+        if out_path and os.path.exists(out_path): os.remove(out_path)
+
+
+async def extract_voice_vector(
+    files_bytes: list[bytes]
+) -> list[float]:
+    """여러 개의 오디오 파일을 병합하여 192차원 음성 임베딩 벡터를 추출합니다.
+
+    Args:
+        files_bytes: 프론트엔드에서 분할 전송된 오디오 파일들의 바이너리 데이터 리스트.
 
     Returns:
         ASV 서버가 추출한 192차원 실수(float) 배열.
 
     Raises:
-        VoiceServiceError: 외부 ASV 서버 통신 실패, 내부 오디오 변환 실패,
+        VoiceServiceError: 외부 ASV 서버 통신 실패, 내부 오디오 병합 실패,
                            또는 반환된 벡터가 192차원이 아닌 경우 발생.
     """
-    
-    # 1. AWS 및 모든 환경에서 안전한 범용 변환 로직 통과
-    audio_bytes = convert_to_wav_with_ffmpeg(audio_bytes)
-    filename = "converted_voice.wav"
+    merged_wav_bytes = merge_and_convert_with_ffmpeg(files_bytes)
+    filename = "merged_voice.wav"
     content_type = "audio/wav"
 
     try:
         async with httpx.AsyncClient() as client:
-            files = {"file": (filename, audio_bytes, content_type)}
+            files = {"file": (filename, merged_wav_bytes, content_type)}
             response = await client.post(
-                f"{settings.ASV_SERVER_URL}/enroll", files=files, timeout=30.0
+                f"{settings.ASV_SERVER_URL}/enroll", files=files, timeout=60.0
             )
             response.raise_for_status()
 
@@ -98,11 +146,9 @@ async def extract_voice_vector(
                 )
             return embedding
     except httpx.HTTPStatusError as e:
-        error_detail = e.response.text
-        print(f"[DEBUG] ASV Server Error Response: {error_detail}")
         raise VoiceServiceError(
             code="VOICE_VECTOR_EXTRACT_FAILED",
-            message=f"ASV 서버 오류 (상태 코드: {e.response.status_code}, 상세: {error_detail})",
+            message=f"ASV 서버 오류 (상태 코드: {e.response.status_code})",
             status_code=502,
         )
     except VoiceServiceError:
@@ -149,5 +195,57 @@ def register_voice_vector(db: Session, user_id: str, vector: list[float]) -> dic
 
     return {
         "success": True,
+        "data": None,
         "message": "음성 벡터(192차원)가 사용자의 계정에 성공적으로 등록되었습니다.",
+    }
+
+
+async def verify_voice(db: Session, user_id: str, audio_bytes: bytes) -> dict:
+    """단일 유저 검증용: 업로드된 오디오를 현재 로그인된 유저의 벡터와 비교하여 유사도를 반환합니다.
+
+    Args:
+        db: 데이터베이스 세션.
+        user_id: 현재 로그인된 사용자의 고유 ID.
+        audio_bytes: 검증할 대상 오디오의 바이너리 데이터.
+
+    Returns:
+        유사도 점수와 동일인 판별 결과를 포함하는 딕셔너리.
+
+    Raises:
+        AppError: 사용자를 찾을 수 없거나 등록된 음성이 없는 경우.
+        VoiceServiceError: ASV 서버 검증 실패 시 발생.
+    """
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise AppError(code="USER_NOT_FOUND", message="사용자를 찾을 수 없습니다.", status_code=404)
+        
+    if user.embedding_vector is None:
+        raise AppError(code="VECTOR_NOT_FOUND", message="아직 음성이 등록되지 않았습니다. 먼저 등록해 주세요.", status_code=400)
+        
+    wav_bytes = convert_to_wav_with_ffmpeg(audio_bytes)
+    
+    import json
+    
+    async with httpx.AsyncClient() as client:
+        files = {"file": ("test.wav", wav_bytes, "audio/wav")}
+        data = {"reference_embedding": json.dumps([float(x) for x in user.embedding_vector])}
+        res = await client.post(f"{settings.ASV_SERVER_URL}/verify", data=data, files=files, timeout=30)
+        
+        if res.status_code != 200:
+            print(f"\n[ASV 서버 에러] {res.status_code}\n{res.text}\n")
+            raise VoiceServiceError(code="VOICE_AUTH_FAILED", message=f"검증 실패: {res.text}", status_code=500)
+            
+        res_data = res.json()
+        score = res_data.get("similarity_score", 0.0)
+        is_same = res_data.get("is_same_speaker", False)
+        
+        print(f"[ASV 단일 검증 결과] 현재 로그인된 유저와의 유사도: {score:.4f} (동일인 판별: {is_same})")
+            
+    return {
+        "success": True,
+        "data": {
+            "score": round(score, 4),
+            "is_same_speaker": is_same,
+        },
+        "message": "음성 검증이 완료되었습니다."
     }

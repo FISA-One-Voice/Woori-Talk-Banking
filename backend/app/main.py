@@ -103,6 +103,9 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
+    if exc.status_code >= 500:
+        print(f"\n[Backend AppError 500] {exc.code}: {exc.message}\n")
+        
     return JSONResponse(
         status_code=exc.status_code,
         content={

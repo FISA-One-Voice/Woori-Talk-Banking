@@ -26,13 +26,15 @@ export default function AccessibleNumKeypad({
       setPin((p) => p.slice(0, -1));
       return;
     }
-    if (key === '') return;
+    if (key === '' || pin.length >= length) return;
 
     const next = pin + key;
     setPin(next);
     if (next.length === length) {
-      onComplete(next);
-      setPin('');
+      setTimeout(() => {
+        onComplete(next);
+        setPin('');
+      }, 100);
     }
   };
 
