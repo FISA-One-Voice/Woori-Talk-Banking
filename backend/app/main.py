@@ -32,6 +32,7 @@ from app.core.exception import AppError
 from app.core.opensearch import create_indices_if_not_exists
 
 # from app.features.event.router import router as event_router  # TODO: event 기능 재구현 후 주석 해제
+from app.features.auto_transfer.router import router as auto_transfer_router
 from app.features.jwt_auth.router import router as jwt_auth_router
 from app.features.voice.router import router as voice_register_router
 from app.features.recipients.router import router as recipients_router
@@ -141,6 +142,7 @@ app.include_router(voice_router)
 app.include_router(jwt_auth_router)
 app.include_router(voice_register_router)
 app.include_router(recipients_router)
+app.include_router(auto_transfer_router)
 
 
 # ── 헬스체크 ────────────────────────────────────────────────────────────────────
@@ -148,3 +150,26 @@ app.include_router(recipients_router)
 def health_check():
     """서버가 정상 실행 중인지 확인하는 엔드포인트."""
     return {"status": "ok"}
+
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from app.core.database import SessionLocal
+from app.features.auto_transfer.service import run_due_auto_transfers
+
+scheduler = BackgroundScheduler()
+
+@app.on_event("startup")
+def start_scheduler():
+    def job():
+        db = SessionLocal()
+        try:
+            run_due_auto_transfers(db, user_id=None)  # 전체 유저 실행
+        finally:
+            db.close()
+
+    scheduler.add_job(job, "cron", hour=0, minute=1)  # 매일 00:01 실행
+    scheduler.start()
+
+@app.on_event("shutdown")
+def stop_scheduler():
+    scheduler.shutdown()
