@@ -30,6 +30,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exception import AgentError
+from app.features.recipients.service import find_recipient_by_voice
 from app.shared.agent.prompts import SYSTEM_PROMPT
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
@@ -37,6 +38,7 @@ from app.shared.agent.slot_schema import (
     COMPLETE_SCREEN_MAP,
     RECIPIENT_REQUIRED_ACTIONS,
     SCREEN_MAP,
+    SCREEN_ONLY_INTENTS,
     SLOT_QUESTIONS,
     SLOT_SCHEMA,
     VALID_INTENTS,
@@ -276,15 +278,18 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "",
             "규칙:",
             f"- 유효한 인텐트 목록: {list(VALID_INTENTS)}",
-            "- intent: 금융 작업 유형이 파악되면 슬롯 유무와 무관하게 반드시 설정."
-            " 슬롯 채우기 진행 중이면 null.",
+            "- intent: 금융 작업 또는 화면 이동 유형이 파악되면 슬롯 유무와 무관하게"
+            " 반드시 설정. 슬롯 채우기 진행 중이면 null.",
             "  예) '이체해줘' → intent='transfer' (슬롯 없어도 설정)",
             "  예) '잔액 얼마야' → intent='balance'",
+            "  예) '홈 화면', '처음으로', '홈으로 가줘' → intent='home'",
             "- extracted_slots: 발화에서 파악한 슬롯 값 (없으면 {})."
             " 금액 슬롯 키는 'amount', 값은 원화 정수 문자열"
             " (예: '3만원'→'30000', '오만원'→'50000')."
-            " 수신자 슬롯 키는 'recipient', 값은 발화에서 언급한 이름·별명 그대로"
-            " (예: '엄마에게'→recipient='엄마', '친구한테'→recipient='친구').",
+            " 수신자 슬롯 키는 'recipient', 값은 발화에서 언급한"
+            " 이름·별명·전화번호 그대로"
+            " (예: '엄마에게'→recipient='엄마',"
+            " '010 1234 5678로'→recipient='010 1234 5678').",
             "- user_confirmed: '네', '맞아요', '그렇게 해줘' 등 확인 발화 시 true",
             "- user_cancelled: '취소', '아니오', '됐어', '하지 마' 등 취소 발화 시 true",
             "- direct_response: 비금융 챗봇 답변(영업시간, 상품 안내 등)에만 사용.",
@@ -360,15 +365,44 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 }
             return updates
 
+        # ── 홈 이동 처리 ─────────────────────────────────────────────────────────
+        # 진행 중인 모든 액션 상태를 초기화하고 홈으로 이동
+        if result.intent == "home":
+            return {
+                "pending_action": None,
+                "collected_slots": {},
+                "awaiting_confirmation": False,
+                "awaiting_asv_audio": False,
+                "execution_ready": False,
+                "recipient_validated": False,
+                "asv_retry_count": 0,
+                "navigate_to": "home",
+                "messages": [AIMessage(content="홈 화면으로 이동합니다.")],
+            }
+
         # ── 새 인텐트 감지 ──────────────────────────────────────────────────────
-        if result.intent and result.intent in VALID_INTENTS and not pending:
-            new_slots = dict(result.extracted_slots)
-            updates["pending_action"] = result.intent
-            updates["navigate_to"] = SCREEN_MAP.get(result.intent)
-            updates["collected_slots"] = new_slots
-            updates["recipient_validated"] = False
-            # navigate_to 설정 후 reset (다음 턴에서는 None)
-            # (slot_fill_node나 confirm_node에서 None으로 설정)
+        # pending과 다른 인텐트가 들어오면 기존 슬롯·상태를 초기화하고 새로 시작
+        if (
+            result.intent
+            and result.intent in VALID_INTENTS
+            and result.intent != pending
+        ):
+            updates = {
+                "pending_action": result.intent,
+                "navigate_to": SCREEN_MAP.get(result.intent),
+                "collected_slots": dict(result.extracted_slots),
+                "recipient_validated": False,
+                "awaiting_confirmation": False,
+                "awaiting_asv_audio": False,
+                "execution_ready": False,
+                "asv_retry_count": 0,
+            }
+            # 화면 전환 전용 인텐트: 화면이 자체 TTS를 처리하므로 간단한 안내만 추가
+            if result.intent in SCREEN_ONLY_INTENTS:
+                screen_name = SCREEN_MAP.get(result.intent, result.intent)
+                updates["messages"] = [
+                    AIMessage(content=f"{screen_name} 화면으로 이동합니다.")
+                ]
 
         # ── 슬롯 보충 ──────────────────────────────────────────────────────────
         elif result.extracted_slots and pending:
@@ -388,9 +422,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
         pending = state.get("pending_action", "")
         slots = state.get("collected_slots", {})
         missing = _missing_slots(pending, slots)
-        logger.info(
-            "[Graph →slot_fill_node] pending=%s missing=%s", pending, missing
-        )
+        logger.info("[Graph →slot_fill_node] pending=%s missing=%s", pending, missing)
 
         if missing:
             slot_name = missing[0]
@@ -428,7 +460,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
     def resolve_node(state: VoiceState) -> dict:
         """recipient 슬롯이 채워진 즉시 수취인 존재 여부를 검증한다.
 
-        lookup_recipient 툴 미등록 시(mock 환경) 검증을 생략하고 통과시킨다.
         성공 시 recipient_validated=True, 실패 시 recipient 슬롯 초기화 후 재수집 유도.
         """
         slots = dict(state.get("collected_slots", {}))
@@ -438,23 +469,10 @@ def build_graph(tools: list) -> CompiledStateGraph:
             recipient_input,
             state.get("user_id"),
         )
-        user_id = state.get("user_id", "")
 
-        resolver = tool_registry.get("lookup_recipient") or tool_registry.get(
-            "mock_lookup_recipient"
+        canonical_name: str | None = find_recipient_by_voice(
+            state.get("user_id", ""), recipient_input
         )
-
-        if resolver is None:
-            logger.warning("resolve_node: lookup_recipient 툴 미등록, 검증 생략")
-            return {"recipient_validated": True}
-
-        try:
-            canonical_name: str | None = resolver.invoke(
-                {"user_id": user_id, "recipient": recipient_input}
-            )
-        except Exception as e:
-            logger.error("resolve_node 수취인 조회 실패: %s", e)
-            canonical_name = None
 
         if canonical_name is None:
             slots["recipient"] = None
@@ -509,12 +527,27 @@ def build_graph(tools: list) -> CompiledStateGraph:
         tool_obj = _find_tool_for_action(pending)
 
         if tool_obj is None:
-            response_text = (
-                "해당 기능을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요."
-            )
             logger.warning(
                 "execute_node: '%s' 액션에 대한 tool을 찾을 수 없습니다.", pending
             )
+            return {
+                "pending_action": None,
+                "collected_slots": {},
+                "awaiting_confirmation": False,
+                "awaiting_asv_audio": False,
+                "execution_ready": False,
+                "recipient_validated": False,
+                "asv_retry_count": 0,
+                "navigate_to": "home",
+                "messages": [
+                    AIMessage(
+                        content=(
+                            "해당 기능을 아직 사용할 수 없습니다."
+                            " 홈 화면으로 이동합니다."
+                        )
+                    )
+                ],
+            }
         else:
             # user_id를 슬롯에 추가 (service 호출에 필요)
             invoke_args = {"user_id": state.get("user_id", ""), **slots}
@@ -581,18 +614,22 @@ def build_graph(tools: list) -> CompiledStateGraph:
             )
             return "slot_fill_node"
 
-        # 슬롯 없는 단순 조회 액션 (balance, history, event) → 확인 없이 즉시 실행
-        if pending not in SLOT_SCHEMA:
+        # 화면 전환 전용 인텐트 (event 등) → 화면이 자체 데이터·TTS 처리
+        if pending in SCREEN_ONLY_INTENTS:
             logger.info(
-                "[Graph route] intent_node → execute_node (no slots required)"
+                "[Graph route] intent_node → END (screen-only=%s)",
+                pending,
             )
+            return END
+
+        # 슬롯 없는 단순 조회 액션 (balance, history) → 확인 없이 즉시 실행
+        if pending not in SLOT_SCHEMA:
+            logger.info("[Graph route] intent_node → execute_node (no slots required)")
             return "execute_node"
 
         if not state.get("awaiting_confirmation"):
             # 슬롯 완전 수집, 아직 확인 안 받음 → 확인 요청
-            logger.info(
-                "[Graph route] intent_node → confirm_node (all slots filled)"
-            )
+            logger.info("[Graph route] intent_node → confirm_node (all slots filled)")
             return "confirm_node"
 
         # awaiting_confirmation=True → 사용자 응답 대기 중 → END

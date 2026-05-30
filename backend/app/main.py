@@ -20,6 +20,11 @@
 
 import logging
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,11 +34,12 @@ logger = logging.getLogger(__name__)
 
 from app.core.database import Base, engine
 from app.core.exception import AppError
-from app.features.event.router import router as event_router
 from app.core.opensearch import create_indices_if_not_exists
+from app.features.event.router import router as event_router
 from app.features.jwt_auth.router import router as jwt_auth_router
-from app.features.voice.router import router as voice_register_router
 from app.features.recipients.router import router as recipients_router
+from app.features.transfer.router import router as transfer_router
+from app.features.voice.router import router as voice_register_router
 from app.shared.voice.router import router as voice_router
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
@@ -101,7 +107,12 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
-    logger.error("[AppError] code=%s status=%s message=%s", exc.code, exc.status_code, exc.message)
+    logger.error(
+        "[AppError] code=%s status=%s message=%s",
+        exc.code,
+        exc.status_code,
+        exc.message,
+    )
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -118,12 +129,21 @@ Base.metadata.create_all(bind=engine)
 
 
 # ── 라우터 등록 ─────────────────────────────────────────────────────────────────
+# 각 feature 의 router 를 앱에 등록합니다.
+# 새 화면(feature)을 추가할 때마다 이 파일에 두 줄씩 추가합니다:
+# from app.features.{name}.router import router as {name}_router
+# app.include_router({name}_router)
+from app.core.config import settings as _settings
+
+logger.info("[Startup] ASV_SERVER_URL = %s", _settings.ASV_SERVER_URL)
+
 app.include_router(voice_router)
 app.include_router(jwt_auth_router)
 app.include_router(asset_router)  # 자산 화면 — 잔액 조회 + 거래 내역 조회
 app.include_router(event_router)
 app.include_router(voice_register_router)
 app.include_router(recipients_router)
+app.include_router(transfer_router)
 
 
 # ── 헬스체크 ────────────────────────────────────────────────────────────────────

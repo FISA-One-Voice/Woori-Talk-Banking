@@ -105,9 +105,6 @@ class Settings(BaseSettings):
     OPENAI_CHAT_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
 
-    # ASV 서버 주소
-    ASV_SERVER_URL: str = ""
-
     # JWT 인증 설정
     JWT_SECRET_KEY: str = "supersecretkey-change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -115,9 +112,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # ── 에이전트 mock tool 설정 (Issue #21) ──────────────────────────────────────
-    # True : MOCK_TOOLS 사용 — Phase 2 화면 담당자 tool 완성 전 개발/테스트용 (기본값)
-    # False: 실제 tool 사용 — 각 화면 담당자의 features/*/tools 완성 후 전환
-    USE_MOCK_TOOLS: bool = True
+    # True : MOCK_TOOLS 사용 — Phase 2 화면 담당자 tool 완성 전 개발/테스트용
+    # False: 실제 tool 사용 — 각 화면 담당자의 features/*/tools 완성 후 (기본값)
+    USE_MOCK_TOOLS: bool = False
 
     # ── ASV 화자 인증 서버 설정 (Issue #7, ai/asv/) ───────────────────────────────
     # ASV_SERVER_URL: CAM++ 기반 화자 인증 서버 주소 (POST /verify)
