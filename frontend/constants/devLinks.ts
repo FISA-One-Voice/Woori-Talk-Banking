@@ -8,4 +8,5 @@ export const DEV_LINKS: DevLinkItem[] = [
   { label: '컴포넌트 쇼케이스', path: '/showcase' },
   { label: '홈 UI 컴포넌트', path: '/dev/home-components' },
   { label: '로그인 화면 테스트 (Real API)', path: '/dev/login' },
+  { label: '단일 음성 검증 테스트', path: '/dev/voice-verify' },
 ];
