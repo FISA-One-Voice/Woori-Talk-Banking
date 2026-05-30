@@ -15,7 +15,7 @@ Phase 2 담당자가 실제 tool 완성 시 USE_MOCK_TOOLS=false 로 전환.
 """
 # Plan SC: build_graph([]) 호출 시 오류 없이 초기화 (Issue #5 완료 조건)
 
-from app.shared.agent.tools.balance import get_total_balance, get_account_balance_by_id
+from app.shared.agent.tools.balance import get_account_balance_by_id, get_total_balance
 from app.shared.agent.tools.history import (
     get_category_history,
     get_monthly_expense,

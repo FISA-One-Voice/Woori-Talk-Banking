@@ -2,11 +2,12 @@
 # backend/app/core/security.py
 # =============================================================================
 from datetime import datetime, timedelta, timezone
+from typing import Optional
+
 import bcrypt
 import jwt
-from typing import Optional
 from fastapi import Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.exception import AuthError
 
@@ -96,21 +97,6 @@ def decode_token(token: str) -> dict | None:
         return None
 
 
-def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> str:
-    """요청 헤더의 Bearer 토큰을 검증하고 user_id를 반환합니다.
-
-    FastAPI 의존성 주입용 함수. 라우터에서 Depends(get_current_user_id)로 사용합니다.
-
-    Args:
-        credentials: FastAPI HTTPBearer가 추출한 Bearer 토큰 정보.
-
-    Returns:
-        토큰 payload의 sub 필드값 (user_id 문자열).
-
-    Raises:
-        AuthError: 토큰이 위변조되었거나 유효하지 않은 경우 (TOKEN_INVALID).
 def get_optional_user_id(request: Request) -> Optional[str]:
     """선택적 인증 의존성. 토큰이 있으면 user_id 반환, 없거나 유효하지 않으면 None 반환.
 
@@ -127,7 +113,9 @@ def get_optional_user_id(request: Request) -> Optional[str]:
     return payload["sub"]
 
 
-def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> str:
     """
     [FastAPI 의존성 주입]
     요청 헤더의 Bearer 토큰을 검증하고, 유효한 경우 user_id(sub)를 반환합니다.
