@@ -150,6 +150,7 @@ async def _handle_normal_flow(
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=result.get("awaiting_asv_audio", False),
         transcript=transcript,
+        pending_action=result.get("pending_action"),
     )
 
 
@@ -183,6 +184,10 @@ async def _handle_asv_flow(
     Raises:
         ASVError: 사용자 음성 미등록 또는 ASV EC2 서버 통신 오류.
     """
+    if settings.MOCK_ASV:
+        logger.info("MOCK_ASV=true — ASV 인증 우회, 즉시 성공 처리")
+        return await _proceed_after_asv_success(user_id, config, graph)
+
     state_snapshot = graph.get_state(config)
     retry_count = (
         state_snapshot.values.get("asv_retry_count", 0) if state_snapshot.values else 0
@@ -322,6 +327,7 @@ async def _proceed_after_asv_success(
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=False,
         transcript=None,
+        pending_action=result.get("pending_action"),
     )
 
 
