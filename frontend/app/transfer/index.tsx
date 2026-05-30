@@ -12,26 +12,42 @@ import type { RecipientItem } from '@/components/display';
 
 type Step = 'recipient' | 'amount' | 'confirm' | 'asv';
 
+function getInitialStep(): Step {
+  const lastResponse = useVoiceResponseStore.getState().lastResponse;
+  if (!lastResponse) return 'recipient';
+  const { awaiting_asv_audio, collected_slots } = lastResponse;
+  if (awaiting_asv_audio) return 'asv';
+  if (collected_slots?.recipient && collected_slots?.amount) return 'confirm';
+  if (collected_slots?.recipient) return 'amount';
+  return 'recipient';
+}
+
 const AMOUNT_PRESETS = [10000, 30000, 50000, 100000, 300000, 500000];
 
 export default function TransferScreen() {
   const { setSelectedRecipient, setAmount, setTxReceipt, reset } = useTransferStore();
-  const [step, setStep] = useState<Step>('recipient');
+  const [step, setStep] = useState<Step>(getInitialStep);
   const [recentList, setRecentList] = useState<RecipientItem[]>([]);
-  const [selected, setSelected] = useState<RecipientItem | null>(null);
-  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  const [selected, setSelected] = useState<RecipientItem | null>(() => {
+    const slots = useVoiceResponseStore.getState().lastResponse?.collected_slots;
+    const name = (slots?.recipient as string) ?? null;
+    if (!name) return null;
+    return { recipientId: null, toName: name, toBankName: '', accountMasked: '' };
+  });
+  const [selectedAmount, setSelectedAmount] = useState<number | null>(() => {
+    const slots = useVoiceResponseStore.getState().lastResponse?.collected_slots;
+    return slots?.amount ? Number(slots.amount) : null;
+  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchRecentRecipients()
-      .then((list) => {
-        setRecentList(list);
-        syncFromAgentSlots(list);
-      })
+      .then((list) => setRecentList(list))
       .catch(() => undefined);
+    syncFromAgentSlots();
   }, []);
 
-  function syncFromAgentSlots(list: RecipientItem[]) {
+  function syncFromAgentSlots() {
     const lastResponse = useVoiceResponseStore.getState().lastResponse;
     if (!lastResponse) return;
 
@@ -40,12 +56,16 @@ export default function TransferScreen() {
     const slotAmount = collected_slots?.amount ? Number(collected_slots.amount) : null;
 
     if (slotRecipient) {
-      const matched = list.find((r) => r.toName === slotRecipient);
-      if (matched) {
-        setSelected(matched);
-        setSelectedRecipient(matched);
-      }
+      const item: RecipientItem = {
+        recipientId: null,
+        toName: slotRecipient,
+        toBankName: '',
+        accountMasked: '',
+      };
+      setSelected(item);
+      setSelectedRecipient(item);
     }
+
     if (slotAmount) {
       setSelectedAmount(slotAmount);
       setAmount(slotAmount);
