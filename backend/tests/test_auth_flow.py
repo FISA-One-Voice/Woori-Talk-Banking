@@ -4,7 +4,7 @@
 # [이 파일의 역할]
 # jwt_auth 기능의 HTTP 통합 테스트입니다.
 # 실제 DB(Aiven PostgreSQL)에 테스트 사용자를 만들고,
-# /jwt-auth/login, /refresh, /logout 엔드포인트를 호출해서
+# /users/login, /refresh, /logout 엔드포인트를 호출해서
 # 응답이 CLAUDE.md의 표준 형식을 따르는지 검증합니다.
 #
 # [테스트 케이스 목록]
