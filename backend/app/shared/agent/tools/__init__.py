@@ -43,11 +43,15 @@ except ImportError:
 # recipients(search_recipient), asv(verify_speaker), transfer 등
 # 다른 담당자 tool은 각 담당자가 완성 후 여기에 추가합니다.
 from app.shared.agent.tools.auto_transfer import parse_auto_transfer_slots
+from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
 from app.shared.agent.tools.execute_auto_transfer import execute_auto_transfer
+from app.shared.agent.tools.lookup_recipient import lookup_recipient
 
 _REAL_TOOLS: list = [
+    lookup_recipient,
     parse_auto_transfer_slots,
     execute_auto_transfer,
+    cancel_auto_transfer,
 ]
 
 # ── 활성 tool 목록 ─────────────────────────────────────────────────────────────
