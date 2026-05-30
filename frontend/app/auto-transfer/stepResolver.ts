@@ -1,31 +1,30 @@
-/**
- * 자동이체 슬롯 상태 → 현재 단계 결정 로직.
- *
- * voice-pipeline-flow.md 기준 슬롯 수집 순서:
- *   alias → amount → cycle → scheduled_day(monthly) / scheduled_dow(weekly)
- *
- * _layout.tsx 가 내려주는 collected_slots 와 awaiting_asv_audio 를 받아
- * 화면에 표시할 서브스텝을 결정합니다.
- */
-
 export type AutoTransferStep =
   | 'input-alias'
   | 'input-amount'
   | 'input-cycle'
   | 'input-day'
   | 'confirm'
-  | 'asv-pending';
+  | 'asv-pending'
+  | 'cancel-input-recipient'
+  | 'cancel-confirm';
 
 export function resolveAutoTransferStep(
   slots: Record<string, unknown>,
   awaitingAsv: boolean,
+  pendingAction?: string | null,
 ): AutoTransferStep {
-  if (awaitingAsv)          return 'asv-pending';
-  if (!slots.alias)         return 'input-alias';
-  if (!slots.amount)        return 'input-amount';
-  if (!slots.cycle)         return 'input-cycle';
+  if (awaitingAsv) return 'asv-pending';
+
+  if (pendingAction === 'cancel_auto_transfer') {
+    if (!slots.recipient) return 'cancel-input-recipient';
+    return 'cancel-confirm';
+  }
+
+  if (!slots.recipient) return 'input-alias';
+  if (!slots.amount)    return 'input-amount';
+  if (!slots.cycle)     return 'input-cycle';
   const cycle = slots.cycle as string;
-  if (cycle === 'monthly' && !slots.scheduled_day)      return 'input-day';
+  if (cycle === 'monthly' && !slots.scheduled_day)       return 'input-day';
   if (cycle === 'weekly'  && slots.scheduled_dow == null) return 'input-day';
   return 'confirm';
 }
@@ -38,9 +37,12 @@ export const STEP_INDEX: Record<AutoTransferStep, number> = {
   'input-day':    3,
   'confirm':      4,
   'asv-pending':  4,
+  'cancel-input-recipient': 0,
+  'cancel-confirm':         1,
 };
 
 export const STEP_TOTAL = 5;
+export const CANCEL_STEP_TOTAL = 2;
 
 export const DOW_LABEL = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -51,10 +53,12 @@ export function formatAmount(amount: unknown): string {
 
 export function formatSchedule(slots: Record<string, unknown>): string {
   const cycle = slots.cycle as string;
-  if (cycle === 'monthly') return `매월 ${slots.scheduled_day}일`;
-  if (cycle === 'weekly') {
-    const dow = slots.scheduled_dow as number;
-    return `매주 ${DOW_LABEL[dow]}요일`;
+  const isMonthly = cycle === 'monthly' || cycle === '매월';
+  const isWeekly = cycle === 'weekly' || cycle === '매주';
+  if (isMonthly) return `매월 ${slots.scheduled_day}일`;
+  if (isWeekly) {
+    const dow = slots.scheduled_dow ?? slots.scheduled_day;
+    return `매주 ${DOW_LABEL[dow as number]}요일`;
   }
   return '';
 }
