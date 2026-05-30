@@ -40,6 +40,14 @@ export interface VoiceResponseData {
    * 정상 흐름에서만 채워지며 ASV 인증 흐름에서는 null.
    */
   transcript: string | null;
+
+  /**
+   * 현재 진행 중인 액션 이름.
+   * - "auto_transfer": 자동이체 등록 흐름
+   * - "cancel_auto_transfer": 자동이체 해지 흐름
+   * - null이면 액션 없음
+   */
+  pending_action: string | null;
 }
 
 /**
