@@ -6,6 +6,7 @@
 """
 
 import json
+import re
 import uuid
 
 from langchain_core.tools import tool
@@ -14,13 +15,24 @@ from app.core.database import SessionLocal
 from app.core.exception import AutoTransferError, RecipientError
 from app.features.auto_transfer.schema import AutoTransferRequest
 from app.features.auto_transfer.service import register_auto_transfer
+from app.features.recipients.service import lookup_recipient_by_voice
 from app.models.account import Account
 
 _DOW_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
 
 
 @tool
-def execute_auto_transfer(user_id: str, slots_json: str) -> str:
+def execute_auto_transfer(
+    user_id: str,
+    recipient: str | None = None,
+    amount: int | str | None = None,
+    cycle: str | None = None,
+    scheduled_day: int | str | None = None,
+    scheduled_dow: int | str | None = None,
+    recipient_id: str | None = None,
+    from_account_id: str | None = None,
+    transfer_note: str | None = None,
+) -> str:
     """슬롯 + ASV 인증 + 최종 의사 확인 완료 후 자동이체를 DB에 등록합니다.
 
     에이전트가 awaiting_confirmation=True + 동의 발화를 확인한 후에만 호출합니다.
@@ -30,20 +42,62 @@ def execute_auto_transfer(user_id: str, slots_json: str) -> str:
 
     Args:
         user_id: JWT에서 추출한 사용자 ID.
-        slots_json: 현재 슬롯 상태 JSON 문자열.
+        recipient: 수취인 이름 또는 별명.
+        amount: 이체 금액 (원 단위).
+        cycle: 'monthly' 또는 'weekly'.
+        scheduled_day: 월 기준 날짜 (1~31, monthly 전용).
+        scheduled_dow: 요일 (0=월~6=일, weekly 전용).
+        recipient_id: 등록 수취인 ID (있으면 직접 사용).
+        from_account_id: 출금 계좌 ID (없으면 주계좌 자동 사용).
+        transfer_note: 이체 메모.
 
     Returns:
         {"success": true,  "order_id": "...", "next_execution_at": "...", "tts_text": "..."}
         {"success": false, "error_code": "...", "tts_text": "..."}
     """
-    try:
-        slots: dict = json.loads(slots_json)
-    except (json.JSONDecodeError, TypeError):
-        slots = {}
+    slots: dict = {
+        "recipient": recipient,
+        "amount": amount,
+        "cycle": cycle,
+        "scheduled_day": scheduled_day,
+        "scheduled_dow": scheduled_dow,
+        "recipientId": recipient_id,
+        "fromAccountId": from_account_id,
+        "transfer_note": transfer_note,
+    }
 
     db = SessionLocal()
     try:
         user_uuid = uuid.UUID(user_id)
+
+        # ── 슬롯 값 정규화 ──────────────────────────────────────────────────────────
+        # cycle: 한국어 표현 → 영문 코드
+        cycle_raw = str(slots.get("cycle", ""))
+        if cycle_raw in ("monthly", "매월", "매달") or "월" in cycle_raw or "달" in cycle_raw:
+            slots["cycle"] = "monthly"
+        elif cycle_raw in ("weekly", "매주") or "주" in cycle_raw:
+            slots["cycle"] = "weekly"
+
+        # scheduled_day / scheduled_dow: 문자열 → 정수
+        for key in ("scheduled_day", "scheduled_dow"):
+            val = slots.get(key)
+            if isinstance(val, str):
+                nums = re.findall(r"\d+", val)
+                slots[key] = int(nums[0]) if nums else None
+
+        # amount: 문자열 → 정수
+        if isinstance(slots.get("amount"), str):
+            nums = re.findall(r"\d+", str(slots["amount"]))
+            slots["amount"] = int("".join(nums)) if nums else 0
+
+        # recipientId — recipient 또는 transfer 슬롯 값으로 DB 재조회
+        recipient_id = slots.get("recipientId")
+        if not recipient_id:
+            alias = slots.get("recipient") or slots.get("transfer")
+            if alias:
+                resolved = lookup_recipient_by_voice(db, uuid.UUID(user_id), alias)
+                if resolved and resolved.recipient_id:
+                    recipient_id = str(resolved.recipient_id)
 
         # from_account_id — 슬롯에 없으면 주계좌 자동 조회
         from_account_id = slots.get("fromAccountId") or slots.get("from_account_id")
@@ -74,7 +128,7 @@ def execute_auto_transfer(user_id: str, slots_json: str) -> str:
                 "cycle": slots["cycle"],
                 "scheduledDay": slots.get("scheduled_day"),
                 "scheduledDow": slots.get("scheduled_dow"),
-                "recipientId": slots.get("recipientId"),
+                "recipientId": recipient_id,
                 "toAccountNumber": slots.get("to_account_number"),
                 "bankName": slots.get("bankName") or slots.get("bank_name"),
                 "toName": slots.get("toName") or slots.get("to_name"),
