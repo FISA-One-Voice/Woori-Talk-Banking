@@ -38,25 +38,3 @@ async def register_voice(
     return service.register_voice_vector(db, user_id, embedding)
 
 
-@router.post("/verify", response_model=dict)
-async def verify_single(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id),
-) -> dict:
-    """업로드된 오디오를 현재 로그인된 유저의 벡터와 비교하여 검증 결과를 반환합니다.
-
-    Args:
-        file: 검증할 단일 오디오 파일 (UploadFile).
-        db: 데이터베이스 세션.
-        user_id: 현재 로그인된 사용자의 고유 ID.
-
-    Returns:
-        유사도 점수와 동일인 여부를 포함하는 딕셔너리.
-
-    Raises:
-        AppError: 유저를 찾을 수 없거나 등록된 벡터가 없는 경우.
-        VoiceServiceError: ASV 서버 검증 요청 실패 시.
-    """
-    audio_bytes = await file.read()
-    return await service.verify_voice(db, user_id, audio_bytes)
