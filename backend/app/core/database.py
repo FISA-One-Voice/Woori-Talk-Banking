@@ -17,7 +17,6 @@ from sqlalchemy.pool import NullPool, StaticPool
 
 from app.core.config import settings
 
-
 # SQLite 전용 옵션: SQLite 는 기본적으로 멀티스레드를 허용하지 않습니다.
 # check_same_thread=False 로 이 제한을 해제해야 FastAPI 가 정상 작동합니다.
 # PostgreSQL 사용 시에는 이 옵션이 자동으로 무시되니 그냥 두어도 됩니다.

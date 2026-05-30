@@ -6,6 +6,9 @@
     "scheme": "wooritalk",
     "platforms": ["ios", "android", "web"],
     "assetBundlePatterns": ["**/*"],
-    "plugins": ["expo-router"]
+    "plugins": [
+      "expo-router",
+      ["expo-av", { "microphonePermission": "음성 명령을 입력하기 위해 마이크가 필요합니다." }]
+    ]
   }
 }

@@ -18,16 +18,19 @@
 # - 헬스체크: http://localhost:8000/health
 # =============================================================================
 
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+logger = logging.getLogger(__name__)
+
 from app.core.database import Base, engine
 from app.core.exception import AppError
 from app.features.event.router import router as event_router
 from app.core.opensearch import create_indices_if_not_exists
-# from app.features.event.router import router as event_router  # TODO: event 기능 재구현 후 주석 해제
 from app.features.jwt_auth.router import router as jwt_auth_router
 from app.features.voice.router import router as voice_register_router
 from app.features.recipients.router import router as recipients_router
@@ -98,7 +101,7 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
-    """AppError 및 모든 서브클래스를 표준 ApiResponse 형식으로 변환합니다."""
+    logger.error("[AppError] code=%s status=%s message=%s", exc.code, exc.status_code, exc.message)
     return JSONResponse(
         status_code=exc.status_code,
         content={
