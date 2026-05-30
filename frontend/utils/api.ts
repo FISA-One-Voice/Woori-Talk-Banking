@@ -1,3 +1,6 @@
+import { useAuthStore } from '@/store/authStore';
+import axios from 'axios';
+
 // =============================================================================
 // frontend/utils/api.ts
 //
@@ -10,13 +13,10 @@
 //   EXPO_PUBLIC_API_BASE_URL=http://본인_로컬IP:8000
 // =============================================================================
 
-import axios from 'axios';
-import { useAuthStore } from '@/store/authStore';
-
 if (__DEV__ && !process.env['EXPO_PUBLIC_API_BASE_URL']) {
   console.warn(
     '[api.ts] EXPO_PUBLIC_API_BASE_URL 환경변수가 설정되지 않았습니다.\n' +
-    'frontend/.env.example 을 복사해 frontend/.env 를 만들고 본인 IP를 입력하세요.'
+      'frontend/.env.example 을 복사해 frontend/.env 를 만들고 본인 IP를 입력하세요.',
   );
 }
 
@@ -45,27 +45,27 @@ apiClient.interceptors.response.use(
   (response) => response, // 성공한 응답은 그대로 패스
   async (error) => {
     const originalRequest = error.config;
-    
+
     // 백엔드에서 401(Unauthorized) 에러를 뱉었고, 아직 재요청을 시도하지 않은 상태라면?
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true; // 무한 루프 방지용 플래그
-      
+
       const { refreshToken, setTokens, clearTokens } = useAuthStore.getState();
-      
+
       if (refreshToken) {
         try {
           // 백엔드에 리프레시 토큰을 보내서 새 토큰 발급 요청 (axios 날것으로 호출)
           const response = await axios.post(`${BASE_URL}/api/users/refresh`, {
-            refreshToken: refreshToken
+            refreshToken: refreshToken,
           });
-          
+
           if (response.data.success) {
             const newAccessToken = response.data.data.accessToken;
             const newRefreshToken = response.data.data.refreshToken || refreshToken;
-            
+
             // 새로 발급받은 토큰들을 전역 금고에 갱신
             setTokens(newAccessToken, newRefreshToken);
-            
+
             // 실패했던 원래 요청의 헤더를 새 토큰으로 교체하고 다시 전송! (마치 에러가 없었던 것처럼)
             originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
             return apiClient(originalRequest);
@@ -78,9 +78,9 @@ apiClient.interceptors.response.use(
         clearTokens();
       }
     }
-    
+
     return Promise.reject(error);
-  }
+  },
 );
 
 /** 백엔드 표준 API 응답 형식 */

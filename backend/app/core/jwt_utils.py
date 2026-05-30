@@ -4,7 +4,8 @@
 from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
-from fastapi import Depends
+from typing import Optional
+from fastapi import Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.exception import AuthError
@@ -87,10 +88,23 @@ def decode_token(token: str) -> dict | None:
     except jwt.InvalidTokenError:
         return None
 
+def get_optional_user_id(request: Request) -> Optional[str]:
+    """선택적 인증 의존성. 토큰이 있으면 user_id 반환, 없거나 유효하지 않으면 None 반환.
 
-def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> str:
+    로그인 없이도 접근 가능한 API에서 '로그인 시 추가 정보 제공' 용도로 사용합니다.
+    예) GET /events/{id} — 비로그인 시 has_participated=False, 로그인 시 실제 참여 여부 반환
+    """
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth[7:]
+    payload = decode_token(token)
+    if not payload or "sub" not in payload:
+        return None
+    return payload["sub"]
+
+
+def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     """
     [FastAPI 의존성 주입]
     요청 헤더의 Bearer 토큰을 검증하고, 유효한 경우 user_id(sub)를 반환합니다.
