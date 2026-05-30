@@ -13,6 +13,22 @@ Phase 2 담당자가 실제 tool 완성 시 USE_MOCK_TOOLS=false 로 전환.
     - tool 파일명은 features/ 화면명과 동일하게 유지하십시오.
       예: features/balance/ → tools/balance.py
 """
+# Plan SC: build_graph([]) 호출 시 오류 없이 초기화 (Issue #5 완료 조건)
+
+from app.shared.agent.tools.balance import get_total_balance, get_account_balance_by_id
+from app.shared.agent.tools.history import (
+    get_category_history,
+    get_monthly_expense,
+    get_recent_history,
+)
+
+ALL_TOOLS: list = [
+    get_total_balance,
+    get_account_balance_by_id,
+    get_recent_history,
+    get_category_history,
+    get_monthly_expense,
+]
 
 from app.core.config import settings
 from app.shared.agent.tools.event import get_event_list
