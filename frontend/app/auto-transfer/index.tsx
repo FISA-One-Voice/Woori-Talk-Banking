@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,6 +22,7 @@ import {
   formatSchedule,
   STEP_INDEX,
   STEP_TOTAL,
+  CANCEL_STEP_TOTAL,
 } from './stepResolver';
 
 // ── 타입 ──────────────────────────────────────────────────────────────────────
@@ -122,9 +124,12 @@ function AccountSelectPhase() {
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [orders, setOrders] = useState<AutoTransferItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const setFromAccountId = useAutoTransferFlowStore((s) => s.setFromAccountId);
 
-  useEffect(() => {
+  const fetchData = () => {
+    setLoading(true);
+    setError('');
     Promise.all([
       apiClient.get('/api/auto-transfer/accounts'),
       apiClient.get('/api/auto-transfer'),
@@ -133,13 +138,52 @@ function AccountSelectPhase() {
         setAccounts(accRes.data?.data ?? []);
         setOrders(orderRes.data?.data ?? []);
       })
+      .catch((e: any) => {
+        const msg = e?.response?.data?.message || e?.message || String(e);
+        setError(`데이터를 불러오지 못했습니다: ${msg}`);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const handleCancel = (orderId: string, toName: string) => {
+    Alert.alert(
+      '자동이체 해지',
+      `${toName ?? ''}에 대한 자동이체를 해지할까요?`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '해지',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiClient.patch(`/api/auto-transfer/${orderId}/status`, { status: 'cancelled' });
+              fetchData();
+            } catch {
+              Alert.alert('오류', '해지에 실패했습니다. 다시 시도해 주세요.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={COLORS.highlightYellow} size="large" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Pressable style={[styles.card, { marginTop: 12 }]} onPress={fetchData}>
+          <Text style={[styles.cardBank, { textAlign: 'center' }]}>다시 시도</Text>
+        </Pressable>
       </View>
     );
   }
@@ -170,7 +214,7 @@ function AccountSelectPhase() {
       {orders.length > 0 && (
         <>
           <Text style={[styles.sectionTitle, { marginTop: 24 }]}>등록된 자동이체</Text>
-          {orders.map((o) => (
+          {orders.filter((o) => o.status !== 'cancelled').map((o) => (
             <View key={o.orderId} style={styles.orderCard}>
               <View style={styles.cardRow}>
                 <Text style={styles.cardBank}>{o.toName ?? '-'}</Text>
@@ -180,7 +224,7 @@ function AccountSelectPhase() {
                     o.status === 'active' ? styles.statusActive : styles.statusPaused,
                   ]}
                 >
-                  {o.status === 'active' ? '활성' : o.status === 'paused' ? '일시정지' : '해지'}
+                  {o.status === 'active' ? '활성' : '일시정지'}
                 </Text>
               </View>
               <Text style={styles.cardAccount}>{o.bankName} {o.accountMasked}</Text>
@@ -191,6 +235,12 @@ function AccountSelectPhase() {
                 {' · '}{o.amount.toLocaleString('ko-KR')}원
                 {o.transferNote ? ` · ${o.transferNote}` : ''}
               </Text>
+              <Pressable
+                style={styles.cancelButton}
+                onPress={() => handleCancel(o.orderId, o.toName ?? '-')}
+              >
+                <Text style={styles.cancelButtonText}>해지</Text>
+              </Pressable>
             </View>
           ))}
         </>
@@ -222,7 +272,7 @@ function AmountInputView({ slots }: { slots: Record<string, unknown> }) {
   return (
     <>
       <View style={styles.slotBox}>
-        <SlotRow label="수취인" value={String(slots.alias)} />
+        <SlotRow label="수취인" value={String(slots.recipient)} />
       </View>
       <TtsBubble message="매번 얼마씩 이체할까요?" />
     </>
@@ -233,7 +283,7 @@ function CycleInputView({ slots }: { slots: Record<string, unknown> }) {
   return (
     <>
       <View style={styles.slotBox}>
-        <SlotRow label="수취인" value={String(slots.alias)} />
+        <SlotRow label="수취인" value={String(slots.recipient)} />
         <SlotRow label="금액" value={formatAmount(slots.amount)} />
       </View>
       <TtsBubble message="매월 특정 날짜에 보낼까요, 아니면 매주 특정 요일에 보낼까요?" />
@@ -246,7 +296,7 @@ function DayInputView({ slots }: { slots: Record<string, unknown> }) {
   return (
     <>
       <View style={styles.slotBox}>
-        <SlotRow label="수취인" value={String(slots.alias)} />
+        <SlotRow label="수취인" value={String(slots.recipient)} />
         <SlotRow label="금액" value={formatAmount(slots.amount)} />
         <SlotRow label="주기" value={isMonthly ? '매월' : '매주'} />
       </View>
@@ -272,7 +322,7 @@ function ConfirmView({
   return (
     <>
       <View style={styles.slotBox}>
-        <SlotRow label="수취인" value={String(slots.alias)} />
+        <SlotRow label="수취인" value={String(slots.recipient)} />
         <SlotRow label="금액" value={formatAmount(slots.amount)} />
         <SlotRow label="일정" value={scheduleText} />
       </View>
@@ -292,7 +342,7 @@ function AsvPendingView({ slots }: { slots: Record<string, unknown> }) {
   return (
     <>
       <View style={styles.slotBox}>
-        <SlotRow label="수취인" value={String(slots.alias ?? '')} />
+        <SlotRow label="수취인" value={String(slots.recipient ?? '')} />
         <SlotRow label="금액" value={formatAmount(slots.amount)} />
         <SlotRow label="일정" value={formatSchedule(slots)} />
       </View>
@@ -300,6 +350,36 @@ function AsvPendingView({ slots }: { slots: Record<string, unknown> }) {
       <View style={styles.asvBadge}>
         <Text style={styles.asvBadgeText}>음성 인증 대기 중</Text>
       </View>
+    </>
+  );
+}
+
+// ── Phase: 자동이체 해지 ──────────────────────────────────────────────────────
+
+function CancelRecipientInputView() {
+  return <TtsBubble message="누구의 자동이체를 해지할까요? 이름이나 별명을 말씀해 주세요." />;
+}
+
+function CancelConfirmView({
+  slots,
+  awaitingConfirmation,
+}: {
+  slots: Record<string, unknown>;
+  awaitingConfirmation: boolean;
+}) {
+  return (
+    <>
+      <View style={styles.slotBox}>
+        <SlotRow label="해지 대상" value={String(slots.recipient)} />
+      </View>
+      <TtsBubble
+        message={
+          awaitingConfirmation
+            ? '네 또는 아니요로 말씀해 주세요.'
+            : `${slots.recipient}에게 설정된 자동이체를 해지할까요?`
+        }
+        variant={awaitingConfirmation ? 'warning' : 'default'}
+      />
     </>
   );
 }
@@ -314,19 +394,27 @@ export default function AutoTransferScreen() {
   const slots = lastResponse?.collected_slots ?? {};
   const awaitingAsv = lastResponse?.awaiting_asv_audio ?? false;
   const awaitingConfirmation = lastResponse?.awaiting_confirmation ?? false;
+  const pendingAction = lastResponse?.pending_action ?? null;
   const hasSlots = Object.keys(slots).length > 0;
+
+  const isCancel = pendingAction === 'cancel_auto_transfer';
 
   // 현재 페이즈 결정
   type Phase = 'login' | 'select-account' | 'voice-guide' | 'slot-filling';
   const phase: Phase = !token
     ? 'login'
-    : !fromAccountId
+    : !fromAccountId && !isCancel
     ? 'select-account'
     : !hasSlots && !awaitingAsv
     ? 'voice-guide'
     : 'slot-filling';
 
-  const step = phase === 'slot-filling' ? resolveAutoTransferStep(slots, awaitingAsv) : null;
+  const step = phase === 'slot-filling'
+    ? resolveAutoTransferStep(slots, awaitingAsv, pendingAction)
+    : null;
+
+  const stepTotal = isCancel ? CANCEL_STEP_TOTAL : STEP_TOTAL;
+  const title = isCancel ? '자동이체 해지' : '자동이체 설정';
 
   return (
     <SafeAreaView style={styles.root}>
@@ -338,9 +426,9 @@ export default function AutoTransferScreen() {
         <AppScreenHeader />
 
         <View style={styles.titleRow}>
-          <Text style={styles.title}>자동이체 설정</Text>
+          <Text style={styles.title}>{title}</Text>
           {step !== null && (
-            <StepIndicator total={STEP_TOTAL} current={STEP_INDEX[step]} />
+            <StepIndicator total={stepTotal} current={STEP_INDEX[step]} />
           )}
         </View>
 
@@ -355,6 +443,10 @@ export default function AutoTransferScreen() {
         {phase === 'slot-filling' && step === 'input-day'    && <DayInputView slots={slots} />}
         {phase === 'slot-filling' && step === 'confirm'      && (
           <ConfirmView slots={slots} awaitingConfirmation={awaitingConfirmation} />
+        )}
+        {phase === 'slot-filling' && step === 'cancel-input-recipient' && <CancelRecipientInputView />}
+        {phase === 'slot-filling' && step === 'cancel-confirm'         && (
+          <CancelConfirmView slots={slots} awaitingConfirmation={awaitingConfirmation} />
         )}
 
         {phase === 'slot-filling' && (
@@ -420,6 +512,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   orderDetail: { fontSize: FONT_SIZES.caption, color: COLORS.grayMedium },
+  cancelButton: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  cancelButtonText: { fontSize: FONT_SIZES.caption, color: COLORS.error },
   statusBadge: {
     fontSize: 18,
     paddingHorizontal: 8,
