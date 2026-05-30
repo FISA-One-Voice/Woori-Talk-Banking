@@ -98,3 +98,7 @@ class VoiceResponseData(BaseModel):
 
     transcript: str | None = None
     """STT 변환 결과 텍스트. 정상 흐름에서만 채워지며 ASV 인증 흐름에서는 None."""
+
+    pending_action: str | None = None
+    """현재 진행 중인 액션 이름 (e.g. 'transfer', 'auto_transfer', 'cancel_auto_transfer').
+    프론트엔드가 액션별로 다른 UI/단계를 렌더링할 때 사용."""
