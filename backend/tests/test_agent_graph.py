@@ -118,8 +118,8 @@ class TestAllTools:
     """tools/__init__.py 의 ALL_TOOLS 상태 검증.
 
     Phase 2.5 (Issue #21) 업데이트:
-        USE_MOCK_TOOLS=true (기본값) → ALL_TOOLS = MOCK_TOOLS (5개 mock tool)
-        USE_MOCK_TOOLS=false → ALL_TOOLS = [] (Phase 2 실제 tool 대기)
+        USE_MOCK_TOOLS=true (기본값) → ALL_TOOLS = MOCK_TOOLS
+        USE_MOCK_TOOLS=false → ALL_TOOLS = _REAL_TOOLS
     """
 
     def test_all_tools_is_list(self) -> None:
@@ -129,11 +129,11 @@ class TestAllTools:
     def test_all_tools_state_matches_use_mock_tools_setting(self) -> None:
         """TC-10: USE_MOCK_TOOLS 설정에 따라 ALL_TOOLS 내용이 올바르게 결정되어야 한다.
 
-        USE_MOCK_TOOLS=true (기본값): ALL_TOOLS == MOCK_TOOLS (5개 mock tool 활성화)
-        USE_MOCK_TOOLS=false:          ALL_TOOLS == [] (Phase 2 실제 tool 대기)
+        USE_MOCK_TOOLS=true (기본값): ALL_TOOLS == MOCK_TOOLS
+        USE_MOCK_TOOLS=false:          ALL_TOOLS == _REAL_TOOLS
         """
         from app.core.config import settings
-        from app.shared.agent.tools import MOCK_TOOLS
+        from app.shared.agent.tools import MOCK_TOOLS, _REAL_TOOLS
 
         if settings.USE_MOCK_TOOLS:
             assert ALL_TOOLS == MOCK_TOOLS, (
@@ -141,11 +141,10 @@ class TestAllTools:
                 f"현재 ALL_TOOLS 길이: {len(ALL_TOOLS)}, MOCK_TOOLS 길이: {len(MOCK_TOOLS)}"
             )
         else:
-            assert ALL_TOOLS == [], (
-                f"USE_MOCK_TOOLS=False 일 때 ALL_TOOLS 는 빈 리스트여야 합니다. "
-                f"(현재: {len(ALL_TOOLS)}개)"
+            assert ALL_TOOLS == _REAL_TOOLS, (
+                f"USE_MOCK_TOOLS=False 일 때 ALL_TOOLS = _REAL_TOOLS 여야 합니다. "
+                f"(현재: {len(ALL_TOOLS)}개, _REAL_TOOLS: {len(_REAL_TOOLS)}개)"
             )
-    """tools/__init__.py 의 ALL_TOOLS 상태 검증."""
 
     def test_all_tools_contains_event_tool(self) -> None:
         """TC-09: Phase 2 에서 ALL_TOOLS 는 get_event_list tool 을 포함해야 한다.

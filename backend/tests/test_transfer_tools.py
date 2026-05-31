@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.features.transfer.tools import add_note, execute_transfer
+from app.shared.agent.tools.transfer import add_note, execute_transfer
 
 # ── 공통 상수 ──────────────────────────────────────────────────────────────────
 _USER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
@@ -39,7 +39,7 @@ def _patch_get_db(mock_db: MagicMock):
     필요합니다. return_value가 아닌 side_effect를 사용하는 이유가 바로 이 때문입니다.
     """
     return patch(
-        "app.features.transfer.tools.get_db",
+        "app.shared.agent.tools.transfer.get_db",
         side_effect=lambda: iter([mock_db]),
     )
 
@@ -75,10 +75,10 @@ class TestExecuteTransferTool:
         with (
             _patch_get_db(mock_db),
             patch(
-                "app.features.transfer.tools.lookup_recipient_by_voice",
+                "app.shared.agent.tools.transfer.lookup_recipient_by_voice",
                 return_value=mock_resolved,
             ),
-            patch("app.features.transfer.tools.transfer_service") as mock_svc,
+            patch("app.shared.agent.tools.transfer.transfer_service") as mock_svc,
         ):
             result = execute_transfer.invoke(
                 {"user_id": _USER_ID, "recipient": "엄마", "amount": 10_000}
@@ -98,10 +98,10 @@ class TestExecuteTransferTool:
         with (
             _patch_get_db(mock_db),
             patch(
-                "app.features.transfer.tools.lookup_recipient_by_voice",
+                "app.shared.agent.tools.transfer.lookup_recipient_by_voice",
                 return_value=None,
             ),
-            patch("app.features.transfer.tools.transfer_service") as mock_svc,
+            patch("app.shared.agent.tools.transfer.transfer_service") as mock_svc,
         ):
             result = execute_transfer.invoke(
                 {"user_id": _USER_ID, "recipient": "모르는사람", "amount": 10_000}
@@ -124,10 +124,10 @@ class TestExecuteTransferTool:
         with (
             _patch_get_db(mock_db),
             patch(
-                "app.features.transfer.tools.lookup_recipient_by_voice",
+                "app.shared.agent.tools.transfer.lookup_recipient_by_voice",
                 return_value=mock_resolved,
             ),
-            patch("app.features.transfer.tools.transfer_service") as mock_svc,
+            patch("app.shared.agent.tools.transfer.transfer_service") as mock_svc,
         ):
             mock_svc.execute_transfer.side_effect = RuntimeError("DB 연결 실패")
             result = execute_transfer.invoke(
@@ -146,7 +146,7 @@ class TestExecuteTransferTool:
         with (
             _patch_get_db(mock_db),
             patch(
-                "app.features.transfer.tools.lookup_recipient_by_voice"
+                "app.shared.agent.tools.transfer.lookup_recipient_by_voice"
             ) as mock_lookup,
         ):
             result = execute_transfer.invoke(
@@ -173,7 +173,7 @@ class TestAddNoteTool:
 
         with (
             _patch_get_db(mock_db),
-            patch("app.features.transfer.tools.transfer_service") as mock_svc,
+            patch("app.shared.agent.tools.transfer.transfer_service") as mock_svc,
         ):
             result = add_note.invoke({"user_id": _USER_ID, "memo": "용돈"})
 
@@ -195,7 +195,7 @@ class TestAddNoteTool:
 
         with (
             _patch_get_db(mock_db),
-            patch("app.features.transfer.tools.transfer_service") as mock_svc,
+            patch("app.shared.agent.tools.transfer.transfer_service") as mock_svc,
         ):
             result = add_note.invoke({"user_id": _USER_ID, "memo": "메모"})
 
@@ -212,7 +212,7 @@ class TestAddNoteTool:
 
         with (
             _patch_get_db(mock_db),
-            patch("app.features.transfer.tools.transfer_service") as mock_svc,
+            patch("app.shared.agent.tools.transfer.transfer_service") as mock_svc,
         ):
             mock_svc.update_memo.side_effect = RuntimeError("메모 저장 실패")
             result = add_note.invoke({"user_id": _USER_ID, "memo": "용돈"})

@@ -8,12 +8,12 @@ DB, 외부 API 없이도 StateGraph 흐름을 검증할 수 있다.
     실제 배포: 화면 담당자가 실제 tool을 완성하면 USE_MOCK_TOOLS=false로 전환
 
 담당자별 교체 대상:
-    공통        (공통): mock_lookup_recipient → features/transfer/tools (또는 recipients)
-    balance  담당자 (B): mock_get_balance → features/balance/tools
-    history  담당자 (B): mock_get_history → features/history/tools
-    transfer 담당자 (C): mock_execute_transfer → features/transfer/tools
-    auto_transfer 담당자 (D): mock_register_auto_transfer → features/auto_transfer/tools
-    event 담당자 (E): mock_get_events → features/event/tools
+    공통        (공통): mock_lookup_recipient → shared/agent/tools/transfer (또는 recipients)
+    balance  담당자 (B): mock_get_balance → shared/agent/tools/balance
+    history  담당자 (B): mock_get_history → shared/agent/tools/history
+    transfer 담당자 (C): mock_execute_transfer → shared/agent/tools/transfer
+    auto_transfer 담당자 (D): mock_register_auto_transfer → shared/agent/tools/auto_transfer
+    event 담당자 (E): mock_get_events → shared/agent/tools/event
 
 Design Ref (Issue #21):
     §3 — mock_tools.py: 화면 탐색·tool 사용 테스트를 위한 mock 구현

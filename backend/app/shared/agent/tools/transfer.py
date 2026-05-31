@@ -1,4 +1,12 @@
-"""이체 에이전트 tool — execute_transfer / add_note."""
+"""이체·메모 Agent Tool.
+
+'이체해줘', '보내줘', '메모 달아줘' 같은 음성 명령을 처리합니다.
+
+tool이 에이전트에 연결되는 방식:
+    1. tools/__init__.py 의 _REAL_TOOLS 에 등록
+    2. shared/voice/router.py 가 build_graph(ALL_TOOLS) 호출
+    3. execute_node가 슬롯·ASV 완료 후 tool 실행
+"""
 
 import logging
 import uuid
