@@ -6,7 +6,7 @@ Design Ref (Issue #21):
     §state.py — VoiceState TypedDict
 """
 
-from typing import Annotated, TypedDict
+from typing import Annotated, NotRequired, TypedDict
 
 from langgraph.graph.message import add_messages
 
@@ -35,6 +35,7 @@ class VoiceState(TypedDict):
             intent_node에서 "네" 수신 후 설정. execute_node 완료 후 False로 초기화.
         recipient_validated: True이면 recipient 슬롯이 resolve_node를 통과한 상태.
             새 인텐트 감지 또는 취소 시 False로 초기화.
+        last_tx_id: transfer execute_node 성공 시 설정. add_note가 지정 tx에 메모할 때 사용.
     """
 
     messages: Annotated[list, add_messages]
@@ -47,3 +48,4 @@ class VoiceState(TypedDict):
     navigate_to: str | None
     execution_ready: bool
     recipient_validated: bool
+    last_tx_id: NotRequired[str | None]

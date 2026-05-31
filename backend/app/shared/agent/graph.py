@@ -42,8 +42,15 @@ from app.shared.agent.slot_schema import (
     VALID_INTENTS,
 )
 from app.shared.agent.state import VoiceState
+from app.shared.agent.tools.transfer import run_add_note, run_execute_transfer
 
 logger = logging.getLogger(__name__)
+
+# pending_action → LangChain tool name (부분 일치 오동작 방지)
+ACTION_TOOL_NAMES: dict[str, str] = {
+    "transfer": "execute_transfer",
+    "add_note": "add_note",
+}
 
 
 # ── LLM 응답 스키마 ────────────────────────────────────────────────────────────
@@ -203,6 +210,9 @@ def build_graph(tools: list) -> CompiledStateGraph:
     # tool 이름 패턴: "mock_{action}" 또는 "{action}_tool"
     def _find_tool_for_action(action: str) -> object | None:
         """액션 이름에 해당하는 tool을 registry에서 찾는다."""
+        explicit = ACTION_TOOL_NAMES.get(action)
+        if explicit and explicit in tool_registry:
+            return tool_registry[explicit]
         candidates = [
             f"mock_execute_{action}",
             f"mock_register_{action}",
@@ -336,6 +346,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "navigate_to": None,
                 "execution_ready": False,
                 "recipient_validated": False,
+                "last_tx_id": None,
                 "messages": [
                     AIMessage(content=result.direct_response or "취소되었습니다.")
                 ],
@@ -367,6 +378,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             updates["navigate_to"] = SCREEN_MAP.get(result.intent)
             updates["collected_slots"] = new_slots
             updates["recipient_validated"] = False
+            updates["last_tx_id"] = None
             # navigate_to 설정 후 reset (다음 턴에서는 None)
             # (slot_fill_node나 confirm_node에서 None으로 설정)
 
@@ -498,33 +510,72 @@ def build_graph(tools: list) -> CompiledStateGraph:
     def execute_node(state: VoiceState) -> dict:
         """수집된 슬롯으로 tool을 직접 호출하고 결과를 TTS 응답으로 추가한다.
 
-        화면에 서비스 실행을 위임하지 않는다.
-        tool(mock 또는 실제)을 직접 invoke()한다.
+        transfer: run_execute_transfer → last_tx_id 저장.
+        add_note: state.last_tx_id로 service.update_memo (최근 1건 조회 없음).
+        그 외: registry tool invoke.
         """
         pending = state.get("pending_action", "")
         slots = dict(state.get("collected_slots", {}))
+        user_id = state.get("user_id", "")
         logger.info("[Graph →execute_node] pending=%s slots=%s", pending, slots)
 
-        # tool 탐색
-        tool_obj = _find_tool_for_action(pending)
+        last_tx_id_after: str | None = state.get("last_tx_id")
+        response_text: str
 
-        if tool_obj is None:
-            response_text = (
-                "해당 기능을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요."
-            )
-            logger.warning(
-                "execute_node: '%s' 액션에 대한 tool을 찾을 수 없습니다.", pending
-            )
-        else:
-            # user_id를 슬롯에 추가 (service 호출에 필요)
-            invoke_args = {"user_id": state.get("user_id", ""), **slots}
+        if pending == "transfer":
             try:
-                response_text = tool_obj.invoke(invoke_args)
-            except Exception as e:
-                logger.error("execute_node tool 호출 실패 (%s): %s", pending, e)
+                response_text, tx_id = run_execute_transfer(
+                    user_id=user_id,
+                    recipient=slots.get("recipient", ""),
+                    amount=int(slots.get("amount", 0)),
+                )
+                if tx_id:
+                    last_tx_id_after = tx_id
+            except (TypeError, ValueError) as e:
+                logger.error("execute_node transfer 인자 오류: %s", e)
                 response_text = (
                     "처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
                 )
+        elif pending == "add_note":
+            tx_id = state.get("last_tx_id")
+            if not tx_id:
+                response_text = (
+                    "먼저 이체를 완료한 뒤 메모를 남겨 주세요."
+                )
+            else:
+                try:
+                    response_text = run_add_note(
+                        user_id=user_id,
+                        memo=slots.get("memo", ""),
+                        tx_id=tx_id,
+                    )
+                    last_tx_id_after = None
+                except Exception as e:
+                    logger.error("execute_node add_note 실패: %s", e)
+                    response_text = (
+                        "메모 추가 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+                    )
+        else:
+            tool_obj = _find_tool_for_action(pending)
+            if tool_obj is None:
+                response_text = (
+                    "해당 기능을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요."
+                )
+                logger.warning(
+                    "execute_node: '%s' 액션에 대한 tool을 찾을 수 없습니다.",
+                    pending,
+                )
+            else:
+                invoke_args = {"user_id": user_id, **slots}
+                try:
+                    response_text = tool_obj.invoke(invoke_args)
+                except Exception as e:
+                    logger.error(
+                        "execute_node tool 호출 실패 (%s): %s", pending, e
+                    )
+                    response_text = (
+                        "처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+                    )
 
         updates: dict = {
             "pending_action": None,
@@ -532,10 +583,9 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "awaiting_confirmation": False,
             "awaiting_asv_audio": False,
             "execution_ready": False,
+            "last_tx_id": last_tx_id_after,
             "messages": [AIMessage(content=response_text)],
         }
-        # transfer/auto_transfer 등 완료 화면이 있는 액션만 navigate_to 덮어씀.
-        # balance처럼 COMPLETE_SCREEN_MAP에 없는 액션은 intent_node가 설정한 값 보존.
         if pending in COMPLETE_SCREEN_MAP:
             updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
         return updates

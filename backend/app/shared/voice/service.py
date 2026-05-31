@@ -240,6 +240,7 @@ async def _handle_asv_flow(
                 "collected_slots": {},
                 "asv_retry_count": 0,
                 "navigate_to": None,
+                "last_tx_id": None,
             },
             as_node="intent_node",
         )
