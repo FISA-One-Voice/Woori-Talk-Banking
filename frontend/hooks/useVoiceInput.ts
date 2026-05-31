@@ -39,18 +39,7 @@ export function useVoiceInput(
       });
 
       const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync({
-        android: {
-          extension: '.wav',
-          outputFormat: 6,   // ENCODING_PCM_16BIT → WAV
-          audioEncoder: 4,   // DEFAULT
-          sampleRate: 16000,
-          numberOfChannels: 1,
-          bitRate: 256000,
-        },
-        ios: Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,
-        web: {},
-      });
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       await recording.startAsync();
 
       recordingRef.current = recording;
@@ -82,12 +71,6 @@ export function useVoiceInput(
       if (!uri) {
         onError('VOICE_PROCESSING_ERROR');
         return;
-      }
-
-      if (__DEV__) {
-        const status = await recording.getStatusAsync();
-        console.log('[REC] uri:', uri);
-        console.log('[REC] status:', JSON.stringify(status));
       }
 
       const data = await sendVoice(uri);

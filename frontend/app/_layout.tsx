@@ -1,19 +1,13 @@
 import { Audio } from 'expo-av';
 import { Stack, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
-import { useAuthStore } from '@/store/authStore';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { getTtsMessage } from '@/utils/errorHandler';
-
-// 개발 테스트용 고정 토큰 — seed_transfer_test.py 실행 후 출력된 값으로 교체
-const DEV_TOKEN = __DEV__
-  ? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWFhYmJiYi1jY2NjLWRkZGQtZWVlZS0xMTExMjIyMjMzMzMiLCJleHAiOjE3ODA2NzgwNTV9.raTrNQ31Pt5A1r0ohu762PIYYtvvXcVHz7Wnzywx9gs'
-  : null;
 
 async function playBase64Audio(base64: string): Promise<void> {
   const { sound } = await Audio.Sound.createAsync({
@@ -31,12 +25,6 @@ async function playBase64Audio(base64: string): Promise<void> {
 export default function RootLayout() {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const router = useRouter();
-
-  useEffect(() => {
-    if (DEV_TOKEN && !useAuthStore.getState().token) {
-      useAuthStore.getState().setTokens(DEV_TOKEN, DEV_TOKEN);
-    }
-  }, []);
 
   const handleResponse = useCallback(
     (data: VoiceResponseData) => {

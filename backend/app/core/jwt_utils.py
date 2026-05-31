@@ -2,11 +2,12 @@
 # backend/app/core/security.py
 # =============================================================================
 from datetime import datetime, timedelta, timezone
+from typing import Optional
+
 import bcrypt
 import jwt
-from typing import Optional
 from fastapi import Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.exception import AuthError
 
@@ -77,7 +78,14 @@ def create_refresh_token(data: dict) -> str:
 
 
 def decode_token(token: str) -> dict | None:
-    """토큰을 디코딩하고 검증합니다. 만료되었거나 유효하지 않으면 None을 반환합니다."""
+    """JWT 토큰을 디코딩하고 서명을 검증합니다.
+
+    Args:
+        token: 검증할 JWT 문자열.
+
+    Returns:
+        유효한 토큰이면 payload dict, 만료되었거나 유효하지 않으면 None.
+    """
     try:
         payload = jwt.decode(
             token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
@@ -87,6 +95,7 @@ def decode_token(token: str) -> dict | None:
         return None
     except jwt.InvalidTokenError:
         return None
+
 
 def get_optional_user_id(request: Request) -> Optional[str]:
     """선택적 인증 의존성. 토큰이 있으면 user_id 반환, 없거나 유효하지 않으면 None 반환.
@@ -104,7 +113,9 @@ def get_optional_user_id(request: Request) -> Optional[str]:
     return payload["sub"]
 
 
-def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+def get_current_user_id(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> str:
     """
     [FastAPI 의존성 주입]
     요청 헤더의 Bearer 토큰을 검증하고, 유효한 경우 user_id(sub)를 반환합니다.

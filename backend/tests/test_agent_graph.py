@@ -129,8 +129,8 @@ class TestAllTools:
     def test_all_tools_state_matches_use_mock_tools_setting(self) -> None:
         """TC-10: USE_MOCK_TOOLS 설정에 따라 ALL_TOOLS 내용이 올바르게 결정되어야 한다.
 
-        USE_MOCK_TOOLS=true (기본값): ALL_TOOLS == MOCK_TOOLS
-        USE_MOCK_TOOLS=false:          ALL_TOOLS == _REAL_TOOLS (이체·메모·이벤트 tool 포함)
+        USE_MOCK_TOOLS=true (기본값): ALL_TOOLS == MOCK_TOOLS (5개 mock tool 활성화)
+        USE_MOCK_TOOLS=false:          ALL_TOOLS == [] (Phase 2 실제 tool 대기)
         """
         from app.core.config import settings
         from app.shared.agent.tools import MOCK_TOOLS
@@ -141,21 +141,24 @@ class TestAllTools:
                 f"현재 ALL_TOOLS 길이: {len(ALL_TOOLS)}, MOCK_TOOLS 길이: {len(MOCK_TOOLS)}"
             )
         else:
-            assert len(ALL_TOOLS) > 0, (
-                f"USE_MOCK_TOOLS=False 일 때 ALL_TOOLS 는 비어 있으면 안 됩니다. "
+            assert ALL_TOOLS == [], (
+                f"USE_MOCK_TOOLS=False 일 때 ALL_TOOLS 는 빈 리스트여야 합니다. "
                 f"(현재: {len(ALL_TOOLS)}개)"
             )
+    """tools/__init__.py 의 ALL_TOOLS 상태 검증."""
 
     def test_all_tools_contains_event_tool(self) -> None:
-        """TC-09: ALL_TOOLS 는 이벤트 관련 tool 을 포함해야 한다.
+        """TC-09: Phase 2 에서 ALL_TOOLS 는 get_event_list tool 을 포함해야 한다.
 
-        USE_MOCK_TOOLS=true:  mock_get_events (mock 구현체)
-        USE_MOCK_TOOLS=false: get_event_list  (실제 구현체)
+        Phase 1 에는 빈 리스트였으나, 이벤트 기능(Issue #event) 구현으로
+        get_event_list 가 등록되었습니다.
+        이후 다른 화면 tool 이 추가될 때마다 이 테스트도 함께 업데이트합니다.
         """
-        from app.core.config import settings
+        from app.shared.agent.tools.event import get_event_list
 
+        assert isinstance(ALL_TOOLS, list), "ALL_TOOLS 가 list 타입이 아닙니다."
+        assert len(ALL_TOOLS) > 0, "Phase 2 이상에서 ALL_TOOLS 는 비어 있으면 안 됩니다."
         tool_names = [t.name for t in ALL_TOOLS]
-        expected = "mock_get_events" if settings.USE_MOCK_TOOLS else "get_event_list"
-        assert expected in tool_names, (
-            f"ALL_TOOLS 에 {expected} 가 없습니다. (현재: {tool_names})"
+        assert "get_event_list" in tool_names, (
+            f"ALL_TOOLS 에 get_event_list 가 없습니다. (현재: {tool_names})"
         )
