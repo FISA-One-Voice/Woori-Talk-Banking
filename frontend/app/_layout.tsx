@@ -1,6 +1,7 @@
 import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
+import { useTransferStore as transferStore } from '@/store/transferStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { getTtsMessage } from '@/utils/errorHandler';
@@ -104,6 +105,10 @@ export default function RootLayout() {
 
   const handleResponse = useCallback(
     async (data: VoiceResponseData) => {
+      // execute_node는 collected_slots를 {}로 초기화하므로
+      // setLastResponse 이전에 이전 슬롯을 저장해 이체 완료 화면에 전달한다.
+      const prevSlots = useVoiceResponseStore.getState().lastResponse?.collected_slots ?? {};
+
       useVoiceResponseStore.getState().setLastResponse(data);
 
       if (data.awaiting_asv_audio) {
@@ -112,6 +117,19 @@ export default function RootLayout() {
         setVoiceState('awaiting_confirm');
       } else {
         setVoiceState('idle');
+      }
+
+      if (data.navigate_to === 'transfer/complete') {
+        const recipientName = (prevSlots.recipient as string) ?? '';
+        const amount = prevSlots.amount ? Number(prevSlots.amount) : 0;
+        if (recipientName && amount) {
+          transferStore.getState().setTxReceipt({
+            txId: '',
+            toName: recipientName,
+            toBankName: '',
+            amount,
+          });
+        }
       }
 
       if (data.audio) {

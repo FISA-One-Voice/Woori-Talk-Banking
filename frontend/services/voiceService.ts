@@ -22,7 +22,10 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
   const { data } = await apiClient.post<ApiResponse<VoiceResponseData>>(
     '/api/voice/voice',
     formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } },
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000,
+    },
   );
 
   if (!data.success || !data.data) {

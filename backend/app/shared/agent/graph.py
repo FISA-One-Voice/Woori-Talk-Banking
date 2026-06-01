@@ -231,10 +231,20 @@ def build_graph(tools: list) -> CompiledStateGraph:
         1. 취소 발화("취소", "아니오") → 상태 초기화
         2. awaiting_confirmation=True + "네" + ASV 필요 → awaiting_asv_audio=True
         3. awaiting_confirmation=True + "네" + ASV 불필요 → execution_ready=True
-        4. 새 인텐트 감지 → pending_action, navigate_to, 초기 슬롯 설정
-        5. 슬롯 채우기 → collected_slots 업데이트
-        6. 일반 챗봇 질의 → direct_response를 AIMessage로 추가
+        4. execution_ready=True → LLM 없이 즉시 통과 (execute_node로 라우팅)
+        5. 새 인텐트 감지 → pending_action, navigate_to, 초기 슬롯 설정
+        6. 슬롯 채우기 → collected_slots 업데이트
+        7. 일반 챗봇 질의 → direct_response를 AIMessage로 추가
         """
+        # ASV 인증 성공 직후: execution_ready=True이면 LLM 호출 없이 즉시 반환.
+        # route_after_intent가 execute_node로 라우팅한다.
+        if state.get("execution_ready"):
+            logger.info(
+                "[Graph →intent_node] execution_ready=True"
+                " — LLM skip, pass-through to execute_node"
+            )
+            return {}
+
         logger.info(
             "[Graph →intent_node] pending=%s slots=%s"
             " await_confirm=%s await_asv=%s exec_ready=%s",
