@@ -63,7 +63,7 @@ export default function DevVoiceRegisterScreen() {
         }
       });
     } else if (step === 'SUCCESS') {
-      speakWithSpeaker("고객님의 목소리가 성공적으로 등록되었습니다. 이제 목소리로 간편하게 인증할 수 있습니다. 감사합니다.", { language: 'ko-KR', rate: 0.9 });
+      speakWithSpeaker("목소리 등록이 완료되었습니다. 이제부터 화면을 길게 누르면 어시스턴트를 호출할 수 있으며, 안내 도중 화면에 알파벳 브이 자를 그리면 음성을 즉시 중단할 수 있습니다.", { language: 'ko-KR', rate: 0.9 });
     } else if (step === 'FAIL') {
       speakWithSpeaker("목소리 인식에 실패했습니다. 조용한 곳에서 다시 시도해 주세요.", { language: 'ko-KR', rate: 0.9 });
     }
@@ -231,6 +231,7 @@ export default function DevVoiceRegisterScreen() {
       });
       
       if (response.data.success) {
+        useAuthStore.getState().setHasVoiceRegistered(true);
         setStep('SUCCESS');
       } else {
         setStep('FAIL');
@@ -350,8 +351,8 @@ export default function DevVoiceRegisterScreen() {
               {renderInfoBox('등록 완료', '성공적으로 등록되었습니다!\n이제 목소리로 간편하게 \n인증하세요.')}
               
               <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-                <Pressable style={styles.button} onPress={() => router.replace('/dev/login')}>
-                  <Text style={styles.buttonText}>다시 로그인 화면으로 이동</Text>
+                <Pressable style={styles.button} onPress={() => router.replace('/home')}>
+                  <Text style={styles.buttonText}>홈 화면으로 이동</Text>
                 </Pressable>
               </View>
             </View>

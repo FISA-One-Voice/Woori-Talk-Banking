@@ -2,6 +2,7 @@ import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay'
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { useTransferStore as transferStore } from '@/store/transferStore';
+import { useAuthStore } from '@/store/authStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { getTtsMessage } from '@/utils/errorHandler';
@@ -172,15 +173,17 @@ export default function RootLayout() {
     setVoiceState,
   );
 
+  const hasVoiceRegistered = useAuthStore((state) => state.hasVoiceRegistered);
+
   return (
     <Pressable
       style={styles.root}
-      onLongPress={handleLongPress}
-      onPressOut={handlePressOut}
+      onLongPress={hasVoiceRegistered ? handleLongPress : undefined}
+      onPressOut={hasVoiceRegistered ? handlePressOut : undefined}
       delayLongPress={500}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onTouchStart={hasVoiceRegistered ? handleTouchStart : undefined}
+      onTouchMove={hasVoiceRegistered ? handleTouchMove : undefined}
+      onTouchEnd={hasVoiceRegistered ? handleTouchEnd : undefined}
     >
       <Stack screenOptions={{ headerShown: false }} />
       <VoiceStatusOverlay state={voiceState} />

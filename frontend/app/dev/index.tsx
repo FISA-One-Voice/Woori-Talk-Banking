@@ -4,9 +4,12 @@ import { TopBar } from '@/components/layout';
 import { DEV_LINKS } from '@/constants/devLinks';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 
+import { useAuthStore } from '@/store/authStore';
 import { syncDeviceContactsToBackend } from '@/utils/contactSync';
 
 export default function DevHubScreen() {
+  const clearTokens = useAuthStore((state) => state.clearTokens);
+
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.pad}>
@@ -16,6 +19,16 @@ export default function DevHubScreen() {
           여기는 컴포넌트·API 등 개발용 화면만 모아 둡니다.
         </Text>
         
+        <Pressable 
+          style={[styles.link, { backgroundColor: '#3f1a1a', borderColor: '#F87171', marginBottom: 8 }]} 
+          onPress={() => {
+            clearTokens();
+            router.replace('/dev/login');
+          }}
+        >
+          <Text style={[styles.linkText, { color: '#F87171' }]}>🗑️ 토큰 및 상태 초기화 (로그아웃)</Text>
+        </Pressable>
+
         <Pressable 
           style={[styles.link, { backgroundColor: COLORS.surfaceLight, borderColor: COLORS.highlightYellow, marginBottom: 16 }]} 
           onPress={syncDeviceContactsToBackend}
