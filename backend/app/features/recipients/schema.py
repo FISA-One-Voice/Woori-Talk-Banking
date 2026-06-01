@@ -21,3 +21,23 @@ class ResolvedRecipient:
     bank_name: str
     account_number: str
     recipient_name: str | None
+
+from pydantic import BaseModel
+
+class ContactItem(BaseModel):
+    """디바이스 연락처 단건 아이템.
+    
+    Attributes:
+        name: 기기에 저장된 이름.
+        phone: 기기에 저장된 전화번호.
+    """
+    name: str
+    phone: str
+
+class SyncContactsRequest(BaseModel):
+    """디바이스 연락처 동기화 요청 스키마.
+    
+    Attributes:
+        contacts: 전송할 연락처 목록.
+    """
+    contacts: list[ContactItem]

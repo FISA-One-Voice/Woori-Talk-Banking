@@ -9,11 +9,6 @@ class JwtLoginRequest(BaseModel):
     phone: str = Field(..., alias="phone")
     pin: str = Field(..., alias="pin")
 
-class JwtBiometricLoginRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    phone: str = Field(..., alias="phone")
-
 
 class JwtRefreshRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

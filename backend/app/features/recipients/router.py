@@ -11,6 +11,7 @@ from app.core.jwt_utils import get_current_user_id
 from app.features.recipients import service
 from app.models.recipient import RegisteredRecipient
 from app.shared.crypto import decrypt
+from app.features.recipients.schema import SyncContactsRequest
 
 router = APIRouter(prefix="/api", tags=["수취인"])
 
@@ -96,4 +97,27 @@ def match_contacts(
         "success": True,
         "data": {"matched": [_to_item(r) for r in matched]},
         "message": f"{len(matched)}명의 수취인을 찾았습니다.",
+    }
+
+@router.post("/contacts/sync", response_model=dict)
+def sync_contacts(
+    request: SyncContactsRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """디바이스 연락처를 서버로 전송하여 가입된 수취인을 자동 등록합니다.
+
+    Args:
+        request: 동기화할 기기 연락처 목록이 담긴 요청 바디.
+        db: 데이터베이스 세션 (의존성 주입).
+        user_id: JWT에서 추출한 사용자 ID.
+
+    Returns:
+        동기화(새로 등록된) 수취인의 수를 포함한 표준 응답 객체.
+    """
+    added_count = service.sync_device_contacts(db, uuid.UUID(user_id), request.contacts)
+    return {
+        "success": True,
+        "data": {"addedCount": added_count},
+        "message": f"{added_count}명의 연락처가 동기화되었습니다.",
     }

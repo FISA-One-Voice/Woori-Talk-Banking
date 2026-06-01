@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.jwt_utils import get_current_user_id
 from app.features.jwt_auth import service
-from app.features.jwt_auth.schema import JwtLoginRequest, JwtRefreshRequest, JwtBiometricLoginRequest
+from app.features.jwt_auth.schema import JwtLoginRequest, JwtRefreshRequest
 
 router = APIRouter(prefix="/api/users", tags=["Users Auth"])
 
@@ -28,17 +28,6 @@ def login(req: JwtLoginRequest, db: Session = Depends(get_db)):
         "success": True,
         "data": data.model_dump(by_alias=True),
         "message": "로그인 성공 및 토큰이 발급되었습니다.",
-    }
-
-
-@router.post("/login/biometric", response_model=dict)
-def login_biometric(req: JwtBiometricLoginRequest, db: Session = Depends(get_db)):
-    """Face ID 등 생체 인증 성공 시 PIN 없이 전화번호만으로 로그인합니다."""
-    data = service.biometric_login(db, req)
-    return {
-        "success": True,
-        "data": data.model_dump(by_alias=True),
-        "message": "생체 인증 로그인 성공 및 토큰이 발급되었습니다.",
     }
 
 
