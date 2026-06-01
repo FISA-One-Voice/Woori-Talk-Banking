@@ -83,8 +83,7 @@ async def speech_to_text(file: UploadFile) -> ApiResponse:
         ApiResponse — data.transcript에 인식된 텍스트 포함.
 
     Raises:
-        HTTPException 400: 용량 초과 또는 지원하지 않는 포맷.
-        HTTPException 503: Clova Speech API 장애.
+        STTError: 용량 초과, 지원하지 않는 포맷, 또는 Clova Speech API 장애 시.
     """
     audio_bytes = await file.read()
     content_type = file.content_type or "audio/wav"
@@ -108,8 +107,7 @@ async def text_to_speech(body: TTSRequest) -> ApiResponse:
         ApiResponse — data.audio_base64에 MP3 Base64 인코딩 데이터 포함.
 
     Raises:
-        HTTPException 400: tts_speed 범위 초과.
-        HTTPException 503: Azure TTS API 장애.
+        TTSError: tts_speed 범위 초과, 또는 Azure TTS API 장애 시.
     """
     audio_bytes = await synthesize_speech(body.text, body.speed)
 

@@ -19,8 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """
-    앱 설정 클래스.
+    """앱 설정 클래스.
 
     BaseSettings 가 .env 파일과 os.environ 을 자동으로 읽어
     각 필드에 타입 변환 후 매핑합니다.
@@ -72,7 +71,10 @@ class Settings(BaseSettings):
           3. 둘 다 없으면 SQLite 로컬 파일 DB
         """
         if self.DATABASE_URL:
-            return self.DATABASE_URL
+            url = self.DATABASE_URL
+            if self.POSTGRES_SSL_ROOT_CERT and "sslrootcert" not in url:
+                url += f"&sslrootcert={self.POSTGRES_SSL_ROOT_CERT}"
+            return url
         if self.POSTGRES_HOST:
             url = (
                 f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"

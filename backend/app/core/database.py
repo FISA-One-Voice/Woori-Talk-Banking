@@ -51,17 +51,15 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 class Base(DeclarativeBase):
-    """
-    모든 SQLAlchemy 모델이 상속받는 베이스 클래스.
+    """모든 SQLAlchemy 모델이 상속받는 베이스 클래스.
 
-    models/event.py 에서 "class Event(Base):" 형태로 사용합니다.
+    models/ 하위에서 "class Account(Base):" 형태로 상속합니다.
     Base 를 상속받은 클래스가 곧 데이터베이스 테이블이 됩니다.
     """
 
 
 def get_db():
-    """
-    FastAPI 의존성 주입(Dependency Injection)용 DB 세션 제공 함수.
+    """FastAPI 의존성 주입(Dependency Injection)용 DB 세션 제공 함수.
 
     라우터 함수 매개변수에 "db: Session = Depends(get_db)" 라고 쓰면
     FastAPI 가 요청마다 자동으로 이 함수를 호출해서 세션을 주입해줍니다.
