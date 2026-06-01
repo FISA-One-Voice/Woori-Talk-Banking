@@ -19,8 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """
-    앱 설정 클래스.
+    """앱 설정 클래스.
 
     BaseSettings 가 .env 파일과 os.environ 을 자동으로 읽어
     각 필드에 타입 변환 후 매핑합니다.
@@ -72,7 +71,10 @@ class Settings(BaseSettings):
           3. 둘 다 없으면 SQLite 로컬 파일 DB
         """
         if self.DATABASE_URL:
-            return self.DATABASE_URL
+            url = self.DATABASE_URL
+            if self.POSTGRES_SSL_ROOT_CERT and "sslrootcert" not in url:
+                url += f"&sslrootcert={self.POSTGRES_SSL_ROOT_CERT}"
+            return url
         if self.POSTGRES_HOST:
             url = (
                 f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
@@ -103,9 +105,6 @@ class Settings(BaseSettings):
     OPENAI_CHAT_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
 
-    # ASV 서버 주소
-    ASV_SERVER_URL: str = ""
-
     # JWT 인증 설정
     JWT_SECRET_KEY: str = "supersecretkey-change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -113,9 +112,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # ── 에이전트 mock tool 설정 (Issue #21) ──────────────────────────────────────
-    # True : MOCK_TOOLS 사용 — Phase 2 화면 담당자 tool 완성 전 개발/테스트용 (기본값)
-    # False: 실제 tool 사용 — 각 화면 담당자의 features/*/tools 완성 후 전환
-    USE_MOCK_TOOLS: bool = True
+    # True : MOCK_TOOLS 사용 — Phase 2 화면 담당자 tool 완성 전 개발/테스트용
+    # False: 실제 tool 사용 — 각 화면 담당자의 features/*/tools 완성 후 (기본값)
+    USE_MOCK_TOOLS: bool = False
 
     # ── ASV 화자 인증 서버 설정 (Issue #7, ai/asv/) ───────────────────────────────
     # ASV_SERVER_URL: CAM++ 기반 화자 인증 서버 주소 (POST /verify)

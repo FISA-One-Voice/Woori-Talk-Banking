@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import * as Speech from 'expo-speech';
+import { speakText } from '@/utils/ttsManager';
 
 interface AccessibleNumKeypadProps {
   length: number;
@@ -40,7 +40,7 @@ export default function AccessibleNumKeypad({
 
   const handleFocus = (key: string) => {
     if (!key || key === '삭제') return;
-    Speech.speak(key, { language: 'ko-KR' });
+    speakText(key);
     onFocusDigit?.(key);
   };
 

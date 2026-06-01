@@ -4,7 +4,7 @@
 # [이 파일의 역할]
 # jwt_auth 기능의 HTTP 통합 테스트입니다.
 # 실제 DB(Aiven PostgreSQL)에 테스트 사용자를 만들고,
-# /jwt-auth/login, /refresh, /logout 엔드포인트를 호출해서
+# /users/login, /refresh, /logout 엔드포인트를 호출해서
 # 응답이 CLAUDE.md의 표준 형식을 따르는지 검증합니다.
 #
 # [테스트 케이스 목록]
@@ -97,12 +97,12 @@ def test_user(db: Session) -> User:
 
 
 class TestLogin:
-    """POST /users/login 테스트"""
+    """POST /api/users/login 테스트"""
 
     def test_login_success(self, client: TestClient, test_user: User):
         """정상적인 전화번호 + PIN으로 로그인하면 토큰이 반환됩니다."""
         res = client.post(
-            "/users/login",
+            "/api/users/login",
             json={"phone": TEST_PHONE, "pin": TEST_PIN},
         )
 
@@ -126,7 +126,7 @@ class TestLogin:
     def test_login_unknown_phone(self, client: TestClient):
         """가입되지 않은 전화번호로 로그인하면 USER_NOT_FOUND 오류가 반환됩니다."""
         res = client.post(
-            "/users/login",
+            "/api/users/login",
             json={"phone": "010-9999-9999", "pin": TEST_PIN},
         )
 
@@ -141,7 +141,7 @@ class TestLogin:
         """올바른 전화번호지만 틀린 PIN → UNAUTHORIZED 오류가 반환됩니다."""
         _ = test_user  # DB에 사용자가 존재해야 "잘못된 PIN" 케이스를 테스트할 수 있음
         res = client.post(
-            "/users/login",
+            "/api/users/login",
             json={"phone": TEST_PHONE, "pin": "000000"},  # 틀린 PIN
         )
 
@@ -159,7 +159,7 @@ class TestRefreshToken:
         """유효한 refresh token으로 새 access token을 발급받을 수 있습니다."""
         # 1단계: 로그인해서 refresh token 획득
         login_res = client.post(
-            "/users/login",
+            "/api/users/login",
             json={"phone": TEST_PHONE, "pin": TEST_PIN},
         )
         refresh_token = login_res.json()["data"]["refreshToken"]
@@ -169,7 +169,7 @@ class TestRefreshToken:
         # exp 값이 동일해 완전히 같은 토큰이 생성됩니다.
         time.sleep(1)
         res = client.post(
-            "/users/refresh",
+            "/api/users/refresh",
             json={"refreshToken": refresh_token},
         )
 
@@ -185,7 +185,7 @@ class TestRefreshToken:
     def test_refresh_with_invalid_token(self, client: TestClient):
         """위조된 refresh token은 TOKEN_INVALID 오류를 반환합니다."""
         res = client.post(
-            "/users/refresh",
+            "/api/users/refresh",
             json={"refreshToken": "this.is.a.fake.token"},
         )
 
@@ -198,7 +198,7 @@ class TestRefreshToken:
     def test_refresh_with_empty_token(self, client: TestClient):
         """빈 문자열 refresh token도 TOKEN_INVALID 오류를 반환합니다."""
         res = client.post(
-            "/users/refresh",
+            "/api/users/refresh",
             json={"refreshToken": ""},
         )
 
@@ -216,7 +216,7 @@ class TestLogout:
         """유효한 access token으로 로그아웃하면 userId가 반환됩니다."""
         # 1단계: 로그인해서 access token 획득
         login_res = client.post(
-            "/users/login",
+            "/api/users/login",
             json={"phone": TEST_PHONE, "pin": TEST_PIN},
         )
         data = login_res.json()["data"]
@@ -225,7 +225,7 @@ class TestLogout:
 
         # 2단계: 로그아웃 요청
         res = client.put(
-            "/users/logout",
+            "/api/users/logout",
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
@@ -241,7 +241,7 @@ class TestLogout:
 
         HTTPBearer는 토큰이 없으면 403 Not authenticated를 반환합니다.
         """
-        res = client.put("/users/logout")  # 헤더 없음
+        res = client.put("/api/users/logout")  # 헤더 없음
 
         # 이 서비스는 토큰 없는 요청에 401을 반환합니다
         assert res.status_code == 401
@@ -249,7 +249,7 @@ class TestLogout:
     def test_logout_with_invalid_token(self, client: TestClient):
         """위조된 access token으로 logout을 시도하면 401이 반환됩니다."""
         res = client.put(
-            "/users/logout",
+            "/api/users/logout",
             headers={"Authorization": "Bearer fake.access.token"},
         )
 

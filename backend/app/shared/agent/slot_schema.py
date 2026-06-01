@@ -21,6 +21,7 @@ SCREEN_MAP: dict[str, str] = {
     "balance": "balance",
     "history": "balance",  # 자산 화면에 통합 (Issue #9)
     "event": "event",
+    "home": "home",
 }
 
 # ── 수취인 검증이 필요한 액션 ────────────────────────────────────────────────────
@@ -42,12 +43,13 @@ SLOT_QUESTIONS: dict[str, str] = {
     "amount": "얼마를 보낼까요?",
     "cycle": "매월 또는 매주 중 어떤 주기로 보낼까요?",
     "scheduled_day": "매월 며칠에 이체할까요?",
+    "memo": "어떤 메모를 달까요?",
 }
 
 # ── 실행 완료 화면 경로 ────────────────────────────────────────────────────────────
 # execute_node 실행 후 navigate_to에 설정되어 프론트엔드 완료 화면으로 이동한다.
 COMPLETE_SCREEN_MAP: dict[str, str] = {
-    "transfer":      "transfer/complete",
+    "transfer": "transfer/complete",
     "auto_transfer": "auto-transfer/complete",
 }
 
@@ -57,6 +59,12 @@ ACTION_LABELS: dict[str, str] = {
     "transfer": "이체",
     "auto_transfer": "자동이체 등록",
 }
+
+# ── 화면 전환 전용 인텐트 ─────────────────────────────────────────────────────────
+# 화면이 자체적으로 데이터를 가져오고 TTS를 처리하므로
+# intent_node에서 navigate_to만 설정하고 execute_node 없이 바로 END.
+# balance/history는 에이전트가 잔액·내역을 TTS로 읽어주므로 여기에 포함하지 않음.
+SCREEN_ONLY_INTENTS: set[str] = {"event"}
 
 # ── 유효한 인텐트 목록 ─────────────────────────────────────────────────────────────
 VALID_INTENTS: set[str] = set(SCREEN_MAP.keys())

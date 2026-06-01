@@ -12,17 +12,21 @@
     )
 """
 
+import logging
 import re
 import uuid
 
 from sqlalchemy.orm import Session
 
+from app.core.database import get_db
 from app.core.exception import RecipientError
 from app.features.recipients.schema import ResolvedRecipient, ContactItem
 from app.models.account import Account
 from app.models.recipient import RegisteredRecipient
 from app.models.user import User
 from app.shared.crypto import decrypt, encrypt
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_by_id(
@@ -125,7 +129,6 @@ def resolve_by_phone(
         account_number=decrypt(primary_account.account_number),
         recipient_name=target_user.name,
     )
-
 
 
 def create_recipient(
@@ -237,9 +240,18 @@ def lookup_recipient_by_voice(
     """
     kind = classify_recipient_input(alias)
 
+    logger.info("alias '%s' classified as '%s'", alias, kind)
+
     if kind == "phone":
         try:
-            return resolve_by_phone(db, alias)
+            cleaned = alias.replace("-", "").replace(" ", "")
+            if len(cleaned) == 11:
+                formatted = f"{cleaned[:3]}-{cleaned[3:7]}-{cleaned[7:]}"
+            elif len(cleaned) == 10:
+                formatted = f"{cleaned[:3]}-{cleaned[3:6]}-{cleaned[6:]}"
+            else:
+                formatted = cleaned
+            return resolve_by_phone(db, formatted)
         except RecipientError:
             return None
 
@@ -338,3 +350,27 @@ def sync_device_contacts(
         
     db.commit()
     return added_count
+
+
+def find_recipient_by_voice(user_id: str, recipient: str) -> str | None:
+    """음성 발화 수취인 조회 — DB 세션을 내부에서 관리하는 에이전트용 래퍼.
+
+    graph.py의 resolve_node에서 호출한다.
+    DB 세션 생명주기를 service 레이어에서 캡슐화하여
+    graph.py가 인프라 코드에 직접 의존하지 않도록 한다.
+
+    Args:
+        user_id: 요청 사용자 UUID 문자열.
+        recipient: 수취인 이름·별명·전화번호.
+
+    Returns:
+        정규화된 수취인 실명 (찾은 경우), None (없는 경우).
+    """
+    db = next(get_db())
+    try:
+        resolved = lookup_recipient_by_voice(db, uuid.UUID(user_id), recipient)
+        return resolved.recipient_name if resolved else None
+    except Exception:
+        return None
+    finally:
+        db.close()
