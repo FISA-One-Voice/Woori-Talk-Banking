@@ -4,6 +4,8 @@ import { TopBar } from '@/components/layout';
 import { DEV_LINKS } from '@/constants/devLinks';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 
+import { syncDeviceContactsToBackend } from '@/utils/contactSync';
+
 export default function DevHubScreen() {
   return (
     <SafeAreaView style={styles.root}>
@@ -13,6 +15,14 @@ export default function DevHubScreen() {
           앱 진입(홈)은 첫 화면의 「앱 진입」을 사용하세요.{'\n'}
           여기는 컴포넌트·API 등 개발용 화면만 모아 둡니다.
         </Text>
+        
+        <Pressable 
+          style={[styles.link, { backgroundColor: COLORS.surfaceLight, borderColor: COLORS.highlightYellow, marginBottom: 16 }]} 
+          onPress={syncDeviceContactsToBackend}
+        >
+          <Text style={[styles.linkText, { color: COLORS.textMain }]}>📱 기기 연락처 동기화 테스트</Text>
+        </Pressable>
+
         {DEV_LINKS.map((item) => (
           <Pressable key={item.path} style={styles.link} onPress={() => router.push(item.path)}>
             <Text style={styles.linkText}>{item.label}</Text>

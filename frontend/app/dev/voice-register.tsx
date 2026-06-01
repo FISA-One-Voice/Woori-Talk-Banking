@@ -27,6 +27,17 @@ export default function DevVoiceRegisterScreen() {
   
   const recordingRef = useRef<Audio.Recording | null>(null);
 
+  const speakWithSpeaker = async (text: string, options: any = {}) => {
+    try {
+      const { sound: dummySound } = await Audio.Sound.createAsync(require('@/assets/sounds/beep.wav'));
+      await dummySound.setVolumeAsync(0);
+      await dummySound.playAsync();
+      await dummySound.unloadAsync();
+    } catch (e) {}
+    await new Promise(resolve => setTimeout(resolve, 200));
+    Speech.speak(text, options);
+  };
+
   useEffect(() => {
     Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
@@ -38,10 +49,10 @@ export default function DevVoiceRegisterScreen() {
     Speech.stop();
 
     if (step === 'TUTORIAL') {
-      Speech.speak("고객님의 목소리 등록을 시작합니다. 준비사항. 1. 조용한 환경에서 진행해 주세요. 2. 음성 안내가 끝나고 삐 소리가 나면 화면에 뜨는 문장을 천천히 읽어주세요. 3. 총 세 개의 문장을 녹음합니다. 준비가 되셨다면 화면 하단의 시작하기 버튼을 눌러주세요.", { language: 'ko-KR', rate: 0.9 });
+      speakWithSpeaker("고객님의 목소리 등록을 시작합니다. 준비사항. 1. 조용한 환경에서 진행해 주세요. 2. 음성 안내가 끝나고 삐 소리가 나면 화면에 뜨는 문장을 천천히 읽어주세요. 3. 총 세 개의 문장을 녹음합니다. 준비가 되셨다면 화면 하단의 시작하기 버튼을 눌러주세요.", { language: 'ko-KR', rate: 0.9 });
     } else if (step === 'READY') {
       const message = "잠시 후 첫 번째 문장 녹음을 시작합니다.";
-      Speech.speak(message, {
+      speakWithSpeaker(message, {
         language: 'ko-KR',
         rate: 0.9,
         volume: 1.0,
@@ -52,9 +63,9 @@ export default function DevVoiceRegisterScreen() {
         }
       });
     } else if (step === 'SUCCESS') {
-      Speech.speak("고객님의 목소리가 성공적으로 등록되었습니다. 이제 목소리로 간편하게 인증할 수 있습니다. 감사합니다.", { language: 'ko-KR', rate: 0.9 });
+      speakWithSpeaker("고객님의 목소리가 성공적으로 등록되었습니다. 이제 목소리로 간편하게 인증할 수 있습니다. 감사합니다.", { language: 'ko-KR', rate: 0.9 });
     } else if (step === 'FAIL') {
-      Speech.speak("목소리 인식에 실패했습니다. 조용한 곳에서 다시 시도해 주세요.", { language: 'ko-KR', rate: 0.9 });
+      speakWithSpeaker("목소리 인식에 실패했습니다. 조용한 곳에서 다시 시도해 주세요.", { language: 'ko-KR', rate: 0.9 });
     }
 
     return () => {
@@ -339,8 +350,8 @@ export default function DevVoiceRegisterScreen() {
               {renderInfoBox('등록 완료', '성공적으로 등록되었습니다!\n이제 목소리로 간편하게 \n인증하세요.')}
               
               <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-                <Pressable style={styles.button} onPress={() => router.push('/dev')}>
-                  <Text style={styles.buttonText}>홈 화면으로 이동</Text>
+                <Pressable style={styles.button} onPress={() => router.replace('/dev/login')}>
+                  <Text style={styles.buttonText}>다시 로그인 화면으로 이동</Text>
                 </Pressable>
               </View>
             </View>

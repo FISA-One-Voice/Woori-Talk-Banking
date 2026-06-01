@@ -5,26 +5,11 @@ import { useAuthStore } from '@/store/authStore';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { router } from 'expo-router';
 import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import * as LocalAuthentication from 'expo-local-authentication';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export default function DevLoginScreen() {
-  const savedPhone = useAuthStore((state) => state.phone);
   const [phone, setPhone] = useState('');
-  const [step, setStep] = useState<'PHONE' | 'PIN' | 'BIOMETRIC'>('PHONE');
-
-  useEffect(() => {
-    if (savedPhone) {
-      setPhone(savedPhone);
-      setStep('BIOMETRIC');
-    }
-  }, [savedPhone]);
-
-  useEffect(() => {
-    if (step === 'BIOMETRIC') {
-      triggerBiometric();
-    }
-  }, [step]);
+  const [step, setStep] = useState<'PHONE' | 'PIN'>('PHONE');
 
   const handlePhoneComplete = (completedPhone: string) => {
     let formatted = completedPhone;
@@ -32,55 +17,7 @@ export default function DevLoginScreen() {
       formatted = `${completedPhone.slice(0, 3)}-${completedPhone.slice(3, 7)}-${completedPhone.slice(7, 11)}`;
     }
     setPhone(formatted);
-    setStep('PIN'); // 수동 전화번호 입력 후에는 보통 바로 PIN으로 감 (또는 원하면 BIOMETRIC 호출 가능)
-  };
-
-  const triggerBiometric = async () => {
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      if (hasHardware && isEnrolled) {
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: 'Face ID로 로그인합니다',
-          fallbackLabel: 'PIN으로 로그인',
-          disableDeviceFallback: true,
-        });
-        if (result.success) {
-          handleBiometricLogin();
-        } else {
-          setStep('PIN');
-        }
-      } else {
-        setStep('PIN');
-      }
-    } catch (e) {
-      console.error(e);
-      setStep('PIN');
-    }
-  };
-
-  const handleBiometricLogin = async () => {
-    try {
-      const response = await apiClient.post<
-        ApiResponse<{ accessToken: string; refreshToken: string; hasVoiceRegistered: boolean }>
-      >('/api/users/login/biometric', {
-        phone,
-      });
-
-      const result = response.data;
-
-      if (result.success && result.data) {
-        useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken, phone);
-        router.replace('/home'); 
-      } else {
-        Alert.alert('로그인 실패 🚫', result.message || '인증에 실패했습니다.');
-        setStep('PIN');
-      }
-    } catch (error: any) {
-      const message = error.response?.data?.message || '인증에 실패했습니다.';
-      Alert.alert('로그인 실패 🚫', message);
-      setStep('PIN');
-    }
+    setStep('PIN');
   };
 
   const handleLogin = async (pinValue: string) => {
@@ -95,7 +32,7 @@ export default function DevLoginScreen() {
       const result = response.data;
 
       if (result.success && result.data) {
-        useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken, phone);
+        useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken);
 
         if (result.data.hasVoiceRegistered) {
           router.replace('/home');
@@ -124,16 +61,7 @@ export default function DevLoginScreen() {
         <TopBar variant="back" title="로그인 화면 테스트" onBack={() => router.back()} />
 
         <View style={styles.form}>
-          {step === 'BIOMETRIC' ? (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ color: COLORS.highlightYellow, fontSize: 20, fontWeight: '600', marginBottom: 20 }}>
-                Face ID 인증을 진행해주세요.
-              </Text>
-              <Pressable onPress={() => setStep('PIN')} style={{ padding: 16 }}>
-                <Text style={{ color: COLORS.grayMedium, fontSize: 16 }}>PIN 번호로 로그인하기</Text>
-              </Pressable>
-            </View>
-          ) : step === 'PHONE' ? (
+          {step === 'PHONE' ? (
             <View style={{ flex: 1 }}>
               <View>
                 <Text style={styles.label}>전화번호 11자리</Text>
