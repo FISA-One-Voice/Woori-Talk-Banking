@@ -13,12 +13,13 @@
 # 그 다음:       settings.DATABASE_URL  로 값을 읽습니다.
 # =============================================================================
 
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """
-    앱 설정 클래스.
+    """앱 설정 클래스.
 
     BaseSettings 가 .env 파일과 os.environ 을 자동으로 읽어
     각 필드에 타입 변환 후 매핑합니다.
@@ -70,7 +71,10 @@ class Settings(BaseSettings):
           3. 둘 다 없으면 SQLite 로컬 파일 DB
         """
         if self.DATABASE_URL:
-            return self.DATABASE_URL
+            url = self.DATABASE_URL
+            if self.POSTGRES_SSL_ROOT_CERT and "sslrootcert" not in url:
+                url += f"&sslrootcert={self.POSTGRES_SSL_ROOT_CERT}"
+            return url
         if self.POSTGRES_HOST:
             url = (
                 f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
@@ -101,9 +105,6 @@ class Settings(BaseSettings):
     OPENAI_CHAT_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
 
-    # ASV 서버 주소
-    ASV_SERVER_URL: str = ""
-
     # JWT 인증 설정
     JWT_SECRET_KEY: str = "supersecretkey-change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -111,14 +112,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # ── 에이전트 mock tool 설정 (Issue #21) ──────────────────────────────────────
-    # True : MOCK_TOOLS 사용 — Phase 2 화면 담당자 tool 완성 전 개발/테스트용 (기본값)
-    # False: 실제 tool 사용 — 각 화면 담당자의 features/*/tools 완성 후 전환
+    # True : MOCK_TOOLS 사용 — Phase 2 화면 담당자 tool 완성 전 개발/테스트용
+    # False: 실제 tool 사용 — 각 화면 담당자의 features/*/tools 완성 후 (기본값)
     USE_MOCK_TOOLS: bool = False
-
-    # ── ASV mock 설정 ─────────────────────────────────────────────────────────────
-    # True : ASV 인증을 항상 성공으로 처리 — 화자 인증 서버 없이 개발/테스트용
-    # False: 실제 ASV EC2 서버 호출
-    MOCK_ASV: bool = False
 
     # ── ASV 화자 인증 서버 설정 (Issue #7, ai/asv/) ───────────────────────────────
     # ASV_SERVER_URL: CAM++ 기반 화자 인증 서버 주소 (POST /verify)
@@ -133,7 +129,26 @@ class Settings(BaseSettings):
     ANTI_SPOOFING_EC2_URL: str = "http://localhost:8003"
     USE_ANTI_SPOOFING: bool = False
 
+    # ── LangSmith 트레이싱 (개발 전용 — 프로덕션에서는 미설정) ────────────────────────
+    # .env에 LANGSMITH_* 형식으로 설정한다.
+    # LangChain/LangGraph는 os.environ을 직접 읽으므로 model_post_init에서 반영한다.
+    LANGSMITH_TRACING: str = ""
+    LANGSMITH_API_KEY: str = ""
+    LANGSMITH_PROJECT: str = ""
+    LANGSMITH_ENDPOINT: str = ""
+
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
+
+    def model_post_init(self, __context: object) -> None:
+        """LangSmith가 직접 읽는 환경변수를 os.environ에 반영한다."""
+        if self.LANGSMITH_TRACING:
+            os.environ["LANGSMITH_TRACING"] = self.LANGSMITH_TRACING
+        if self.LANGSMITH_API_KEY:
+            os.environ["LANGSMITH_API_KEY"] = self.LANGSMITH_API_KEY
+        if self.LANGSMITH_PROJECT:
+            os.environ["LANGSMITH_PROJECT"] = self.LANGSMITH_PROJECT
+        if self.LANGSMITH_ENDPOINT:
+            os.environ["LANGSMITH_ENDPOINT"] = self.LANGSMITH_ENDPOINT
 
 
 # 싱글턴 패턴: 이 모듈을 import 하는 모든 파일이 같은 객체를 공유합니다.

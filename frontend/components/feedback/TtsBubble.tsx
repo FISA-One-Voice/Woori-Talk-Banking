@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
+import { speakText } from '@/utils/ttsManager';
 
 type TtsBubbleVariant = 'default' | 'error' | 'warning';
 
@@ -68,8 +69,7 @@ export default function TtsBubble({
     if (prevMessage.current === message) return;
     prevMessage.current = message;
 
-    Speech.speak(message, {
-      language: 'ko-KR',
+    speakText(message, {
       onDone: onEnd,
       onStopped: onEnd,
     });

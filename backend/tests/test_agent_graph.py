@@ -17,13 +17,11 @@
     .ainvoke() 통합 테스트는 Issue #7 (음성 파이프라인) 에서 수행합니다.
 """
 
-import pytest
 from langchain_core.tools import tool
 
 from app.shared.agent.graph import build_graph
 from app.shared.agent.prompts import SYSTEM_PROMPT
 from app.shared.agent.tools import ALL_TOOLS
-
 
 # ── 테스트용 더미 tool ──────────────────────────────────────────────────────────
 
@@ -141,7 +139,21 @@ class TestAllTools:
                 f"현재 ALL_TOOLS 길이: {len(ALL_TOOLS)}, MOCK_TOOLS 길이: {len(MOCK_TOOLS)}"
             )
         else:
-            assert ALL_TOOLS == [], (
-                f"USE_MOCK_TOOLS=False 일 때 ALL_TOOLS 는 빈 리스트여야 합니다. "
+            assert len(ALL_TOOLS) > 0, (
+                f"USE_MOCK_TOOLS=False 일 때 ALL_TOOLS 는 비어 있으면 안 됩니다. "
                 f"(현재: {len(ALL_TOOLS)}개)"
             )
+
+    def test_all_tools_contains_event_tool(self) -> None:
+        """TC-09: ALL_TOOLS 는 이벤트 관련 tool 을 포함해야 한다.
+
+        USE_MOCK_TOOLS=true:  mock_get_events (mock 구현체)
+        USE_MOCK_TOOLS=false: get_event_list  (실제 구현체)
+        """
+        from app.core.config import settings
+
+        tool_names = [t.name for t in ALL_TOOLS]
+        expected = "mock_get_events" if settings.USE_MOCK_TOOLS else "get_event_list"
+        assert expected in tool_names, (
+            f"ALL_TOOLS 에 {expected} 가 없습니다. (현재: {tool_names})"
+        )

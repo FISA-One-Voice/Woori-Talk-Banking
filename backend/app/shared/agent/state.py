@@ -24,7 +24,7 @@ class VoiceState(TypedDict):
         pending_action: 진행 중인 액션 이름 ("transfer", "auto_transfer").
             None이면 대기 상태.
         collected_slots: 수집된 슬롯 값.
-            예: {"alias": "엄마", "amount": 100000}
+            예: {"recipient": "엄마", "amount": 100000}
         awaiting_confirmation: True이면 사용자의 "네/아니오" 확인 대기 중.
         awaiting_asv_audio: True이면 다음 오디오 입력이 ASV 검증용임.
             router.py에서 이 값을 확인해 ASV EC2 서버로 라우팅한다.
@@ -33,7 +33,7 @@ class VoiceState(TypedDict):
             intent 첫 감지 시에만 설정되고, 이후 턴에서는 None.
         execution_ready: True이면 사용자 확인 완료 + ASV 불필요 → execute_node로 즉시 실행.
             intent_node에서 "네" 수신 후 설정. execute_node 완료 후 False로 초기화.
-        recipient_validated: True이면 alias 슬롯이 resolve_node를 통과한 상태.
+        recipient_validated: True이면 recipient 슬롯이 resolve_node를 통과한 상태.
             새 인텐트 감지 또는 취소 시 False로 초기화.
     """
 

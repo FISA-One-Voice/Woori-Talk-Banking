@@ -21,8 +21,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 
+KST = timezone(timedelta(hours=9))
+
+
 def _now() -> datetime:
-    return (datetime.now(timezone.utc) + timedelta(hours=9)).replace(tzinfo=None)
+    """timezone-aware 없이 현재 KST 시각을 반환합니다. (SQLite/PostgreSQL 호환)"""
+    return datetime.now(KST).replace(tzinfo=None)
 
 
 class Event(Base):

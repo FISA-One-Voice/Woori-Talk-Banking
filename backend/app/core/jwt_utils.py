@@ -2,10 +2,12 @@
 # backend/app/core/security.py
 # =============================================================================
 from datetime import datetime, timedelta, timezone
+from typing import Optional
+
 import bcrypt
 import jwt
-from fastapi import Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.exception import AuthError
 
@@ -76,7 +78,14 @@ def create_refresh_token(data: dict) -> str:
 
 
 def decode_token(token: str) -> dict | None:
-    """토큰을 디코딩하고 검증합니다. 만료되었거나 유효하지 않으면 None을 반환합니다."""
+    """JWT 토큰을 디코딩하고 서명을 검증합니다.
+
+    Args:
+        token: 검증할 JWT 문자열.
+
+    Returns:
+        유효한 토큰이면 payload dict, 만료되었거나 유효하지 않으면 None.
+    """
     try:
         payload = jwt.decode(
             token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
@@ -86,6 +95,22 @@ def decode_token(token: str) -> dict | None:
         return None
     except jwt.InvalidTokenError:
         return None
+
+
+def get_optional_user_id(request: Request) -> Optional[str]:
+    """선택적 인증 의존성. 토큰이 있으면 user_id 반환, 없거나 유효하지 않으면 None 반환.
+
+    로그인 없이도 접근 가능한 API에서 '로그인 시 추가 정보 제공' 용도로 사용합니다.
+    예) GET /events/{id} — 비로그인 시 has_participated=False, 로그인 시 실제 참여 여부 반환
+    """
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    token = auth[7:]
+    payload = decode_token(token)
+    if not payload or "sub" not in payload:
+        return None
+    return payload["sub"]
 
 
 def get_current_user_id(

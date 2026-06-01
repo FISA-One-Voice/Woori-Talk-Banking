@@ -16,6 +16,9 @@ if TYPE_CHECKING:
     from app.models.transaction import Transaction
 
 
+_KST = timezone(timedelta(hours=9))
+
+
 def _now() -> datetime:
     return (datetime.now(timezone.utc) + timedelta(hours=9)).replace(tzinfo=None)
 

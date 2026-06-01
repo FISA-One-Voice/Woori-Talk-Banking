@@ -215,7 +215,7 @@ class TestLlmAsvTrigger:
     async def test_confirmation_triggers_asv_for_transfer(self, real_graph) -> None:
         """TC-L02: 슬롯 완전 수집 상태에서 확인('네') → awaiting_asv_audio=True.
 
-        LLM이 추출하는 슬롯 키 이름(alias vs recipient 등) 변동성을 피하기 위해
+        LLM이 추출하는 슬롯 키 이름 변동성을 피하기 위해
         aupdate_state로 awaiting_confirmation=True 상태를 직접 주입한다.
         테스트 관심사: LLM이 '네'를 확인으로 인식하고 transfer ASV 흐름을 트리거하는지.
         """
@@ -231,7 +231,7 @@ class TestLlmAsvTrigger:
             {
                 "pending_action": "transfer",
                 "awaiting_confirmation": True,
-                "collected_slots": {"alias": "엄마", "amount": 50000},
+                "collected_slots": {"recipient": "엄마", "amount": 50000},
                 "awaiting_asv_audio": False,
                 "execution_ready": False,
                 "asv_retry_count": 0,
@@ -335,7 +335,7 @@ class TestAsvLlmFullPipeline:
                 "awaiting_asv_audio": True,
                 "awaiting_confirmation": False,
                 "pending_action": "transfer",
-                "collected_slots": {"alias": "엄마", "amount": 50000},
+                "collected_slots": {"recipient": "엄마", "amount": 50000},
                 "asv_retry_count": 0,
                 "execution_ready": False,
                 "navigate_to": None,
@@ -389,7 +389,7 @@ class TestAsvLlmFullPipeline:
                 "awaiting_asv_audio": True,
                 "awaiting_confirmation": False,
                 "pending_action": "transfer",
-                "collected_slots": {"alias": "엄마", "amount": 50000},
+                "collected_slots": {"recipient": "엄마", "amount": 50000},
                 "asv_retry_count": 0,
                 "execution_ready": False,
                 "navigate_to": None,
