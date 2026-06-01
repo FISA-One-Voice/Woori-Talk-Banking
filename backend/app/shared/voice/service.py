@@ -19,12 +19,14 @@ Design Ref:
 
 import asyncio
 import base64
+import io
 import json
 import logging
 import uuid
 
 import httpx
 from langchain_core.messages import HumanMessage
+from pydub import AudioSegment
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -95,6 +97,12 @@ async def process_voice_pipeline(
         if state_snapshot.values
         else False
     )
+    logger.info(
+        "[Pipeline] user_id=%s awaiting_asv=%s state_values=%s",
+        user_id,
+        awaiting_asv,
+        state_snapshot.values if state_snapshot.values else "EMPTY",
+    )
 
     if awaiting_asv:
         return await _handle_asv_flow(audio_bytes, user_id, config, db, graph)
@@ -156,6 +164,24 @@ async def _handle_normal_flow(
 # ── ASV 인증 흐름 ───────────────────────────────────────────────────────────────
 
 
+def _to_wav_bytes(audio_bytes: bytes) -> bytes:
+    """m4a/AAC 등 임의 포맷 오디오 바이트를 WAV(PCM)로 변환한다.
+
+    ASV 서버의 soundfile은 m4a를 디코딩하지 못하므로 ASV 흐름 진입 시 호출한다.
+    ffmpeg이 시스템에 설치되어 있어야 한다.
+
+    Args:
+        audio_bytes: 변환할 원시 오디오 바이트 (m4a, AAC 등).
+
+    Returns:
+        WAV PCM 포맷 바이트.
+    """
+    audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
+    buf = io.BytesIO()
+    audio.export(buf, format="wav")
+    return buf.getvalue()
+
+
 async def _handle_asv_flow(
     audio_bytes: bytes,
     user_id: str,
@@ -191,10 +217,22 @@ async def _handle_asv_flow(
     # DB에서 사용자 음성 임베딩 조회 (ASV /verify 호출에 필요)
     reference_embedding = _get_user_embedding(user_id, db)
 
+    # m4a/AAC → WAV 변환 (soundfile은 m4a 디코딩 불가)
+    wav_bytes = _to_wav_bytes(audio_bytes)
+
+    logger.info(
+        "[ASV] _call_asv_ec2 호출 직전: url=%s/verify "
+        "embedding_len=%d audio_bytes=%d wav_bytes=%d",
+        settings.ASV_SERVER_URL,
+        len(reference_embedding),
+        len(audio_bytes),
+        len(wav_bytes),
+    )
+
     # ASV + anti-spoofing 병렬 호출
     asv_result, spoof_result = await asyncio.gather(
-        _call_asv_ec2(audio_bytes, reference_embedding),
-        _call_anti_spoofing_ec2(audio_bytes),
+        _call_asv_ec2(wav_bytes, reference_embedding),
+        _call_anti_spoofing_ec2(wav_bytes),
         return_exceptions=True,
     )
 
@@ -239,14 +277,14 @@ async def _handle_asv_flow(
                 "pending_action": None,
                 "collected_slots": {},
                 "asv_retry_count": 0,
-                "navigate_to": None,
+                "navigate_to": "home",
             },
             as_node="intent_node",
         )
         tts_text = (
-            "본인 확인에 세 번 실패하여 작업이 취소되었습니다. "
-            "처음부터 다시 말씀해 주세요."
+            "본인 확인에 세 번 실패하여 작업이 취소되었습니다. 홈 화면으로 이동합니다."
         )
+        navigate_to_next: str | None = "home"
         awaiting_asv_next = False
     else:
         # 재시도 기회 남음 → retry_count만 증가
@@ -260,12 +298,13 @@ async def _handle_asv_flow(
             f"본인 확인에 실패했습니다. {remaining}번 더 시도하실 수 있습니다. "
             "다시 한번 말씀해 주세요."
         )
+        navigate_to_next = None
         awaiting_asv_next = True
 
     audio_mp3 = await synthesize_speech(tts_text)
     return VoiceResponseData(
         audio=base64.b64encode(audio_mp3).decode(),
-        navigate_to=None,
+        navigate_to=navigate_to_next,
         collected_slots={},
         awaiting_confirmation=False,
         awaiting_asv_audio=awaiting_asv_next,
@@ -351,15 +390,16 @@ def _get_user_embedding(user_id_str: str, db: Session) -> list[float]:
         )
 
     user: User | None = db.get(User, user_uuid)
-    if user is None or not user.embedding_vector:
+    if user is None or user.embedding_vector is None:
         raise ASVError(
             code="ASV_NOT_ENROLLED",
             message="음성 등록이 필요합니다. 앱에서 음성 등록을 먼저 진행해 주세요.",
             status_code=422,
         )
 
-    # pgvector는 list 또는 numpy array 반환. list[float]로 변환
-    return list(user.embedding_vector)
+    # pgvector는 numpy array를 반환. float32 → Python float으로 변환해야
+    # json.dumps가 가능하다.
+    return [float(v) for v in user.embedding_vector]
 
 
 # ── 외부 EC2 서버 호출 ──────────────────────────────────────────────────────────

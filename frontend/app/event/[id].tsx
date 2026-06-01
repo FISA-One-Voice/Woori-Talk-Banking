@@ -369,7 +369,7 @@ export default function EventDetailScreen() {
 
       <View style={styles.body}>
         <TopBar variant="back" title="이벤트" onBack={() => router.back()} />
-        <TtsBubble message={tts.message} variant={tts.variant} autoPlay />
+        <TtsBubble message={tts.message} variant={tts.variant} autoPlay={screen !== 'loading'} />
 
         {screen === 'loading' && (
           <View style={styles.center}>

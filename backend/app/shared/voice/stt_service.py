@@ -6,7 +6,6 @@ import mutagen
 from app.core.config import settings
 from app.core.exception import STTError
 
-# CLOVA STT가 지원하는 오디오 MIME 타입, 절대 안바뀌는 값 이므로 frozenset으로 정의
 SUPPORTED_CONTENT_TYPES = frozenset(
     {
         "audio/wav",
@@ -14,7 +13,7 @@ SUPPORTED_CONTENT_TYPES = frozenset(
         "audio/mpeg",
         "audio/mp4",
         "audio/m4a",
-        "audio/x-m4a",  # Apple 구형 MIME 변형 (React Native iOS가 전송하는 타입)
+        "audio/x-m4a",
         "audio/aac",
         "audio/flac",
         "audio/ogg",
@@ -22,10 +21,7 @@ SUPPORTED_CONTENT_TYPES = frozenset(
     }
 )
 
-# CLOVA STT 파일 용량 상한 (10 MB)
 MAX_AUDIO_BYTES = 10 * 1024 * 1024
-
-# CLOVA STT 음성 길이 상한 (60초)
 MAX_AUDIO_DURATION = 60.0
 
 
@@ -33,21 +29,8 @@ async def transcribe_audio(
     audio_bytes: bytes,
     content_type: str = "audio/wav",
 ) -> str:
-    """Clova Speech API로 음성을 텍스트로 변환합니다.
-
-    Args:
-        audio_bytes: 변환할 음성 파일의 바이트 데이터.
-        content_type: 오디오 파일의 MIME 타입.
-            지원 형식: wav, mp3, mp4, m4a, aac, flac, ogg.
-            미지정 시 audio/wav로 처리.
-
-    Returns:
-        Clova Speech가 인식한 텍스트 문자열.
-
-    Raises:
-        STTError: 파일 용량·길이 초과, 지원하지 않는 포맷, 또는 API 호출 실패 시.
-    """
-    _validate_audio(audio_bytes, content_type)  # API 호출 전에 용량·포맷·길이를 검증
+    """Clova Speech API로 음성을 텍스트로 변환합니다."""
+    _validate_audio(audio_bytes, content_type)
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -89,15 +72,6 @@ async def transcribe_audio(
 
 
 def _validate_audio(audio_bytes: bytes, content_type: str) -> None:
-    """음성 파일 용량·포맷·길이를 검증합니다.
-
-    Args:
-        audio_bytes: 검증할 음성 파일 바이트 데이터.
-        content_type: 오디오 파일의 MIME 타입.
-
-    Raises:
-        STTError: 용량 초과, 지원하지 않는 포맷, 또는 재생 시간 초과인 경우.
-    """
     if len(audio_bytes) > MAX_AUDIO_BYTES:
         raise STTError(
             code="VOICE_AUDIO_TOO_LARGE",
@@ -120,16 +94,6 @@ def _validate_audio(audio_bytes: bytes, content_type: str) -> None:
 
 
 def _get_audio_duration(audio_bytes: bytes) -> float | None:
-    """음성 파일의 재생 시간을 초 단위로 반환합니다.
-
-    mutagen이 파싱하지 못하는 포맷이면 None을 반환하고 길이 검증을 건너뜁니다.
-
-    Args:
-        audio_bytes: 재생 시간을 구할 음성 파일 바이트 데이터.
-
-    Returns:
-        재생 시간(초), 파악 불가 시 None.
-    """
     try:
         audio = mutagen.File(io.BytesIO(audio_bytes))
         if audio is not None and audio.info is not None:
