@@ -14,12 +14,14 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.exception import AppError, TTSError
 from app.core.jwt_utils import get_current_user_id
 from app.shared.voice.schema import (
     ApiResponse,
     STTResult,
     TTSRequest,
     TTSResult,
+    VoiceResponseData,
 )
 from app.shared.voice.service import process_voice_pipeline
 from app.shared.voice.stt_service import transcribe_audio
@@ -64,12 +66,31 @@ async def voice_pipeline(
     """
     audio_bytes = await audio.read()
     content_type = audio.content_type or "audio/wav"
-    data = await process_voice_pipeline(audio_bytes, user_id, db, content_type)
-    return ApiResponse(
-        success=True,
-        data=data.model_dump(),
-        message="음성 처리가 완료되었습니다.",
-    )
+    try:
+        data = await process_voice_pipeline(audio_bytes, user_id, db, content_type)
+        return ApiResponse(
+            success=True,
+            data=data.model_dump(),
+            message="음성 처리가 완료되었습니다.",
+        )
+    except TTSError:
+        raise  # global handler로 폴백 — TTS 자체 불가, 프론트 expo-speech 처리
+    except AppError as exc:
+        audio_mp3 = await synthesize_speech(exc.message)
+        error_data = VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to=None,
+            collected_slots={},
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            transcript=None,
+        )
+        return ApiResponse(
+            success=False,
+            data=error_data.model_dump(),
+            message=exc.message,
+            code=exc.code,
+        )
 
 
 @router.post("/stt", response_model=ApiResponse)

@@ -1,7 +1,7 @@
 ﻿import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import * as Speech from 'expo-speech';
-import { speakText } from '@/utils/ttsManager';
+import { fetchTtsAudio } from '@/services/voiceService';
+import { playBase64Audio } from '@/utils/audioPlayer';
 
 type TtsBubbleVariant = 'default' | 'error' | 'warning';
 
@@ -69,14 +69,10 @@ export default function TtsBubble({
     if (prevMessage.current === message) return;
     prevMessage.current = message;
 
-    speakText(message, {
-      onDone: onEnd,
-      onStopped: onEnd,
-    });
-
-    return () => {
-      Speech.stop();
-    };
+    fetchTtsAudio(message)
+      .then(base64 => playBase64Audio(base64))
+      .then(onEnd)
+      .catch(() => onEnd?.());
   }, [message, autoPlay, onEnd]);
 
   const variantStyles = TTS_BUBBLE_VARIANT_STYLES[variant];
