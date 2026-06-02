@@ -5,7 +5,7 @@ import { useTransferStore as transferStore } from '@/store/transferStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { playBase64Audio } from '@/utils/audioPlayer';
 import { getTtsMessage } from '@/utils/errorHandler';
-import { stopAllTts } from '@/utils/ttsManager';
+import { speakText, stopAllTts } from '@/utils/ttsManager';
 import { Stack, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useCallback, useRef, useState } from 'react';
@@ -126,7 +126,7 @@ export default function RootLayout() {
   const handleError = useCallback((code: string) => {
     setVoiceState('idle');
     const errorMessage = getTtsMessage(code);
-    Speech.speak(errorMessage, { language: 'ko-KR' });
+    speakText(errorMessage);
   }, []);
 
   const { handleLongPress, handlePressOut } = useVoiceInput(
