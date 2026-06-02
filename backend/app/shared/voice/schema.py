@@ -70,6 +70,7 @@ class VoiceResponseData(BaseModel):
         awaiting_asv_audio: True이면 다음 오디오 입력이 ASV 검증용임.
             프론트엔드는 "목소리로 인증해 주세요" 오버레이를 표시한다.
         awaiting_memo_decision: True이면 이체 직후 메모 제안에 대한 응답 대기 중.
+        awaiting_transfer_clarification: True이면 전화·계좌만 말한 뒤 송금 여부 확인 대기 중.
 
     Usage (Issue #7 router.py):
         data = VoiceResponseData(
@@ -99,6 +100,9 @@ class VoiceResponseData(BaseModel):
 
     awaiting_memo_decision: bool = False
     """True이면 이체 완료 후 메모 제안에 대한 음성 응답 대기 중."""
+
+    awaiting_transfer_clarification: bool = False
+    """True이면 송금 의도 확인(네/아니오) 응답 대기 중."""
 
     transcript: str | None = None
     """STT 변환 결과 텍스트. 정상 흐름에서만 채워지며 ASV 인증 흐름에서는 None."""

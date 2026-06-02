@@ -36,6 +36,12 @@ from app.shared.agent.memo_decision import (
     build_memo_decision_update,
     last_user_text,
 )
+from app.shared.agent.transfer_clarification import (
+    build_transfer_clarification_offer,
+    build_transfer_clarification_response,
+    should_offer_transfer_clarification,
+)
+from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
     ASV_REQUIRED_ACTIONS,
@@ -259,6 +265,15 @@ def build_graph(tools: list) -> CompiledStateGraph:
             )
             return build_memo_decision_update(user_text)
 
+        if state.get("awaiting_transfer_clarification"):
+            user_text = last_user_text(state.get("messages", []))
+            draft = state.get("draft_recipient") or user_text
+            logger.info(
+                "[Graph →intent_node] awaiting_transfer_clarification user_text=%s",
+                user_text,
+            )
+            return build_transfer_clarification_response(user_text, draft)
+
         logger.info(
             "[Graph →intent_node] pending=%s slots=%s"
             " await_confirm=%s await_asv=%s await_memo=%s exec_ready=%s",
@@ -327,6 +342,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "  ★ intent가 설정된 경우 반드시 빈 문자열('')로 설정할 것.",
             "  ★ 누락 슬롯 질문('누구에게?', '얼마?')을 절대 여기에 쓰지 말 것."
             " 슬롯 수집은 시스템이 자동으로 처리한다.",
+            "  ★ 전화·계좌만 말하고 이체 의도가 없으면 direct_response는 비우고"
+            " 사용자 발화를 그대로 반복하지 말 것 (송금 여부는 시스템이 질문한다).",
             "- TTS 출력: 마크다운 없이 자연스러운 한국어 구어체만 사용",
         ]
 
@@ -374,6 +391,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "recipient_validated": False,
                 "last_tx_id": None,
                 "awaiting_memo_decision": False,
+                "awaiting_transfer_clarification": False,
+                "draft_recipient": None,
                 "messages": [
                     AIMessage(content=result.direct_response or "취소되었습니다.")
                 ],
@@ -410,6 +429,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "recipient_validated": False,
                 "asv_retry_count": 0,
                 "awaiting_memo_decision": False,
+                "awaiting_transfer_clarification": False,
+                "draft_recipient": None,
                 "navigate_to": "home",
                 "messages": [AIMessage(content="홈 화면으로 이동합니다.")],
             }
@@ -431,6 +452,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "execution_ready": False,
                 "asv_retry_count": 0,
                 "awaiting_memo_decision": False,
+                "awaiting_transfer_clarification": False,
+                "draft_recipient": None,
             }
             # 화면 전환 전용 인텐트: 화면이 자체 TTS를 처리하므로 간단한 안내만 추가
             if result.intent in SCREEN_ONLY_INTENTS:
@@ -449,8 +472,36 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 updates["execution_ready"] = True
 
         # ── 챗봇 직접 응답 (인텐트 없음) ───────────────────────────────────────
+        user_text = last_user_text(state.get("messages", []))
         if result.direct_response:
-            updates["messages"] = [AIMessage(content=result.direct_response)]
+            echoed = result.direct_response.strip() == user_text.strip()
+            if echoed and should_offer_transfer_clarification(
+                user_text,
+                pending_action=state.get("pending_action"),
+                awaiting_memo_decision=state.get("awaiting_memo_decision", False),
+                awaiting_transfer_clarification=state.get(
+                    "awaiting_transfer_clarification", False
+                ),
+            ):
+                updates = {**updates, **build_transfer_clarification_offer(user_text)}
+            elif not echoed:
+                updates["messages"] = [AIMessage(content=result.direct_response)]
+
+        if not updates.get("messages"):
+            if should_offer_transfer_clarification(
+                user_text,
+                pending_action=updates.get("pending_action")
+                or state.get("pending_action"),
+                awaiting_memo_decision=state.get("awaiting_memo_decision", False),
+                awaiting_transfer_clarification=state.get(
+                    "awaiting_transfer_clarification", False
+                ),
+            ):
+                updates = {**updates, **build_transfer_clarification_offer(user_text)}
+            elif not (updates.get("pending_action") or state.get("pending_action")):
+                updates["messages"] = [
+                    AIMessage(content=_DEFAULT_TTS_FALLBACK)
+                ]
 
         return updates
 
@@ -672,6 +723,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
         # 메모 제안 응답 대기 → END (다음 발화로 intent_node에서 처리)
         if state.get("awaiting_memo_decision"):
             logger.info("[Graph route] intent_node → END (awaiting_memo_decision)")
+            return END
+
+        if state.get("awaiting_transfer_clarification"):
+            logger.info(
+                "[Graph route] intent_node → END (awaiting_transfer_clarification)"
+            )
             return END
 
         # 확인 완료 + 즉시 실행 가능 → execute_node

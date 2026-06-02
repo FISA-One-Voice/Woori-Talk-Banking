@@ -38,6 +38,8 @@ class VoiceState(TypedDict):
         last_tx_id: execute_transfer 성공 시 저장된 tx_id.
             add_note 실행 후 None으로 초기화. 최근 거래 DB 조회 대신 사용.
         awaiting_memo_decision: True이면 이체 직후 메모 제안에 대한 응답 대기 중.
+        awaiting_transfer_clarification: True이면 전화·계좌만 말한 뒤 송금 여부 확인 대기 중.
+        draft_recipient: 송금 확인 대기 중 보관한 수취인 힌트(전화·계좌 등).
     """
 
     messages: Annotated[list, add_messages]
@@ -47,6 +49,8 @@ class VoiceState(TypedDict):
     awaiting_confirmation: bool
     awaiting_asv_audio: bool
     awaiting_memo_decision: bool
+    awaiting_transfer_clarification: bool
+    draft_recipient: str | None
     asv_retry_count: int
     navigate_to: str | None
     execution_ready: bool

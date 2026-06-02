@@ -4,6 +4,54 @@
 
 ---
 
+## 2026-06-02 — 애매한 수취인 힌트(전화·계좌만) + TTS STT 에코 수정
+
+### 배경
+
+- `010 1111 0003`처럼 **전화·계좌만** 말하면 `intent=null`, `navigate_to=null` → 화면 미이동.
+- `intent_node`가 AIMessage를 추가하지 않을 때 `voice/service.py`가 **`messages[-1]`(HumanMessage)** 를 TTS로 읽어 STT와 동일하게 들림.
+- `SYSTEM_PROMPT`의 「의도 불명확 시 재질문」과 `intent_node` 규칙(`direct_response`에 슬롯 질문 금지)이 맞지 않아 LLM만으로는 송금 확인이 보장되지 않음.
+
+### 완료한 작업
+
+| 영역 | 내용 |
+|------|------|
+| `backend/app/shared/voice/message_utils.py` | `tts_text_from_messages()` — 마지막 AIMessage만 TTS, 없으면 기본 안내 |
+| `backend/app/shared/voice/service.py` | 정상·ASV 흐름 TTS 추출 교체, `awaiting_transfer_clarification` 응답 |
+| `backend/app/shared/agent/transfer_clarification.py` | 전화/계좌만 감지, 송금 확인 멀티턴(네→transfer, 아니오→취소, 잔액→balance) |
+| `backend/app/shared/agent/state.py` | `awaiting_transfer_clarification`, `draft_recipient` |
+| `backend/app/shared/agent/graph.py` | clarification 분기·fallback·`route_after_intent` END |
+| `backend/app/shared/voice/schema.py` | API 필드 `awaiting_transfer_clarification` |
+| `frontend/types/voice.ts` | 동일 필드 타입(선택) |
+| `backend/tests/test_transfer_clarification.py` | 감지·멀티턴·TTS 추출 단위 테스트 9건 |
+
+### 음성 플로우 (송금 확인)
+
+```
+"010 1111 0003" (이체·금액 키워드 없음)
+  → awaiting_transfer_clarification=true
+  → TTS: "송금을 도와드릴까요? 네 또는 아니오로 …"
+  → navigate_to=null
+       ↓ [다음 롱프레스]
+"네"
+  → pending_action=transfer, recipient=010 1111 0003
+  → navigate_to=transfer → resolve_node → slot_fill(amount) …
+"아니요"
+  → 상태 초기화, TTS 안내
+```
+
+### 체크포인트 (되돌리기)
+
+- 수정 **직전** 커밋: `chore(transfer): 3계층 리팩터 체크포인트 (음성 clarification 수정 전)` (`3cca292`)
+
+### 후속 과제
+
+- [ ] `VoiceStatusOverlay`에 `awaiting_transfer_clarification` 전용 UI (선택)
+- [ ] 계좌번호 직접 이체(`classify` account) — `bank_name` 슬롯·`lookup` 경로 구현
+- [ ] 실기기: 전화만 → 확인 TTS → 「네」 후 `/transfer`·amount 질문 E2E
+
+---
+
 ## 2026-06-02 — 이체 직후 메모 제안: 그래프 멀티턴 + `tx_id` 연동
 
 ### 배경

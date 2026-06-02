@@ -35,6 +35,7 @@ from app.models.user import User
 from app.shared.agent import build_graph
 from app.shared.agent.tools import ALL_TOOLS
 from app.shared.voice.schema import AntiSpoofResult, ASVResult, VoiceResponseData
+from app.shared.voice.message_utils import tts_text_from_messages
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
 
@@ -145,7 +146,7 @@ async def _handle_normal_flow(
         config=config,
     )
 
-    response_text = result["messages"][-1].content
+    response_text = tts_text_from_messages(result["messages"])
 
     # 3. TTS: 텍스트 → MP3
     audio_mp3 = await synthesize_speech(response_text)
@@ -158,6 +159,9 @@ async def _handle_normal_flow(
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=result.get("awaiting_asv_audio", False),
         awaiting_memo_decision=result.get("awaiting_memo_decision", False),
+        awaiting_transfer_clarification=result.get(
+            "awaiting_transfer_clarification", False
+        ),
         transcript=transcript,
     )
 
@@ -354,7 +358,7 @@ async def _proceed_after_asv_success(
         config=config,
     )
 
-    response_text = result["messages"][-1].content
+    response_text = tts_text_from_messages(result["messages"])
     audio_mp3 = await synthesize_speech(response_text)
 
     return VoiceResponseData(
@@ -364,6 +368,9 @@ async def _proceed_after_asv_success(
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=False,
         awaiting_memo_decision=result.get("awaiting_memo_decision", False),
+        awaiting_transfer_clarification=result.get(
+            "awaiting_transfer_clarification", False
+        ),
         transcript=None,
     )
 

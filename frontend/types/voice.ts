@@ -42,6 +42,11 @@ export interface VoiceResponseData {
   awaiting_memo_decision: boolean;
 
   /**
+   * 전화·계좌만 말한 뒤 송금 여부(네/아니오) 확인 대기.
+   */
+  awaiting_transfer_clarification?: boolean;
+
+  /**
    * STT 변환 결과 텍스트 (사용자가 말한 내용).
    * 정상 흐름에서만 채워지며 ASV 인증 흐름에서는 null.
    */
