@@ -41,7 +41,9 @@ export default function DevLoginScreen() {
         if (result.success) {
           router.replace('/home'); 
         } else {
-          if (result.error === 'missing_usage_description' || result.error === 'not_available') {
+          // TS의 엄격한 타입 검사를 피하기 위해 any로 캐스팅하여 에러 코드를 확인합니다.
+          const errorCode = (result as any).error;
+          if (errorCode === 'missing_usage_description' || errorCode === 'not_available') {
             Alert.alert(
               'Face ID 시뮬레이션 (Expo Go)',
               '현재 사용 중인 Expo Go 앱은 애플 정책상 Face ID 테스트를 제한하고 있습니다.\n테스트를 위해 Face ID 인증을 통과한 것으로 처리합니다!',
@@ -94,7 +96,7 @@ export default function DevLoginScreen() {
         if (result.data.hasVoiceRegistered) {
           router.replace('/home');
         } else {
-          router.replace('/dev/voice-register');
+          router.replace('/voice-register');
         }
       } else {
         Alert.alert('로그인 실패 🚫', result.message || '인증에 실패했습니다.');

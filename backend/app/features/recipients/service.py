@@ -266,6 +266,7 @@ def lookup_recipient_by_voice(
         # 0명 또는 동명이인 → None (재입력 유도)
         return None
     return resolve_by_id(db, user_uuid, str(matches[0].recipient_id))
+
 def sync_device_contacts(
     db: Session,
     user_uuid: uuid.UUID,

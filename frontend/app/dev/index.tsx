@@ -23,7 +23,7 @@ export default function DevHubScreen() {
           style={[styles.link, { backgroundColor: '#3f1a1a', borderColor: '#F87171', marginBottom: 8 }]} 
           onPress={() => {
             clearTokens();
-            router.replace('/dev/login');
+            router.replace('/login');
           }}
         >
           <Text style={[styles.linkText, { color: '#F87171' }]}>🗑️ 토큰 및 상태 초기화 (로그아웃)</Text>

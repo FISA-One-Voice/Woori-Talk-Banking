@@ -63,7 +63,7 @@ export default function DevVoiceRegisterScreen() {
         }
       });
     } else if (step === 'SUCCESS') {
-      speakWithSpeaker("목소리 등록이 완료되었습니다. 이제부터 화면을 길게 누르면 어시스턴트를 호출할 수 있으며, 안내 도중 화면에 알파벳 브이 자를 그리면 음성을 즉시 중단할 수 있습니다.", { language: 'ko-KR', rate: 0.9 });
+      speakWithSpeaker("목소리 등록이 완료되었습니다. 이제부터 화면을 길게 누르면 어시스턴트를 호출할 수 있으며, 안내 도중 화면에 알파벳 브이 자를 그리면 음성을 즉시 중단할 수 있습니다. 이제 목소리로 간편하게 이용하세요 화면 하단의 버튼을 눌러 홈 화면으로 이동하세요", { language: 'ko-KR', rate: 0.9 });
     } else if (step === 'FAIL') {
       speakWithSpeaker("목소리 인식에 실패했습니다. 조용한 곳에서 다시 시도해 주세요.", { language: 'ko-KR', rate: 0.9 });
     }
@@ -222,18 +222,26 @@ export default function DevVoiceRegisterScreen() {
           type: isWav ? 'audio/wav' : 'audio/m4a'
         } as any);
       });
-
-      const response = await apiClient.post<ApiResponse>('/api/voice/register', formData, {
+      
+      const token = useAuthStore.getState().token;
+      const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+      
+      const response = await fetch(`${baseUrl}/api/voice/register`, {
+        method: 'POST',
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`,
         },
-        timeout: 60000,
+        body: formData,
       });
       
-      if (response.data.success) {
+      const data = await response.json();
+
+      if (response.ok && data.success) {
         useAuthStore.getState().setHasVoiceRegistered(true);
         setStep('SUCCESS');
       } else {
+        console.error('Server returned error:', data);
+        Alert.alert('업로드 실패', `서버 응답: ${JSON.stringify(data.detail || data.message)}`);
         setStep('FAIL');
       }
     } catch (error) {
