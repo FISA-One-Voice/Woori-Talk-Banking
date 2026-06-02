@@ -7,7 +7,7 @@ import { apiClient, ApiResponse } from '@/utils/api';
 import { getTtsMessage } from '@/utils/errorHandler';
 import { registerSound, stopAllTts } from '@/utils/ttsManager';
 import { Audio } from 'expo-av';
-import { Stack, useRouter } from 'expo-router';
+import { Href, Stack, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useCallback, useRef, useState } from 'react';
 import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
@@ -63,6 +63,16 @@ function isVGesture(pts: Array<{ x: number; y: number }>): boolean {
   if (bottomY - endY < 60) return false;
 
   return true;
+}
+
+/** 에이전트 navigate_to → Expo Router replace (스택 단일 유지) */
+function navigateFromAgent(router: ReturnType<typeof useRouter>, navigateTo: string): void {
+  if (navigateTo === 'home') {
+    transferStore.getState().reset();
+    router.replace('/home' as Href);
+    return;
+  }
+  router.replace(`/${navigateTo}` as Href);
 }
 
 // ── 루트 레이아웃 ─────────────────────────────────────────────────────────────
@@ -148,11 +158,7 @@ export default function RootLayout() {
       }
 
       if (data.navigate_to) {
-        if (data.navigate_to === 'home') {
-          router.replace('/home');
-        } else {
-          router.push(`/${data.navigate_to}`);
-        }
+        navigateFromAgent(router, data.navigate_to);
       }
     },
     [router],

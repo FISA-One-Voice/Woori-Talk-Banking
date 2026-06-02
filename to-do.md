@@ -42,12 +42,71 @@
   → add_note(last_tx_id) 또는 홈 이동
 ```
 
+### 2026-06-02 — 화면 제어 3계층 리팩터 (transfer + complete)
+
+- `_layout`: `router.replace`, `navigateFromAgent`, home 시 `transferStore.reset`
+- `transfer/stepResolver.ts`, `views/*`, `index.tsx` (store 구독, TtsBubble 제거)
+- `complete.tsx`: `goHome` + replace, `completeStepResolver`, views 분리
+- `.cursorrules`, `voice-pipeline-flow.md` 3계층 문서
+
 ### 후속 과제 (선택)
 
 - [x] `voice-pipeline-flow.md` 플로우 다이어그램 갱신
+- [ ] 실기기 E2E (voice-pipeline 체크리스트) — 3계층 리팩터 후 재검증 권장
 - [ ] Mock 모드(`USE_MOCK_TOOLS=true`)에서 이체 후 `txId`·메모 턴 연동
 - [ ] LLM 인텐트 프롬프트에 `add_note` / 메모 제안 예시 발화 추가
 - [ ] 버튼으로 메모 저장 시에도 에이전트 TTS 완료 안내 통일 여부 검토
+
+---
+
+## 2026-06-02 — 화면 제어 3계층 리팩터 (transfer + complete) — 상세
+
+> 메모·`tx_id` 작업 **이후** 진행. 요약은 위 「화면 제어 3계층 리팩터」 항목 참고.
+
+### 배경
+
+- 「분기」를 세 계층으로 분리해 역할 혼선을 줄임.
+  1. **백엔드 에이전트** — 슬롯·TTS·`navigate_to` (`resolve_node` = 수취인 DB 검증)
+  2. **`_layout.tsx`** — `router.replace(navigate_to)` 로 **라우트만**
+  3. **`stepResolver.ts` + `index.tsx`** — 같은 `/transfer` URL 안 **뷰만** 전환
+- auto-transfer 담당자 `stepResolver` 패턴을 **참고만** 하고, 구현 scope는 **transfer + complete** 만.
+- 스택은 `router.replace()` 단일 유지 (뒤로가기 시 transfer/complete 잔류 방지).
+
+### 완료한 작업
+
+| 계층 | 파일 | 내용 |
+|------|------|------|
+| Layer 2 | `frontend/app/_layout.tsx` | `navigateFromAgent()` — 전 경로 `router.replace`; `home` 시 `transferStore.reset()`; `transfer/complete` 시 `txReceipt` 유지 |
+| Layer 3 | `frontend/app/transfer/stepResolver.ts` | `resolveTransferStep(slots, awaitingAsv)` — `input-alias` / `input-amount` / `confirm` / `asv-pending`, `STEP_INDEX`, `STEP_TOTAL=3`, `formatAmount` |
+| Layer 3 | `frontend/app/transfer/index.tsx` | `useVoiceResponseStore` 구독 → `step = touchStep ?? voiceStep`; `switch(step)` 뷰만; `TtsBubble autoPlay` 제거 |
+| Layer 3 | `frontend/app/transfer/views/` | `AliasStepView`, `AmountStepView`, `ConfirmStepView`, `AsvStepView` |
+| Complete | `frontend/app/transfer/complete.tsx` | `goHome()` = `reset` + `replace('/home')`; `router.back()` 제거 |
+| Complete | `frontend/app/transfer/completeStepResolver.ts` | 터치 phase: `summary` / `memo_done` / `error` |
+| Complete | `frontend/app/transfer/views/Complete*.tsx` | `CompleteSummaryView`, `CompleteMemoDoneView`, `CompleteErrorView` |
+| Dev | `frontend/app/dev/transfer-test.tsx` | mock에 `awaiting_memo_decision` 추가, `router.replace` |
+| 문서 | `.cursorrules` | 3계층 표, `router.replace`, `resolve_node` ≠ `stepResolver` |
+| 문서 | `voice-pipeline-flow.md` | 3계층 섹션, `router.replace`, transfer `stepResolver`·complete 라우트 분리 |
+
+### 3계층 동작 요약 (이체 시나리오)
+
+| 사용자 발화 | 에이전트 | `_layout` | `stepResolver` → index |
+|-------------|----------|-----------|-------------------------|
+| "엄마한테 이체해줘" | `resolve_node`, `navigate_to=transfer` | `replace('/transfer')` | `input-amount` (recipient 있음) |
+| "30만원" | `navigate_to=null`, slots에 amount | 라우트 유지 | `confirm` |
+| "네" | `awaiting_asv_audio=true` | Overlay `awaiting_asv` | `asv-pending` |
+| ASV 후 이체 성공 | `navigate_to=transfer/complete` | `replace('/transfer/complete')` | (unmount) |
+| "식비" / "건너뛰기" | 메모 저장 또는 `navigate_to=home` | `replace('/home')` + reset | complete unmount |
+
+### 검증
+
+- `cd frontend && npx tsc --noEmit` 통과
+- 시뮬: `/dev/transfer-test` 시나리오 ①~④
+- [ ] 실기기 E2E (`voice-pipeline-flow.md` 체크리스트 — Layer 2·3·Complete)
+
+### 후속 과제 (3계층 리팩터 기준)
+
+- [ ] 실기기: 슬롯 턴 시 URL `/transfer` 유지, confirm/ASV 뷰 전환, 메모 음성·터치
+- [ ] 터치 메모 후 음성 `awaiting_memo_decision` 잔존 시 중복 저장 여부 확인
 
 ---
 

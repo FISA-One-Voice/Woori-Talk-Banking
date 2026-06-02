@@ -11,7 +11,7 @@ _layout.tsx (글로벌)
   ├─ POST /api/voice/voice
   └─ VoiceResponseData 수신
         ├─ audio        → TTS 재생
-        ├─ navigate_to  → router.push() 화면 이동
+        ├─ navigate_to  → router.replace() 화면 이동 (스택 단일 유지)
         ├─ awaiting_asv_audio / awaiting_confirmation / awaiting_memo_decision
         │                     → VoiceStatusOverlay 상태 변경
         ├─ navigate_to=transfer/complete + collected_slots.txId
@@ -52,6 +52,21 @@ slot_fill_node → END
 confirm_node   → END
 execute_node   → END
 ```
+
+---
+
+## 화면 제어 3계층 (혼동 주의)
+
+| 계층 | 코드 | 하는 일 |
+|------|------|---------|
+| 1. 백엔드 에이전트 | `graph.py` (`intent_node`, **`resolve_node`**, `slot_fill`, `execute`) | 슬롯·TTS·`navigate_to` — **수취인 DB 검증은 `resolve_node`** |
+| 2. 글로벌 | `_layout.tsx` | `router.replace(navigate_to)` — **라우트(URL)만** |
+| 3. 기능 화면 | `app/transfer/stepResolver.ts` + `index.tsx` | 같은 `/transfer` 안 **뷰만** 전환 (`recipient`/`amount` 슬롯) |
+
+- **`resolve_node` ≠ `stepResolver.ts`** (이름만 비슷함).
+- **`/transfer/complete`** 는 별도 라우트 — `transfer/stepResolver` 범위 밖. 터치 메모는 `complete.tsx`, 음성 메모는 에이전트+Overlay.
+
+구현: [`frontend/app/transfer/stepResolver.ts`](frontend/app/transfer/stepResolver.ts), [`frontend/app/transfer/index.tsx`](frontend/app/transfer/index.tsx), [`frontend/app/transfer/complete.tsx`](frontend/app/transfer/complete.tsx).
 
 ---
 
@@ -208,20 +223,19 @@ const isAwaitingAsv = lastResponse?.awaiting_asv_audio ?? false;
 
 #### stepResolver 로직
 
-```typescript
-// stepResolver.ts
-export type TransferStep = 'input-alias' | 'input-amount' | 'confirm' | 'asv-pending';
+슬롯 키는 백엔드와 동일: **`recipient`**, **`amount`**. UI 단계명만 `input-alias`.
 
-export function resolveTransferStep(
-  slots: Record<string, unknown>,
-  awaitingAsv: boolean,
-): TransferStep {
-  if (awaitingAsv)   return 'asv-pending';
-  if (!slots.alias)  return 'input-alias';
+```typescript
+// app/transfer/stepResolver.ts (auto-transfer 패턴과 동형, cancel/cycle 없음)
+export function resolveTransferStep(slots, awaitingAsv): TransferStep {
+  if (awaitingAsv) return 'asv-pending';
+  if (!slots.recipient) return 'input-alias';
   if (!slots.amount) return 'input-amount';
   return 'confirm';
 }
 ```
+
+`index.tsx`는 `useVoiceResponseStore` 구독 → `switch(step)` → `views/*` 만 렌더 (TtsBubble autoPlay 없음).
 
 > `alias` 슬롯이 채워지면 에이전트가 즉시 resolve_node를 실행해 수취인 검증함.
 > 검증 실패 시 alias가 null로 초기화되어 input-alias 단계로 복귀함.
