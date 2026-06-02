@@ -34,9 +34,14 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
 
   if (__DEV__) {
     console.log('[STT]', data.data.transcript ?? '(인식 결과 없음)');
-    console.log('[Agent] navigate_to=%s pending=%s', data.data.navigate_to, data.data.pending_action);
-    console.log('[Agent] slots=%o', data.data.collected_slots);
-    console.log('[Agent] awaiting_confirmation=%s awaiting_asv=%s', data.data.awaiting_confirmation, data.data.awaiting_asv_audio);
+    console.log('[Agent]', {
+      navigate_to: data.data.navigate_to,
+      pending_action: data.data.pending_action,
+      slots: data.data.collected_slots,
+      awaiting_confirmation: data.data.awaiting_confirmation,
+      awaiting_asv_audio: data.data.awaiting_asv_audio,
+      awaiting_transfer_clarification: data.data.awaiting_transfer_clarification ?? false,
+    });
   }
 
   return data.data;

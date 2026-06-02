@@ -2,12 +2,13 @@ import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay'
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { useTransferStore as transferStore } from '@/store/transferStore';
+import { useAuthStore } from '@/store/authStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { getTtsMessage } from '@/utils/errorHandler';
 import { registerSound, stopAllTts } from '@/utils/ttsManager';
 import { Audio } from 'expo-av';
-import { Stack, useRouter } from 'expo-router';
+import { Href, Stack, useRouter } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useCallback, useRef, useState } from 'react';
 import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
@@ -65,6 +66,16 @@ function isVGesture(pts: Array<{ x: number; y: number }>): boolean {
   return true;
 }
 
+/** 에이전트 navigate_to → Expo Router replace (스택 단일 유지) */
+function navigateFromAgent(router: ReturnType<typeof useRouter>, navigateTo: string): void {
+  if (navigateTo === 'home') {
+    transferStore.getState().reset();
+    router.replace('/home' as Href);
+    return;
+  }
+  router.replace(`/${navigateTo}` as Href);
+}
+
 // ── 루트 레이아웃 ─────────────────────────────────────────────────────────────
 
 export default function RootLayout() {
@@ -113,20 +124,30 @@ export default function RootLayout() {
 
       if (data.awaiting_asv_audio) {
         setVoiceState('awaiting_asv');
-      } else if (data.awaiting_confirmation) {
+      } else if (data.awaiting_memo_decision) {
+        setVoiceState('awaiting_memo');
+      } else if (data.awaiting_confirmation || data.awaiting_transfer_clarification) {
         setVoiceState('awaiting_confirm');
       } else {
         setVoiceState('idle');
       }
 
       if (data.navigate_to === 'transfer/complete') {
-        const recipientName = (prevSlots.recipient as string) ?? '';
-        const amount = prevSlots.amount ? Number(prevSlots.amount) : 0;
+        const slotsForReceipt = {
+          ...prevSlots,
+          ...(data.collected_slots ?? {}),
+        };
+        const recipientName = (slotsForReceipt.recipient as string) ?? '';
+        const amount = slotsForReceipt.amount ? Number(slotsForReceipt.amount) : 0;
+        const txId =
+          (slotsForReceipt.txId as string) ??
+          (slotsForReceipt.tx_id as string) ??
+          '';
         if (recipientName && amount) {
           transferStore.getState().setTxReceipt({
-            txId: '',
+            txId,
             toName: recipientName,
-            toBankName: '',
+            toBankName: (slotsForReceipt.toBankName as string) ?? '',
             amount,
           });
         }
@@ -138,11 +159,7 @@ export default function RootLayout() {
       }
 
       if (data.navigate_to) {
-        if (data.navigate_to === 'home') {
-          router.replace('/home');
-        } else {
-          router.push(`/${data.navigate_to}`);
-        }
+        navigateFromAgent(router, data.navigate_to);
       }
     },
     [router],
@@ -172,15 +189,17 @@ export default function RootLayout() {
     setVoiceState,
   );
 
+  const hasVoiceRegistered = useAuthStore((state) => state.hasVoiceRegistered);
+
   return (
     <Pressable
       style={styles.root}
-      onLongPress={handleLongPress}
-      onPressOut={handlePressOut}
+      onLongPress={hasVoiceRegistered ? handleLongPress : undefined}
+      onPressOut={hasVoiceRegistered ? handlePressOut : undefined}
       delayLongPress={500}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onTouchStart={hasVoiceRegistered ? handleTouchStart : undefined}
+      onTouchMove={hasVoiceRegistered ? handleTouchMove : undefined}
+      onTouchEnd={hasVoiceRegistered ? handleTouchEnd : undefined}
     >
       <Stack screenOptions={{ headerShown: false }} />
       <VoiceStatusOverlay state={voiceState} />

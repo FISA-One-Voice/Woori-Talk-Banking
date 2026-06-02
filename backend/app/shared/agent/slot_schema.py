@@ -4,13 +4,19 @@ Design Ref (Issue #21):
     §slot_schema.py — SLOT_SCHEMA / SCREEN_MAP / ASV_REQUIRED_ACTIONS
 """
 
+from app.features.recipients.service import classify_recipient_input
+
 # ── 액션별 필요 슬롯 ─────────────────────────────────────────────────────────────
 # key: pending_action 값 (intent_node가 설정)
 # value: 슬롯 이름 목록 (각 슬롯명은 service.py 파라미터명과 일치)
 SLOT_SCHEMA: dict[str, list[str]] = {
     "transfer": ["recipient", "amount"],
     "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
+    "add_note": ["memo"],
 }
+
+# SCREEN_MAP에 없는 음성 전용 인텐트 (화면 이동 없음)
+VOICE_ONLY_INTENTS: set[str] = {"add_note"}
 
 # ── intent → 프론트엔드 화면 이름 매핑 ────────────────────────────────────────────
 # Expo Router 경로명을 기준으로 정의한다.
@@ -39,10 +45,19 @@ ASV_REQUIRED_ACTIONS: set[str] = {
     "auto_transfer",  # 자동이체 등록
 }
 
+# ── 이체 완료 후 메모 제안 (에이전트 TTS) ─────────────────────────────────────────
+MEMO_OFFER_SUFFIX: str = (
+    " 메모를 남기시겠어요? 식비, 교통비, 쇼핑, 의료비, 문화생활, 기타 중 말씀해 주시거나, "
+    "건너뛰기라고 말씀해 주세요."
+)
+
 # ── 슬롯별 TTS 질문 템플릿 ────────────────────────────────────────────────────────
 # slot_fill_node에서 첫 번째 누락 슬롯의 질문을 TTS로 반환한다.
 SLOT_QUESTIONS: dict[str, str] = {
-    "recipient": "누구에게 보낼까요? 별명, 성함, 전화번호 모두 괜찮습니다.",
+    "recipient": "누구에게 보낼까요? 별명이나 이름을 말씀해 주세요.",
+    "bank_name": (
+        "어느 은행 계좌인가요? 우리은행, 국민은행처럼 말씀해 주세요."
+    ),
     "amount": "얼마를 보낼까요?",
     "cycle": "매월 또는 매주 중 어떤 주기로 보낼까요?",
     "scheduled_day": "매월 며칠에 이체할까요?",
@@ -78,4 +93,21 @@ ACTION_LABELS: dict[str, str] = {
 SCREEN_ONLY_INTENTS: set[str] = {"event"}
 
 # ── 유효한 인텐트 목록 ─────────────────────────────────────────────────────────────
-VALID_INTENTS: set[str] = set(SCREEN_MAP.keys())
+VALID_INTENTS: set[str] = set(SCREEN_MAP.keys()) | VOICE_ONLY_INTENTS
+
+
+def transfer_missing_slots(collected_slots: dict) -> list[str]:
+    """transfer 액션의 누락 슬롯 (미등록 계좌는 bank_name 동적 포함)."""
+    missing: list[str] = []
+    recipient = collected_slots.get("recipient")
+    if not recipient:
+        missing.append("recipient")
+    elif (
+        classify_recipient_input(str(recipient)) == "account"
+        and not collected_slots.get("recipient_id")
+        and not collected_slots.get("bank_name")
+    ):
+        missing.append("bank_name")
+    if not collected_slots.get("amount"):
+        missing.append("amount")
+    return missing

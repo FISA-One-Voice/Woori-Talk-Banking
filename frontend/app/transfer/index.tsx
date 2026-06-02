@@ -1,190 +1,147 @@
-import { useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { TopBar } from '@/components/layout';
-import { TtsBubble, StatusBadge, FingerprintIcon } from '@/components/feedback';
-import { SummaryBox, RecipientList, ActionButton } from '@/components/display';
-import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
+import { TopBar, StepIndicator } from '@/components/layout';
+import { COLORS, LAYOUT } from '@/constants/theme';
 import { useTransferStore } from '@/store/transferStore';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { fetchRecentRecipients, executeTransfer } from '@/services/transferService';
 import type { RecipientItem } from '@/components/display';
+import {
+  resolveTransferStep,
+  STEP_INDEX,
+  STEP_TOTAL,
+  type TransferStep,
+} from './stepResolver';
+import { AliasStepView } from './views/AliasStepView';
+import { AmountStepView } from './views/AmountStepView';
+import { ConfirmStepView } from './views/ConfirmStepView';
+import { AsvStepView } from './views/AsvStepView';
 
-type Step = 'recipient' | 'amount' | 'confirm' | 'asv';
-
-function getInitialStep(): Step {
-  const lastResponse = useVoiceResponseStore.getState().lastResponse;
-  if (!lastResponse) return 'recipient';
-  const { awaiting_asv_audio, collected_slots } = lastResponse;
-  if (awaiting_asv_audio) return 'asv';
-  if (collected_slots?.recipient && collected_slots?.amount) return 'confirm';
-  if (collected_slots?.recipient) return 'amount';
-  return 'recipient';
+function recipientFromSlots(slots: Record<string, unknown>): RecipientItem | null {
+  const name = (slots.recipient as string) ?? '';
+  if (!name) return null;
+  const bankName =
+    (slots.bank_name as string) ?? (slots.bankName as string) ?? '';
+  const recipientId =
+    (slots.recipient_id as string) ?? (slots.recipientId as string) ?? null;
+  const accountMasked =
+    typeof slots.account_number === 'string'
+      ? slots.account_number.replace(/\d(?=\d{4})/g, '*')
+      : '';
+  return {
+    recipientId,
+    toName: name,
+    toBankName: bankName,
+    accountMasked,
+  };
 }
 
-const AMOUNT_PRESETS = [10000, 30000, 50000, 100000, 300000, 500000];
-
 export default function TransferScreen() {
-  const { setSelectedRecipient, setAmount, setTxReceipt, reset } = useTransferStore();
-  const [step, setStep] = useState<Step>(getInitialStep);
+  const lastResponse = useVoiceResponseStore((s) => s.lastResponse);
+  const { setSelectedRecipient, setAmount, setTxReceipt, reset, selectedRecipient, amount } =
+    useTransferStore();
+
+  const slots = lastResponse?.collected_slots ?? {};
+  const awaitingAsv = lastResponse?.awaiting_asv_audio ?? false;
+
+  const voiceStep = useMemo(
+    () => resolveTransferStep(slots, awaitingAsv),
+    [lastResponse, slots, awaitingAsv],
+  );
+
+  const [touchStep, setTouchStep] = useState<TransferStep | null>(null);
   const [recentList, setRecentList] = useState<RecipientItem[]>([]);
-  const [selected, setSelected] = useState<RecipientItem | null>(() => {
-    const slots = useVoiceResponseStore.getState().lastResponse?.collected_slots;
-    const name = (slots?.recipient as string) ?? null;
-    if (!name) return null;
-    return { recipientId: null, toName: name, toBankName: '', accountMasked: '' };
-  });
-  const [selectedAmount, setSelectedAmount] = useState<number | null>(() => {
-    const slots = useVoiceResponseStore.getState().lastResponse?.collected_slots;
-    return slots?.amount ? Number(slots.amount) : null;
-  });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setTouchStep(null);
+  }, [lastResponse]);
 
   useEffect(() => {
     fetchRecentRecipients()
       .then((list) => setRecentList(list))
       .catch(() => undefined);
-    syncFromAgentSlots();
   }, []);
 
-  function syncFromAgentSlots() {
-    const lastResponse = useVoiceResponseStore.getState().lastResponse;
-    if (!lastResponse) return;
+  useEffect(() => {
+    const fromSlots = recipientFromSlots(slots);
+    if (fromSlots) setSelectedRecipient(fromSlots);
+    if (slots.amount != null) setAmount(Number(slots.amount));
+  }, [lastResponse, slots.recipient, slots.amount, setSelectedRecipient, setAmount]);
 
-    const { collected_slots, awaiting_asv_audio } = lastResponse;
-    const slotRecipient = (collected_slots?.recipient as string) ?? null;
-    const slotAmount = collected_slots?.amount ? Number(collected_slots.amount) : null;
+  const step = touchStep ?? voiceStep;
 
-    if (slotRecipient) {
-      const item: RecipientItem = {
-        recipientId: null,
-        toName: slotRecipient,
-        toBankName: '',
-        accountMasked: '',
-      };
-      setSelected(item);
-      setSelectedRecipient(item);
-    }
-
-    if (slotAmount) {
-      setSelectedAmount(slotAmount);
-      setAmount(slotAmount);
-    }
-
-    if (awaiting_asv_audio) {
-      setStep('asv');
-    } else if (slotRecipient && slotAmount) {
-      setStep('confirm');
-    } else if (slotRecipient) {
-      setStep('amount');
-    }
-  }
+  const displayRecipient =
+    selectedRecipient ?? recipientFromSlots(slots);
+  const displayAmount =
+    amount ?? (slots.amount != null ? Number(slots.amount) : null);
 
   const handleSelectRecipient = (item: RecipientItem) => {
-    setSelected(item);
     setSelectedRecipient(item);
-    setStep('amount');
+    setTouchStep('input-amount');
   };
 
-  const handleSelectAmount = (amount: number) => {
-    setSelectedAmount(amount);
-    setAmount(amount);
-    setStep('confirm');
+  const handleSelectAmount = (amt: number) => {
+    setAmount(amt);
+    setTouchStep('confirm');
   };
 
   const handleConfirm = () => {
-    setStep('asv');
+    setTouchStep('asv-pending');
   };
 
   const handleAsvSkip = async () => {
-    if (!selected || !selectedAmount) return;
+    if (!displayRecipient || displayAmount == null) return;
     setLoading(true);
     try {
-      const receipt = await executeTransfer(selected, selectedAmount);
+      const receipt = await executeTransfer(displayRecipient, displayAmount);
       setTxReceipt(receipt);
-      router.push('/transfer/complete');
+      router.replace('/transfer/complete');
     } catch {
-      router.push('/transfer/complete');
+      router.replace('/transfer/complete');
     } finally {
       setLoading(false);
     }
   };
 
   const handleBack = () => {
-    if (step === 'amount') setStep('recipient');
-    else if (step === 'confirm') setStep('amount');
-    else if (step === 'asv') setStep('confirm');
-    else { reset(); router.back(); }
+    if (step === 'input-amount') setTouchStep('input-alias');
+    else if (step === 'confirm') setTouchStep('input-amount');
+    else if (step === 'asv-pending') setTouchStep('confirm');
+    else {
+      reset();
+      router.replace('/home');
+    }
   };
-
-  const summaryRows = [
-    { label: '받는 분', value: selected?.toName ?? '' },
-    { label: '은행', value: selected?.toBankName ?? '' },
-    { label: '금액', value: selectedAmount ? `${selectedAmount.toLocaleString()}원` : '', variant: 'yellow' as const },
-  ].filter((r) => r.value);
 
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.body}>
         <TopBar variant="back" title="송금" onBack={handleBack} />
+        <StepIndicator total={STEP_TOTAL} current={STEP_INDEX[step]} />
         <ScrollView contentContainerStyle={styles.content}>
-
-          {step === 'recipient' && (
-            <>
-              <TtsBubble message="누구에게 보내시겠어요?" autoPlay />
-              <StatusBadge text="수취인 선택" />
-              <RecipientList items={recentList} onSelect={handleSelectRecipient} />
-            </>
+          {step === 'input-alias' && (
+            <AliasStepView recentList={recentList} onSelect={handleSelectRecipient} />
           )}
-
-          {step === 'amount' && (
-            <>
-              <TtsBubble message={`${selected?.toName}님께 얼마를 보낼까요?`} autoPlay />
-              <StatusBadge text="금액 선택" />
-              <View style={styles.amountGrid}>
-                {AMOUNT_PRESETS.map((amt) => (
-                  <TouchableOpacity
-                    key={amt}
-                    style={styles.amountBtn}
-                    onPress={() => handleSelectAmount(amt)}
-                  >
-                    <Text style={styles.amountText}>{amt.toLocaleString()}원</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
+          {step === 'input-amount' && displayRecipient && (
+            <AmountStepView
+              recipientName={displayRecipient.toName}
+              onSelectAmount={handleSelectAmount}
+            />
           )}
-
-          {step === 'confirm' && (
-            <>
-              <TtsBubble
-                message={`${selected?.toName}님께 ${selectedAmount?.toLocaleString()}원 이체할까요?`}
-                autoPlay
-              />
-              <SummaryBox rows={summaryRows} />
-              <View style={styles.row}>
-                <ActionButton label="취소" variant="outline" flex={1} onPress={() => setStep('amount')} />
-                <ActionButton label="확인" flex={2} onPress={handleConfirm} />
-              </View>
-            </>
+          {step === 'confirm' && displayRecipient && displayAmount != null && (
+            <ConfirmStepView
+              recipientName={displayRecipient.toName}
+              bankName={displayRecipient.toBankName}
+              amount={displayAmount}
+              onCancel={() => setTouchStep('input-amount')}
+              onConfirm={handleConfirm}
+            />
           )}
-
-          {step === 'asv' && (
-            <>
-              <TtsBubble message="목소리로 인증해 주세요." autoPlay />
-              <FingerprintIcon />
-              <StatusBadge text="음성 인증 중" />
-              {__DEV__ && (
-                <ActionButton
-                  label="[개발] 인증 건너뛰기"
-                  variant="outline"
-                  onPress={handleAsvSkip}
-                  disabled={loading}
-                />
-              )}
-            </>
+          {step === 'asv-pending' && (
+            <AsvStepView loading={loading} onDevSkip={handleAsvSkip} />
           )}
-
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -195,29 +152,4 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
   body: { flex: 1, paddingHorizontal: LAYOUT.paddingMedium },
   content: { paddingBottom: 40, gap: 12 },
-  amountGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 8,
-  },
-  amountBtn: {
-    width: '47%',
-    paddingVertical: 18,
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: LAYOUT.borderRadius,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-  },
-  amountText: {
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textMain,
-    fontWeight: '600',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
 });
