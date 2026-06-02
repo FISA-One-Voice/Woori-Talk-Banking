@@ -59,6 +59,32 @@ def _get_graph():
 _MAX_ASV_RETRIES = 3
 
 
+# ── 상태 초기화 ─────────────────────────────────────────────────────────────────
+
+
+async def reset_voice_state(user_id: str) -> None:
+    """유저의 LangGraph 대화 상태를 초기화한다.
+
+    자동이체 화면 진입 시 이전 세션 슬롯이 남아있는 문제를 방지한다.
+    """
+    graph = _get_graph()
+    config = {"configurable": {"thread_id": user_id}}
+    await graph.aupdate_state(
+        config,
+        {
+            "pending_action": None,
+            "collected_slots": {},
+            "awaiting_confirmation": False,
+            "awaiting_asv_audio": False,
+            "execution_ready": False,
+            "recipient_validated": False,
+            "asv_retry_count": 0,
+            "navigate_to": None,
+        },
+        as_node="intent_node",
+    )
+
+
 # ── 공개 진입점 ─────────────────────────────────────────────────────────────────
 
 
@@ -151,12 +177,22 @@ async def _handle_normal_flow(
     audio_mp3 = await synthesize_speech(response_text)
     audio_b64 = base64.b64encode(audio_mp3).decode()
 
+    awaiting_confirmation = result.get("awaiting_confirmation", False)
+    awaiting_asv_audio = result.get("awaiting_asv_audio", False)
+
+    # 확인/ASV 대기 중에는 navigate_to를 null로 — 같은 화면 재진입 방지
+    navigate_to = (
+        None
+        if awaiting_confirmation or awaiting_asv_audio
+        else result.get("navigate_to")
+    )
+
     return VoiceResponseData(
         audio=audio_b64,
-        navigate_to=result.get("navigate_to"),
+        navigate_to=navigate_to,
         collected_slots=result.get("collected_slots") or {},
-        awaiting_confirmation=result.get("awaiting_confirmation", False),
-        awaiting_asv_audio=result.get("awaiting_asv_audio", False),
+        awaiting_confirmation=awaiting_confirmation,
+        awaiting_asv_audio=awaiting_asv_audio,
         transcript=transcript,
         pending_action=result.get("pending_action"),
     )
@@ -210,6 +246,10 @@ async def _handle_asv_flow(
     Raises:
         ASVError: 사용자 음성 미등록 또는 ASV EC2 서버 통신 오류.
     """
+    if settings.MOCK_ASV:
+        logger.info("MOCK_ASV=true — ASV 인증 우회, 즉시 성공 처리")
+        return await _proceed_after_asv_success(user_id, config, graph)
+
     state_snapshot = graph.get_state(config)
     retry_count = (
         state_snapshot.values.get("asv_retry_count", 0) if state_snapshot.values else 0

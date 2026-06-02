@@ -33,6 +33,9 @@ ALL_TOOLS: list = [
 from app.core.config import settings
 from app.shared.agent.tools.event import get_event_list
 from app.shared.agent.tools.transfer import execute_transfer
+from app.shared.agent.tools.lookup_recipient import lookup_recipient
+from app.shared.agent.tools.execute_auto_transfer import execute_auto_transfer
+from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
 from app.shared.agent.tools.mock_tools import (
     mock_execute_transfer,
     mock_get_balance,
@@ -64,12 +67,13 @@ MOCK_TOOLS: list = [
 #   auto_transfer (D): from app.shared.agent.tools.auto_transfer import (
 #                          register_auto_transfer)
 _REAL_TOOLS: list = [
-    get_event_list,  # event 담당자 완료
-    execute_transfer,  # transfer 담당자 완료
-    # lookup_recipient,   # 공통 — tools/lookup_recipient.py 완성 후 주석 해제
-    # execute_balance,    # balance 담당자 — tools/balance.py 완성 후 주석 해제
-    # execute_history,    # history 담당자 — tools/history.py 완성 후 주석 해제
-    # register_auto_transfer,  # auto_transfer 담당자 — auto_transfer.py 완성 후 해제
+    get_event_list,
+    execute_transfer,
+    lookup_recipient,
+    execute_auto_transfer,
+    cancel_auto_transfer,
+    # execute_balance,
+    # execute_history,
 ]
 
 # ── 활성 tool 목록 ─────────────────────────────────────────────────────────────

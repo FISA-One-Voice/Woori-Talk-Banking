@@ -40,6 +40,7 @@ from app.shared.agent.slot_schema import (
     SCREEN_MAP,
     SCREEN_ONLY_INTENTS,
     SLOT_QUESTIONS,
+    SLOT_QUESTIONS_BY_ACTION,
     SLOT_SCHEMA,
     VALID_INTENTS,
 )
@@ -79,9 +80,21 @@ def _all_slots_filled(pending_action: str, collected_slots: dict) -> bool:
 
 
 def _missing_slots(pending_action: str, collected_slots: dict) -> list[str]:
-    """수집되지 않은 슬롯 이름 목록을 반환한다."""
+    """수집되지 않은 슬롯 이름 목록을 반환한다.
+
+    scheduled_day는 0(월요일)도 유효한 값이므로 is None으로 체크한다.
+    """
     required = SLOT_SCHEMA.get(pending_action, [])
-    return [s for s in required if not collected_slots.get(s)]
+    missing = []
+    for s in required:
+        val = collected_slots.get(s)
+        if s == "scheduled_day":
+            if val is None:
+                missing.append(s)
+        else:
+            if not val:
+                missing.append(s)
+    return missing
 
 
 def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
@@ -270,14 +283,21 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 f"수집된 슬롯: {json.dumps(slots, ensure_ascii=False)}"
             )
             context_lines.append(f"누락된 슬롯: {missing}")
-            context_lines.append(
-                f"★ 슬롯 채우기 진행 중 — intent는 반드시 null로 설정하고,"
-                f" 누락 슬롯 {missing}의 값을 extracted_slots에서만 채울 것."
-                " 사용자 발화가 새 인텐트처럼 보여도 절대 intent를 설정하지 말 것."
-            )
+            if missing:
+                context_lines.append(
+                    f"★ 슬롯 채우기 진행 중 — intent는 반드시 null로 설정하고,"
+                    f" 누락 슬롯 {missing}의 값을 extracted_slots에서만 채울 것."
+                    " 사용자 발화가 새 인텐트처럼 보여도 절대 intent를 설정하지 말 것."
+                )
 
         if state.get("awaiting_confirmation"):
-            context_lines.append("대기 상태: 사용자 확인('네'/'아니오') 대기 중")
+            context_lines.append(
+                "★ 대기 상태: 사용자 확인('네'/'아니오') 대기 중."
+                " '네', '응', '맞아', '그렇게 해줘' → user_confirmed=true 반드시 설정."
+                " '아니오', '취소', '됐어' → user_cancelled=true 반드시 설정."
+                " '6만원으로 바꿔줘', '수취인 변경' 등 슬롯 수정 발화 →"
+                " extracted_slots에 바꿀 값만 설정 (user_confirmed/cancelled는 false)."
+            )
 
         context_lines += [
             "",
@@ -296,11 +316,17 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "- intent: 진행 중인 액션이 없을 때만 설정."
             " 진행 중인 액션이 있으면 반드시 null.",
             "  transfer    : 일회성 이체 ('이체해줘', '보내줘', '송금해줘')",
-            "  auto_transfer: 정기·반복 이체 ('자동이체', '매달', '매주',"
-            " '정기적으로', '자동으로 보내줘')",
+            "  auto_transfer: 정기·반복 이체 ("
+            "'자동이체', '자동 송금', '정기 이체', '정기 송금',"
+            " '매달', '매월', '한달에 한번', '한달에 한번씩', '월 1회', '월마다',"
+            " '매주', '주마다', '일주일에 한번', '일주일마다', '주 1회',"
+            " '정기적으로', '주기적으로', '반복해서', '계속', '꾸준히',"
+            " '자동으로 보내줘', '고정으로 보내줘', 'N일마다',"
+            " '격주', '격월')",
             "  balance     : 잔액·거래내역 조회 ('잔액 얼마야', '내역 보여줘')",
             "  home        : 홈 화면 이동 ('홈 화면', '처음으로', '홈으로 가줘')",
-            "  ★ '매달', '매주', '자동이체' 키워드가 있으면 반드시 auto_transfer.",
+            "  ★ '매달', '매주', '자동이체', '한달에', '주마다', '매월', '정기',"
+            " '반복', '주기', '계속', '꾸준히', '고정' 키워드가 있으면 반드시 auto_transfer.",
             "- extracted_slots: 발화에서 파악한 슬롯 값 (없으면 {})."
             " 금액 슬롯 키는 'amount', 값은 원화 정수 문자열"
             " (예: '3만원'→'30000', '오만원'→'50000')."
@@ -313,7 +339,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "- scheduled_day: monthly일 때 날짜 정수(1-31). '15일'→15, '말일'→31."
             " ★ 자동이체에서 'N월마다'는 달(月)이 아닌 날짜로 해석:"
             " '10월마다'→scheduled_day=10, '5월마다'→scheduled_day=5."
-            " scheduled_dow: weekly일 때 요일 정수(0=월~6=일).",
+            " weekly일 때도 scheduled_day에 요일 정수(0=월,1=화,2=수,3=목,4=금,5=토,6=일)를 저장."
+            " '월요일'→scheduled_day=0, '수요일'→scheduled_day=2, '금요일'→scheduled_day=4.",
             "- user_confirmed: '네', '맞아요', '그렇게 해줘' 등 확인 발화 시 true",
             "- user_cancelled: '취소', '아니오', '됐어', '하지 마' 등 취소 발화 시 true",
             "- direct_response: 비금융 챗봇 답변(영업시간, 상품 안내 등)에만 사용.",
@@ -388,6 +415,18 @@ def build_graph(tools: list) -> CompiledStateGraph:
                     "execution_ready": True,
                 }
             return updates
+
+        # ── 확인 단계에서 슬롯 수정 ────────────────────────────────────────────────
+        # "6만원으로 바꿔줘" 등 슬롯 수정 발화 → awaiting_confirmation 해제 후 재확인
+        if state.get("awaiting_confirmation") and result.extracted_slots:
+            existing = dict(state.get("collected_slots", {}))
+            existing.update(result.extracted_slots)
+            logger.info("[Graph →intent_node] 확인 단계 슬롯 수정: %s", result.extracted_slots)
+            return {
+                "collected_slots": existing,
+                "awaiting_confirmation": False,
+                "recipient_validated": False if "recipient" in result.extracted_slots else state.get("recipient_validated", False),
+            }
 
         # ── 홈 이동 처리 ─────────────────────────────────────────────────────────
         # 진행 중인 모든 액션 상태를 초기화하고 홈으로 이동
@@ -493,9 +532,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
             state.get("user_id"),
         )
 
-        canonical_name: str | None = find_recipient_by_voice(
-            state.get("user_id", ""), recipient_input
-        )
+        try:
+            canonical_name: str | None = find_recipient_by_voice(
+                state.get("user_id", ""), recipient_input
+            )
+        except Exception as e:
+            logger.error("resolve_node 수취인 조회 실패: %s", e)
+            canonical_name = None
 
         if canonical_name is None:
             slots["recipient"] = None
@@ -507,7 +550,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                     AIMessage(
                         content=(
                             f"'{recipient_input}'은(는) 등록된 수취인이 아닙니다."
-                            " 별명, 성함, 전화번호를 다시 말씀해 주세요."
+                            " 수신인 이름이나 별명, 계좌번호를 다시 말씀해 주세요."
                         )
                     )
                 ],

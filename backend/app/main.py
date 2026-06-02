@@ -34,9 +34,9 @@ logger = logging.getLogger(__name__)
 
 from app.core.database import Base, engine
 from app.core.exception import AppError
-from app.core.opensearch import create_indices_if_not_exists
 
 # from app.features.event.router import router as event_router  # TODO: event 기능 재구현 후 주석 해제
+from app.features.asset.router import router as asset_router
 from app.features.auto_transfer.router import router as auto_transfer_router
 from app.features.event.router import router as event_router
 from app.features.jwt_auth.router import router as jwt_auth_router
@@ -44,7 +44,6 @@ from app.features.recipients.router import router as recipients_router
 from app.features.transfer.router import router as transfer_router
 from app.features.voice.router import router as voice_register_router
 from app.shared.voice.router import router as voice_router
-from app.shared.
 
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -159,10 +158,12 @@ def health_check():
 
 
 from apscheduler.schedulers.background import BackgroundScheduler
+
 from app.core.database import SessionLocal
 from app.features.auto_transfer.service import run_due_auto_transfers
 
 scheduler = BackgroundScheduler()
+
 
 @app.on_event("startup")
 def start_scheduler():
@@ -173,8 +174,9 @@ def start_scheduler():
         finally:
             db.close()
 
-    scheduler.add_job(job, "cron", hour=0, minute=1)  # 매일 00:01 실행
+    scheduler.add_job(job, "cron", hour=14, minute=30)  # 매일 14:30 실행
     scheduler.start()
+
 
 @app.on_event("shutdown")
 def stop_scheduler():
