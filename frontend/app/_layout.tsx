@@ -125,7 +125,7 @@ export default function RootLayout() {
         setVoiceState('awaiting_asv');
       } else if (data.awaiting_memo_decision) {
         setVoiceState('awaiting_memo');
-      } else if (data.awaiting_confirmation) {
+      } else if (data.awaiting_confirmation || data.awaiting_transfer_clarification) {
         setVoiceState('awaiting_confirm');
       } else {
         setVoiceState('idle');

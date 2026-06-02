@@ -4,6 +4,8 @@ Design Ref (Issue #21):
     §slot_schema.py — SLOT_SCHEMA / SCREEN_MAP / ASV_REQUIRED_ACTIONS
 """
 
+from app.features.recipients.service import classify_recipient_input
+
 # ── 액션별 필요 슬롯 ─────────────────────────────────────────────────────────────
 # key: pending_action 값 (intent_node가 설정)
 # value: 슬롯 이름 목록 (각 슬롯명은 service.py 파라미터명과 일치)
@@ -50,6 +52,9 @@ MEMO_OFFER_SUFFIX: str = (
 # slot_fill_node에서 첫 번째 누락 슬롯의 질문을 TTS로 반환한다.
 SLOT_QUESTIONS: dict[str, str] = {
     "recipient": "누구에게 보낼까요? 별명이나 이름을 말씀해 주세요.",
+    "bank_name": (
+        "어느 은행 계좌인가요? 우리은행, 국민은행처럼 말씀해 주세요."
+    ),
     "amount": "얼마를 보낼까요?",
     "cycle": "매월 또는 매주 중 어떤 주기로 보낼까요?",
     "scheduled_day": "매월 며칠에 이체할까요?",
@@ -78,3 +83,20 @@ SCREEN_ONLY_INTENTS: set[str] = {"event"}
 
 # ── 유효한 인텐트 목록 ─────────────────────────────────────────────────────────────
 VALID_INTENTS: set[str] = set(SCREEN_MAP.keys()) | VOICE_ONLY_INTENTS
+
+
+def transfer_missing_slots(collected_slots: dict) -> list[str]:
+    """transfer 액션의 누락 슬롯 (미등록 계좌는 bank_name 동적 포함)."""
+    missing: list[str] = []
+    recipient = collected_slots.get("recipient")
+    if not recipient:
+        missing.append("recipient")
+    elif (
+        classify_recipient_input(str(recipient)) == "account"
+        and not collected_slots.get("recipient_id")
+        and not collected_slots.get("bank_name")
+    ):
+        missing.append("bank_name")
+    if not collected_slots.get("amount"):
+        missing.append("amount")
+    return missing

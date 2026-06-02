@@ -104,12 +104,31 @@ def clarification_offer_message(kind: str) -> str:
     return "송금을 도와드릴까요? 네 또는 아니오로 말씀해 주세요."
 
 
+def _recipient_hint_from_state(draft_recipient: str, collected_slots: dict | None) -> str:
+    """확인 대기 중 수취인 힌트 — draft_recipient 우선, 없으면 slots.recipient."""
+    hint = (draft_recipient or "").strip()
+    if hint:
+        return hint
+    if collected_slots:
+        slot_val = collected_slots.get("recipient")
+        if isinstance(slot_val, str) and slot_val.strip():
+            return slot_val.strip()
+    return ""
+
+
 def build_transfer_clarification_offer(user_text: str) -> dict:
     """애매한 수취인 힌트 턴 — 송금 여부 질문."""
     kind = classify_recipient_input(user_text.strip())
+    hint = user_text.strip()
     return {
         "awaiting_transfer_clarification": True,
-        "draft_recipient": user_text.strip(),
+        "draft_recipient": hint,
+        "pending_action": None,
+        "collected_slots": {"recipient": hint},
+        "awaiting_confirmation": False,
+        "awaiting_asv_audio": False,
+        "execution_ready": False,
+        "recipient_validated": False,
         "navigate_to": None,
         "messages": [AIMessage(content=clarification_offer_message(kind))],
     }
@@ -142,11 +161,24 @@ def build_transfer_clarification_response(user_text: str, draft_recipient: str) 
         }
 
     if is_clarification_yes(user_text) or has_transfer_intent_keyword(user_text):
+        hint = (draft_recipient or "").strip()
+        if not hint:
+            return {
+                "awaiting_transfer_clarification": True,
+                "messages": [
+                    AIMessage(
+                        content=(
+                            "수취인 정보를 찾지 못했습니다. "
+                            "전화번호나 별명을 다시 말씀해 주세요."
+                        )
+                    )
+                ],
+            }
         return {
             "awaiting_transfer_clarification": False,
             "draft_recipient": None,
             "pending_action": "transfer",
-            "collected_slots": {"recipient": draft_recipient},
+            "collected_slots": {"recipient": hint},
             "recipient_validated": False,
             "navigate_to": "transfer",
             "messages": [AIMessage(content="이체 화면으로 이동합니다. 이어서 안내해 드리겠습니다.")],
@@ -166,16 +198,29 @@ def build_transfer_clarification_response(user_text: str, draft_recipient: str) 
     }
 
 
+_RECIPIENT_FLOW_ACTIONS = ("transfer", "auto_transfer")
+
+
 def should_offer_transfer_clarification(
     user_text: str,
     *,
     pending_action: str | None,
     awaiting_memo_decision: bool,
     awaiting_transfer_clarification: bool,
+    awaiting_confirmation: bool = False,
+    awaiting_asv_audio: bool = False,
 ) -> bool:
     """송금 의도 확인 턴을 시작할지."""
-    if awaiting_transfer_clarification or awaiting_memo_decision:
+    if (
+        awaiting_transfer_clarification
+        or awaiting_memo_decision
+        or awaiting_confirmation
+        or awaiting_asv_audio
+    ):
         return False
-    if pending_action:
+    if not is_recipient_only_utterance(user_text):
         return False
-    return is_recipient_only_utterance(user_text)
+    # 송금 플로우 진행 중(수취인 슬롯만 비는 턴)은 LLM·resolve가 처리한다.
+    if pending_action in _RECIPIENT_FLOW_ACTIONS:
+        return False
+    return True

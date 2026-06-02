@@ -3,6 +3,7 @@
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.shared.agent.transfer_clarification import (
+    _recipient_hint_from_state,
     build_transfer_clarification_offer,
     build_transfer_clarification_response,
     is_recipient_only_utterance,
@@ -27,6 +28,7 @@ class TestTransferClarificationFlow:
         update = build_transfer_clarification_offer("010 1111 0003")
         assert update["awaiting_transfer_clarification"] is True
         assert update["draft_recipient"] == "010 1111 0003"
+        assert update["collected_slots"]["recipient"] == "010 1111 0003"
         assert "송금" in update["messages"][0].content
 
     def test_yes_starts_transfer(self):
@@ -51,6 +53,47 @@ class TestTransferClarificationFlow:
             )
             is True
         )
+
+    def test_should_offer_when_stale_non_transfer_pending(self):
+        assert (
+            should_offer_transfer_clarification(
+                "010 1111 0003",
+                pending_action="balance",
+                awaiting_memo_decision=False,
+                awaiting_transfer_clarification=False,
+            )
+            is True
+        )
+
+    def test_should_not_offer_during_transfer_flow(self):
+        assert (
+            should_offer_transfer_clarification(
+                "010 1111 0003",
+                pending_action="transfer",
+                awaiting_memo_decision=False,
+                awaiting_transfer_clarification=False,
+            )
+            is False
+        )
+
+    def test_offer_clears_stale_pending(self):
+        update = build_transfer_clarification_offer("010 1111 0003")
+        assert update.get("pending_action") is None
+        assert update.get("collected_slots") == {"recipient": "010 1111 0003"}
+
+    def test_yes_without_hint_does_not_use_ne_as_recipient(self):
+        update = build_transfer_clarification_response("네", "")
+        assert update.get("pending_action") != "transfer"
+        assert update["awaiting_transfer_clarification"] is True
+
+    def test_recipient_hint_from_collected_slots(self):
+        hint = _recipient_hint_from_state(
+            "",
+            {"recipient": "010 1111 0003"},
+        )
+        assert hint == "010 1111 0003"
+        update = build_transfer_clarification_response("네", hint)
+        assert update["collected_slots"]["recipient"] == "010 1111 0003"
 
 
 class TestTtsMessageExtraction:

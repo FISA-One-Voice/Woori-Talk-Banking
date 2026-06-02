@@ -21,7 +21,20 @@ import { AsvStepView } from './views/AsvStepView';
 function recipientFromSlots(slots: Record<string, unknown>): RecipientItem | null {
   const name = (slots.recipient as string) ?? '';
   if (!name) return null;
-  return { recipientId: null, toName: name, toBankName: '', accountMasked: '' };
+  const bankName =
+    (slots.bank_name as string) ?? (slots.bankName as string) ?? '';
+  const recipientId =
+    (slots.recipient_id as string) ?? (slots.recipientId as string) ?? null;
+  const accountMasked =
+    typeof slots.account_number === 'string'
+      ? slots.account_number.replace(/\d(?=\d{4})/g, '*')
+      : '';
+  return {
+    recipientId,
+    toName: name,
+    toBankName: bankName,
+    accountMasked,
+  };
 }
 
 export default function TransferScreen() {

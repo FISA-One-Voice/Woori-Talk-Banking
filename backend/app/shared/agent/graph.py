@@ -19,6 +19,7 @@ Design Ref (Issue #21):
 
 import json
 import logging
+import uuid
 
 import openai
 from langchain_core.messages import AIMessage
@@ -30,13 +31,20 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exception import AgentError
-from app.features.recipients.service import find_recipient_by_voice
+from app.features.recipients.service import (
+    classify_recipient_input,
+    find_recipient_by_voice,
+    match_by_registered_account,
+)
+from app.features.recipients.schema import ResolvedRecipient
+from app.features.transfer.service import _mask_account
 from app.shared.agent.prompts import SYSTEM_PROMPT
 from app.shared.agent.memo_decision import (
     build_memo_decision_update,
     last_user_text,
 )
 from app.shared.agent.transfer_clarification import (
+    _recipient_hint_from_state,
     build_transfer_clarification_offer,
     build_transfer_clarification_response,
     should_offer_transfer_clarification,
@@ -53,6 +61,7 @@ from app.shared.agent.slot_schema import (
     SLOT_QUESTIONS,
     SLOT_SCHEMA,
     VALID_INTENTS,
+    transfer_missing_slots,
 )
 from app.shared.agent.state import VoiceState
 
@@ -85,14 +94,47 @@ class IntentResult(BaseModel):
 
 def _all_slots_filled(pending_action: str, collected_slots: dict) -> bool:
     """pending_action에 필요한 슬롯이 모두 수집되었는지 확인한다."""
+    if pending_action == "transfer":
+        return len(transfer_missing_slots(collected_slots)) == 0
     required = SLOT_SCHEMA.get(pending_action, [])
     return all(collected_slots.get(slot) for slot in required)
 
 
 def _missing_slots(pending_action: str, collected_slots: dict) -> list[str]:
     """수집되지 않은 슬롯 이름 목록을 반환한다."""
+    if pending_action == "transfer":
+        return transfer_missing_slots(collected_slots)
     required = SLOT_SCHEMA.get(pending_action, [])
     return [s for s in required if not collected_slots.get(s)]
+
+
+def _enrich_slots_from_resolved(
+    slots: dict,
+    resolved: ResolvedRecipient,
+    recipient_input: str,
+    user_id: str,
+) -> dict:
+    """resolve 결과를 collected_slots에 반영한다."""
+    from app.core.database import get_db
+
+    display = resolved.recipient_name or "수취인"
+    if resolved.recipient_id and classify_recipient_input(recipient_input) == "account":
+        db = next(get_db())
+        try:
+            row = match_by_registered_account(
+                db, uuid.UUID(user_id), recipient_input
+            )
+            if row and row.alias:
+                display = row.alias
+        finally:
+            db.close()
+
+    slots["recipient"] = display
+    slots["bank_name"] = resolved.bank_name
+    slots["account_number"] = resolved.account_number
+    if resolved.recipient_id:
+        slots["recipient_id"] = str(resolved.recipient_id)
+    return slots
 
 
 def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
@@ -109,11 +151,17 @@ def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
     parts: list[str] = []
 
     recipient = collected_slots.get("recipient")
+    bank_name = collected_slots.get("bank_name")
+    account_number = collected_slots.get("account_number")
     amount = collected_slots.get("amount")
     cycle = collected_slots.get("cycle")
     scheduled_day = collected_slots.get("scheduled_day")
 
-    if recipient:
+    if bank_name and account_number:
+        masked = _mask_account(str(account_number))
+        target = f"{recipient}님 " if recipient else ""
+        parts.append(f"{target}{bank_name} 계좌 {masked}로")
+    elif recipient:
         parts.append(f"{recipient}에게")
     if cycle:
         freq_label = "매월" if cycle == "monthly" else "매주"
@@ -267,10 +315,15 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         if state.get("awaiting_transfer_clarification"):
             user_text = last_user_text(state.get("messages", []))
-            draft = state.get("draft_recipient") or user_text
+            draft = _recipient_hint_from_state(
+                state.get("draft_recipient") or "",
+                state.get("collected_slots"),
+            )
             logger.info(
-                "[Graph →intent_node] awaiting_transfer_clarification user_text=%s",
+                "[Graph →intent_node] awaiting_transfer_clarification"
+                " user_text=%s draft=%s",
                 user_text,
+                draft,
             )
             return build_transfer_clarification_response(user_text, draft)
 
@@ -284,6 +337,24 @@ def build_graph(tools: list) -> CompiledStateGraph:
             state.get("awaiting_memo_decision", False),
             state.get("execution_ready", False),
         )
+
+        user_text = last_user_text(state.get("messages", []))
+        if should_offer_transfer_clarification(
+            user_text,
+            pending_action=state.get("pending_action"),
+            awaiting_memo_decision=state.get("awaiting_memo_decision", False),
+            awaiting_transfer_clarification=state.get(
+                "awaiting_transfer_clarification", False
+            ),
+            awaiting_confirmation=state.get("awaiting_confirmation", False),
+            awaiting_asv_audio=state.get("awaiting_asv_audio", False),
+        ):
+            logger.info(
+                "[Graph →intent_node] transfer_clarification offer (pre-LLM) text=%s",
+                user_text,
+            )
+            return build_transfer_clarification_offer(user_text)
+
         # 현재 상태 컨텍스트를 시스템 프롬프트에 추가
         context_lines = [
             SYSTEM_PROMPT,
@@ -336,6 +407,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
             " 이름·별명·전화번호 그대로"
             " (예: '엄마에게'→recipient='엄마',"
             " '010 1234 5678로'→recipient='010 1234 5678').",
+            "  bank_name: 은행명 (예: '우리은행 1101234567890'→bank_name='우리은행',"
+            " recipient='1101234567890').",
             "- user_confirmed: '네', '맞아요', '그렇게 해줘' 등 확인 발화 시 true",
             "- user_cancelled: '취소', '아니오', '됐어', '하지 마' 등 취소 발화 시 true",
             "- direct_response: 비금융 챗봇 답변(영업시간, 상품 안내 등)에만 사용.",
@@ -473,35 +546,22 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         # ── 챗봇 직접 응답 (인텐트 없음) ───────────────────────────────────────
         user_text = last_user_text(state.get("messages", []))
-        if result.direct_response:
-            echoed = result.direct_response.strip() == user_text.strip()
-            if echoed and should_offer_transfer_clarification(
-                user_text,
-                pending_action=state.get("pending_action"),
-                awaiting_memo_decision=state.get("awaiting_memo_decision", False),
-                awaiting_transfer_clarification=state.get(
-                    "awaiting_transfer_clarification", False
-                ),
-            ):
-                updates = {**updates, **build_transfer_clarification_offer(user_text)}
-            elif not echoed:
-                updates["messages"] = [AIMessage(content=result.direct_response)]
-
-        if not updates.get("messages"):
-            if should_offer_transfer_clarification(
-                user_text,
-                pending_action=updates.get("pending_action")
-                or state.get("pending_action"),
-                awaiting_memo_decision=state.get("awaiting_memo_decision", False),
-                awaiting_transfer_clarification=state.get(
-                    "awaiting_transfer_clarification", False
-                ),
-            ):
-                updates = {**updates, **build_transfer_clarification_offer(user_text)}
-            elif not (updates.get("pending_action") or state.get("pending_action")):
-                updates["messages"] = [
-                    AIMessage(content=_DEFAULT_TTS_FALLBACK)
-                ]
+        pending_after = updates.get("pending_action") or state.get("pending_action")
+        if should_offer_transfer_clarification(
+            user_text,
+            pending_action=pending_after,
+            awaiting_memo_decision=state.get("awaiting_memo_decision", False),
+            awaiting_transfer_clarification=state.get(
+                "awaiting_transfer_clarification", False
+            ),
+            awaiting_confirmation=state.get("awaiting_confirmation", False),
+            awaiting_asv_audio=state.get("awaiting_asv_audio", False),
+        ):
+            updates = {**updates, **build_transfer_clarification_offer(user_text)}
+        elif result.direct_response:
+            updates["messages"] = [AIMessage(content=result.direct_response)]
+        elif not updates.get("messages") and not pending_after:
+            updates["messages"] = [AIMessage(content=_DEFAULT_TTS_FALLBACK)]
 
         return updates
 
@@ -551,19 +611,40 @@ def build_graph(tools: list) -> CompiledStateGraph:
         성공 시 recipient_validated=True, 실패 시 recipient 슬롯 초기화 후 재수집 유도.
         """
         slots = dict(state.get("collected_slots", {}))
-        recipient_input = slots.get("recipient", "")
+        recipient_input = str(slots.get("recipient", ""))
+        bank_name = slots.get("bank_name")
+        user_id = state.get("user_id", "")
+        kind = classify_recipient_input(recipient_input) if recipient_input else "name"
+
         logger.info(
-            "[Graph →resolve_node] recipient=%s user_id=%s",
+            "[Graph →resolve_node] recipient=%s bank=%s kind=%s user_id=%s",
             recipient_input,
-            state.get("user_id"),
+            bank_name,
+            kind,
+            user_id,
         )
 
-        canonical_name: str | None = find_recipient_by_voice(
-            state.get("user_id", ""), recipient_input
+        resolved = find_recipient_by_voice(
+            user_id,
+            recipient_input,
+            bank_name=str(bank_name) if bank_name else None,
         )
 
-        if canonical_name is None:
-            slots["recipient"] = None
+        if resolved is not None:
+            _enrich_slots_from_resolved(slots, resolved, recipient_input, user_id)
+            return {
+                "collected_slots": slots,
+                "recipient_validated": True,
+            }
+
+        if kind == "account" and not bank_name:
+            return {
+                "collected_slots": slots,
+                "recipient_validated": False,
+            }
+
+        # 전화·계좌 힌트는 슬롯을 비우지 않는다 (금액만 추가 수집 또는 재시도).
+        if kind in ("phone", "account"):
             return {
                 "collected_slots": slots,
                 "recipient_validated": False,
@@ -571,31 +652,57 @@ def build_graph(tools: list) -> CompiledStateGraph:
                     AIMessage(
                         content=(
                             f"'{recipient_input}'을(를) 찾을 수 없습니다."
-                            " 다시 알려주세요."
+                            " 등록된 별명·전화번호·계좌번호를 다시 말씀해 주세요."
                         )
                     )
                 ],
             }
 
-        slots["recipient"] = canonical_name
+        slots["recipient"] = None
         return {
             "collected_slots": slots,
-            "recipient_validated": True,
+            "recipient_validated": False,
+            "messages": [
+                AIMessage(
+                    content=(
+                        f"'{recipient_input}'을(를) 찾을 수 없습니다."
+                        " 다시 알려주세요."
+                    )
+                )
+            ],
         }
 
     def route_after_resolve(state: VoiceState) -> str:
         """resolve_node 결과에 따라 다음 노드를 결정한다."""
         slots = state.get("collected_slots", {})
+        pending = state.get("pending_action", "")
+        missing = _missing_slots(pending, slots)
+
         if not slots.get("recipient"):
             logger.info(
-                "[Graph route] resolve_node → slot_fill_node (recipient invalid)"
+                "[Graph route] resolve_node → slot_fill_node (recipient empty)"
             )
             return "slot_fill_node"
-        pending = state.get("pending_action", "")
-        if _missing_slots(pending, slots):
+
+        if not state.get("recipient_validated"):
+            # 조회 실패: 금액만 빠진 상태로 slot_fill 가면 안 됨 (미검증 수취인).
+            if missing == ["amount"]:
+                logger.info(
+                    "[Graph route] resolve_node → END (unvalidated, lookup failed)"
+                )
+                return END
+            if missing:
+                logger.info(
+                    "[Graph route] resolve_node → slot_fill_node (missing=%s)",
+                    missing,
+                )
+                return "slot_fill_node"
+            logger.info("[Graph route] resolve_node → END (unvalidated)")
+            return END
+
+        if missing:
             logger.info(
-                "[Graph route] resolve_node → slot_fill_node (missing=%s)",
-                _missing_slots(pending, slots),
+                "[Graph route] resolve_node → slot_fill_node (missing=%s)", missing
             )
             return "slot_fill_node"
         logger.info("[Graph route] resolve_node → confirm_node")
@@ -653,6 +760,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                         user_id=invoke_args["user_id"],
                         recipient=str(invoke_args.get("recipient", "")),
                         amount=int(invoke_args.get("amount", 0)),
+                        collected_slots=slots,
                     )
                     if tx_id:
                         new_last_tx_id = tx_id

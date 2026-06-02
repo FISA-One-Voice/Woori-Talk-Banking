@@ -43,7 +43,7 @@ class TestExecuteTransferTool:
         with (
             _patch_get_db(mock_db),
             patch(
-                "app.shared.agent.tools.transfer.lookup_recipient_by_voice",
+                "app.shared.agent.tools.transfer.lookup_recipient_for_transfer",
                 return_value=mock_resolved,
             ),
             patch("app.shared.agent.tools.transfer.transfer_service") as mock_svc,
@@ -69,7 +69,7 @@ class TestExecuteTransferTool:
         with (
             _patch_get_db(mock_db),
             patch(
-                "app.shared.agent.tools.transfer.lookup_recipient_by_voice",
+                "app.shared.agent.tools.transfer.lookup_recipient_for_transfer",
                 return_value=mock_resolved,
             ),
             patch("app.shared.agent.tools.transfer.transfer_service") as mock_svc,
@@ -79,6 +79,37 @@ class TestExecuteTransferTool:
 
         assert tx_id == _TX_ID
         assert "완료" in message
+
+    def test_run_execute_transfer_from_slots_recipient_id(self, mock_db: MagicMock):
+        mock_resolved = MagicMock()
+        mock_resolved.account_number = "98765432101234"
+        mock_resolved.bank_name = "국민은행"
+        mock_resolved.recipient_name = "홍길순"
+        mock_resolved.recipient_id = "rec-1"
+
+        with (
+            _patch_get_db(mock_db),
+            patch(
+                "app.shared.agent.tools.transfer.resolve_by_id",
+                return_value=mock_resolved,
+            ),
+            patch("app.shared.agent.tools.transfer.transfer_service") as mock_svc,
+        ):
+            mock_svc.execute_transfer.return_value = {"txId": _TX_ID}
+            message, tx_id = run_execute_transfer(
+                _USER_ID,
+                "엄마",
+                10_000,
+                collected_slots={
+                    "recipient": "엄마",
+                    "recipient_id": "rec-1",
+                    "bank_name": "국민은행",
+                    "account_number": "98765432101234",
+                },
+            )
+
+        assert tx_id == _TX_ID
+        mock_svc.execute_transfer.assert_called_once()
 
 
 class TestAddNoteTool:

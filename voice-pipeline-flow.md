@@ -172,7 +172,7 @@ execute_node (execute_transfer 성공)
 |--------|------|------|
 | "엄마", "홍길동" | `name` | `match_by_name()` → 1명이면 통과, 0명·동명이인 → None |
 | "01012345678" | `phone` | `resolve_by_phone()` |
-| "1101234567890" | `account` | 현재 미지원 (은행명 슬롯 추가 필요) → None |
+| "1101234567890" | `account` | 등록 계좌면 `match_by_registered_account` → enrich; 미등록이면 `bank_name` slot_fill 후 `resolve_direct_account` |
 
 ---
 
