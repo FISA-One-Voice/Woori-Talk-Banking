@@ -16,12 +16,13 @@
 import { useFocusEffect } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useCallback } from 'react';
+import { speakText } from '@/utils/ttsManager';
 
 export function useScreenAnnounce(message: string): void {
   useFocusEffect(
     useCallback(() => {
       if (!message) return;
-      Speech.speak(message, { language: 'ko-KR' });
+      speakText(message);
       return () => {
         Speech.stop();
       };

@@ -17,13 +17,11 @@
     .ainvoke() 통합 테스트는 Issue #7 (음성 파이프라인) 에서 수행합니다.
 """
 
-import pytest
 from langchain_core.tools import tool
 
 from app.shared.agent.graph import build_graph
 from app.shared.agent.prompts import SYSTEM_PROMPT
 from app.shared.agent.tools import ALL_TOOLS
-
 
 # ── 테스트용 더미 tool ──────────────────────────────────────────────────────────
 
@@ -115,20 +113,47 @@ class TestSystemPrompt:
 
 
 class TestAllTools:
-    """tools/__init__.py 의 ALL_TOOLS 상태 검증."""
+    """tools/__init__.py 의 ALL_TOOLS 상태 검증.
+
+    Phase 2.5 (Issue #21) 업데이트:
+        USE_MOCK_TOOLS=true (기본값) → ALL_TOOLS = MOCK_TOOLS (5개 mock tool)
+        USE_MOCK_TOOLS=false → ALL_TOOLS = [] (Phase 2 실제 tool 대기)
+    """
+
+    def test_all_tools_is_list(self) -> None:
+        """TC-09: ALL_TOOLS 는 list 타입이어야 한다."""
+        assert isinstance(ALL_TOOLS, list), "ALL_TOOLS 가 list 타입이 아닙니다."
+
+    def test_all_tools_state_matches_use_mock_tools_setting(self) -> None:
+        """TC-10: USE_MOCK_TOOLS 설정에 따라 ALL_TOOLS 내용이 올바르게 결정되어야 한다.
+
+        USE_MOCK_TOOLS=true (기본값): ALL_TOOLS == MOCK_TOOLS (5개 mock tool 활성화)
+        USE_MOCK_TOOLS=false:          ALL_TOOLS == [] (Phase 2 실제 tool 대기)
+        """
+        from app.core.config import settings
+        from app.shared.agent.tools import MOCK_TOOLS
+
+        if settings.USE_MOCK_TOOLS:
+            assert ALL_TOOLS == MOCK_TOOLS, (
+                f"USE_MOCK_TOOLS=True 일 때 ALL_TOOLS = MOCK_TOOLS 여야 합니다. "
+                f"현재 ALL_TOOLS 길이: {len(ALL_TOOLS)}, MOCK_TOOLS 길이: {len(MOCK_TOOLS)}"
+            )
+        else:
+            assert len(ALL_TOOLS) > 0, (
+                f"USE_MOCK_TOOLS=False 일 때 ALL_TOOLS 는 비어 있으면 안 됩니다. "
+                f"(현재: {len(ALL_TOOLS)}개)"
+            )
 
     def test_all_tools_contains_event_tool(self) -> None:
-        """TC-09: Phase 2 에서 ALL_TOOLS 는 get_event_list tool 을 포함해야 한다.
+        """TC-09: ALL_TOOLS 는 이벤트 관련 tool 을 포함해야 한다.
 
-        Phase 1 에는 빈 리스트였으나, 이벤트 기능(Issue #event) 구현으로
-        get_event_list 가 등록되었습니다.
-        이후 다른 화면 tool 이 추가될 때마다 이 테스트도 함께 업데이트합니다.
+        USE_MOCK_TOOLS=true:  mock_get_events (mock 구현체)
+        USE_MOCK_TOOLS=false: get_event_list  (실제 구현체)
         """
-        from app.shared.agent.tools.event import get_event_list
+        from app.core.config import settings
 
-        assert isinstance(ALL_TOOLS, list), "ALL_TOOLS 가 list 타입이 아닙니다."
-        assert len(ALL_TOOLS) > 0, "Phase 2 이상에서 ALL_TOOLS 는 비어 있으면 안 됩니다."
         tool_names = [t.name for t in ALL_TOOLS]
-        assert "get_event_list" in tool_names, (
-            f"ALL_TOOLS 에 get_event_list 가 없습니다. (현재: {tool_names})"
+        expected = "mock_get_events" if settings.USE_MOCK_TOOLS else "get_event_list"
+        assert expected in tool_names, (
+            f"ALL_TOOLS 에 {expected} 가 없습니다. (현재: {tool_names})"
         )

@@ -13,6 +13,7 @@
 # 그 다음:       settings.DATABASE_URL  로 값을 읽습니다.
 # =============================================================================
 
+import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -104,16 +105,50 @@ class Settings(BaseSettings):
     OPENAI_CHAT_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
 
-    # ASV 서버 주소
-    ASV_SERVER_URL: str = ""
-
     # JWT 인증 설정
     JWT_SECRET_KEY: str = "supersecretkey-change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # ── 에이전트 mock tool 설정 (Issue #21) ──────────────────────────────────────
+    # True : MOCK_TOOLS 사용 — Phase 2 화면 담당자 tool 완성 전 개발/테스트용
+    # False: 실제 tool 사용 — 각 화면 담당자의 features/*/tools 완성 후 (기본값)
+    USE_MOCK_TOOLS: bool = True
+
+    # ── ASV 화자 인증 서버 설정 (Issue #7, ai/asv/) ───────────────────────────────
+    # ASV_SERVER_URL: CAM++ 기반 화자 인증 서버 주소 (POST /verify)
+    #   로컬 개발: ai/asv/main.py 실행 시 포트 8000
+    #   프로덕션: EC2 인스턴스 주소 (southgiri/asv:1.0 Docker 이미지)
+    ASV_SERVER_URL: str = "http://localhost:8000"
+
+    # ── Anti-spoofing 서버 설정 (ai/anti-spoofing/ — 미구현) ─────────────────────
+    # ANTI_SPOOFING_EC2_URL: 재생 공격 탐지 서버 주소 (미구현, 추후 활성화)
+    # USE_ANTI_SPOOFING: False이면 anti-spoofing 호출을 바이패스한다 (기본값).
+    #   anti-spoofing 서버 구현 완료 후 .env에 USE_ANTI_SPOOFING=true 설정.
+    ANTI_SPOOFING_EC2_URL: str = "http://localhost:8003"
+    USE_ANTI_SPOOFING: bool = False
+
+    # ── LangSmith 트레이싱 (개발 전용 — 프로덕션에서는 미설정) ────────────────────────
+    # .env에 LANGSMITH_* 형식으로 설정한다.
+    # LangChain/LangGraph는 os.environ을 직접 읽으므로 model_post_init에서 반영한다.
+    LANGSMITH_TRACING: str = ""
+    LANGSMITH_API_KEY: str = ""
+    LANGSMITH_PROJECT: str = ""
+    LANGSMITH_ENDPOINT: str = ""
+
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
+
+    def model_post_init(self, __context: object) -> None:
+        """LangSmith가 직접 읽는 환경변수를 os.environ에 반영한다."""
+        if self.LANGSMITH_TRACING:
+            os.environ["LANGSMITH_TRACING"] = self.LANGSMITH_TRACING
+        if self.LANGSMITH_API_KEY:
+            os.environ["LANGSMITH_API_KEY"] = self.LANGSMITH_API_KEY
+        if self.LANGSMITH_PROJECT:
+            os.environ["LANGSMITH_PROJECT"] = self.LANGSMITH_PROJECT
+        if self.LANGSMITH_ENDPOINT:
+            os.environ["LANGSMITH_ENDPOINT"] = self.LANGSMITH_ENDPOINT
 
 
 # 싱글턴 패턴: 이 모듈을 import 하는 모든 파일이 같은 객체를 공유합니다.

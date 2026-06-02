@@ -1,10 +1,29 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Redirect, router } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
+import { useAuthStore } from '@/store/authStore';
+import { apiClient } from '@/utils/api';
+
+async function devQuickEnter(destination: string) {
+  try {
+    const res = await apiClient.post('/api/users/login', {
+      phone: '010-1111-0001',
+      pin: '000001',
+    });
+    if (res.data.success) {
+      const { accessToken, refreshToken } = res.data.data;
+      useAuthStore.getState().setTokens(accessToken, refreshToken, '010-1111-0001');
+    }
+  } catch {
+  }
+  router.push(destination as never);
+}
 
 export default function Index() {
+  const token = useAuthStore((state) => state.token);
+
   if (!__DEV__) {
-    return <Redirect href="/home" />;
+    return token ? <Redirect href="/home" /> : <Redirect href="/dev/login" />;
   }
 
   return (
@@ -12,8 +31,11 @@ export default function Index() {
       <Text style={styles.title}>우리톡뱅킹</Text>
       <Text style={styles.subtitle}>개발 진입</Text>
 
-      <Pressable style={styles.btn} onPress={() => router.push('/dev')}>
-        <Text style={styles.btnText}>🧪 테스트</Text>
+      <Pressable
+        style={[styles.btn, styles.btnPrimary]}
+        onPress={() => devQuickEnter('/asset')}
+      >
+        <Text style={[styles.btnText, styles.btnTextDark]}>🎙 자산화면 바로가기 (자동로그인)</Text>
       </Pressable>
 
       <Pressable style={styles.btn} onPress={() => router.push('/showcase')}>
@@ -22,6 +44,17 @@ export default function Index() {
 
       <Pressable style={[styles.btn, styles.btnPrimary]} onPress={() => router.push('/home')}>
         <Text style={[styles.btnText, styles.btnTextDark]}>🏠 앱 진입</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.btn}
+        onPress={() => devQuickEnter('/dev/home')}
+      >
+        <Text style={styles.btnText}>🏠 홈 바로가기 (자동로그인)</Text>
+      </Pressable>
+
+      <Pressable style={styles.btn} onPress={() => router.push('/dev/login')}>
+        <Text style={styles.btnText}>🔐 로그인 화면</Text>
       </Pressable>
     </View>
   );

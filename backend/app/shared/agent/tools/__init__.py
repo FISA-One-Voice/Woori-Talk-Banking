@@ -1,35 +1,62 @@
-"""에이전트 tool 등록 포인트.
-Phase 1 상태: ALL_TOOLS = [] (빈 리스트)
-Phase 2에서 각 화면 담당자가 아래 패턴으로 tool을 추가합니다.
-    등록 방법 (tool 작성 가이드는 _sample.py 참고):
-    from app.shared.agent.tools.balance import get_balance, get_accounts
-    from app.shared.agent.tools.transfer import execute_transfer
-    ALL_TOOLS = [get_balance, get_accounts, execute_transfer, ...]
-주의:
-    - _sample.py 는 가이드 파일이므로 여기에 import 하지 마십시오.
-    - tool 파일명은 features/ 화면명과 동일하게 유지하십시오.
-      예: features/balance/ → tools/balance.py
-"""
-# Plan SC: build_graph([]) 호출 시 오류 없이 초기화 (Issue #5 완료 조건)
+"""에이전트 tool 등록 포인트 (Issue #21, #48).
 
-from app.shared.agent.tools.balance import get_total_balance, get_account_balance_by_id
+USE_MOCK_TOOLS=true  (기본값) → MOCK_TOOLS 사용 (개발/테스트 환경)
+USE_MOCK_TOOLS=false           → 실제 tool 사용 (Phase 2 완료 후)
+
+실제 tool 추가 방법:
+    1. features/{screen}/tools.py 에 @tool 함수 작성
+    2. 아래 _REAL_TOOLS 에 import 후 추가
+    3. USE_MOCK_TOOLS=false 설정
+
+주의: _sample.py 는 가이드 파일이므로 여기에 import 하지 마십시오.
+"""
+
+from app.core.config import settings
+from app.shared.agent.tools.mock_tools import (
+    mock_execute_transfer,
+    mock_get_balance,
+    mock_get_events,
+    mock_get_history,
+    mock_lookup_recipient,
+    mock_query_asset,
+    mock_register_auto_transfer,
+)
+
+# ── Mock tool 목록 ─────────────────────────────────────────────────────────────
+MOCK_TOOLS: list = [
+    mock_lookup_recipient,
+    mock_query_asset,
+    mock_get_balance,
+    mock_get_history,
+    mock_execute_transfer,
+    mock_register_auto_transfer,
+    mock_get_events,
+]
+
+# ── 실제 tool 목록 ─────────────────────────────────────────────────────────────
+from app.shared.agent.tools.event import get_event_list
+from app.shared.agent.tools.transfer import execute_transfer
+from app.shared.agent.tools.balance import get_account_balance_by_id, get_total_balance
 from app.shared.agent.tools.history import (
     get_category_history,
     get_monthly_expense,
     get_recent_history,
 )
 
-ALL_TOOLS: list = [
+_REAL_TOOLS: list = [
+    get_event_list,
+    execute_transfer,
     get_total_balance,
     get_account_balance_by_id,
     get_recent_history,
     get_category_history,
     get_monthly_expense,
+    # lookup_recipient,   # 공통 — tools/lookup_recipient.py 완성 후 주석 해제
+    # query_asset,        # asset 담당자 — tools/asset.py 완성 후 주석 해제
+    # register_auto_transfer,  # auto_transfer 담당자 완성 후 주석 해제
 ]
 
-from app.shared.agent.tools.event import get_event_list
+# ── 활성 tool 목록 ─────────────────────────────────────────────────────────────
+ALL_TOOLS: list = MOCK_TOOLS if settings.USE_MOCK_TOOLS else _REAL_TOOLS
 
-# Plan SC: build_graph([]) 호출 시 오류 없이 초기화 (Issue #5 완료 조건)
-ALL_TOOLS: list = [get_event_list]
-
-__all__ = ["ALL_TOOLS"]
+__all__ = ["ALL_TOOLS", "MOCK_TOOLS"]

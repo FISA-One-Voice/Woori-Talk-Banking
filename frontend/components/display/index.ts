@@ -4,3 +4,6 @@ export { default as QuickMenuGrid } from './QuickMenuGrid';
 export { default as VoiceQuickMenuGrid } from './VoiceQuickMenuGrid';
 export type { VoiceQuickMenuItem } from './VoiceQuickMenuGrid';
 export { default as ActionButton } from './ActionButton';
+export { default as RecipientCard } from './RecipientCard';
+export type { RecipientItem } from './RecipientCard';
+export { default as RecipientList } from './RecipientList';

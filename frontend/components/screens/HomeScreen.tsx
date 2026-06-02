@@ -135,7 +135,7 @@ export default function HomeScreen({
   onAssetPress,
   onAutoTransferPress,
 }: HomeScreenProps) {
-  const { voiceState, activateMic } = useMic();
+  const { voiceState, activateMic, stopMic } = useMic();
   const [firstEvent, setFirstEvent] = useState<EventItem | null>(null);
   const [ttsReady, setTtsReady] = useState(false);
   const [idleAutoPlay, setIdleAutoPlay] = useState(false);
@@ -229,6 +229,7 @@ export default function HomeScreen({
             primaryHint={voiceState === 'idle' ? '말씀해 주세요' : undefined}
             subCaption={voiceState === 'idle' ? '화면 꾹 누르기로 활성화' : undefined}
             onMicPress={activateMic}
+            onMicRelease={stopMic}
           />
         </View>
 

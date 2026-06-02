@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Alert,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -9,9 +10,11 @@ import {
   View,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useMic } from '@/context/MicContext';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { getTtsMessage } from '@/utils/errorHandler';
 import { fetchExpenseSummary, fetchTransactionHistory, CategoryItem, TransactionItem } from '@/services/assetService';
+import { playTts, stopCurrentTts } from '@/utils/ttsPlayer';
 
 type Step = 'slot' | 'result' | 'history' | 'error';
 
@@ -22,15 +25,19 @@ function periodToDays(period: string): number {
   return 30;
 }
 
+
 export default function HistoryScreen() {
   const router = useRouter();
   const { type } = useLocalSearchParams<{ type: string }>();
+  const { activateMic, stopMic } = useMic();
 
   const [step, setStep] = useState<Step>(type === 'history' ? 'history' : 'slot');
   const [period, setPeriod] = useState('이번달');
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [topCategories, setTopCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const announcedRef = useRef(false);
 
   const income = transactions.filter((t) => t.category === '수입').reduce((s, t) => s + t.amount, 0);
   const expense = transactions.filter((t) => t.category !== '수입').reduce((s, t) => s + t.amount, 0);
@@ -46,18 +53,54 @@ export default function HistoryScreen() {
       .finally(() => setLoading(false));
   };
 
+  // 화면 진입 시 TTS 안내
   useEffect(() => {
+    if (step === 'slot') {
+      playTts('지출 수입 화면입니다. 이번달, 지난달, 최근 7일 중 기간을 선택해 주세요.');
+    }
     if (step === 'history') {
       fetchHistory(30);
     }
   }, [step]);
 
+  // result 단계: 거래내역 + 카테고리 둘 다 로드 완료 후 TTS 안내
+  useEffect(() => {
+    if (step !== 'result' || loading || categoriesLoading || announcedRef.current) return;
+    if (transactions.length === 0) return;
+    announcedRef.current = true;
+
+    const catText = topCategories
+      .slice(0, 3)
+      .map((c) => `${c.category} ${c.amount.toLocaleString()}원`)
+      .join(', ');
+    const text =
+      `${period} 수입은 ${income.toLocaleString()}원, 지출은 ${expense.toLocaleString()}원입니다.` +
+      (catText ? ` 주요 지출은 ${catText}입니다.` : '');
+    playTts(text);
+  }, [step, loading, categoriesLoading, transactions, topCategories]);
+
+  // history 단계: 거래내역 로드 완료 후 TTS로 전체 읽기
+  useEffect(() => {
+    if (step !== 'history' || loading || transactions.length === 0) return;
+    const txText = transactions
+      .slice(0, 10)
+      .map((tx) => {
+        const date = new Date(tx.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
+        const sign = tx.amount > 0 ? '입금' : '출금';
+        return `${date} ${tx.to_name ?? ''} ${sign} ${Math.abs(tx.amount).toLocaleString()}원`;
+      })
+      .join('. ');
+    const intro = `최근 거래내역 ${transactions.length}건입니다. `;
+    playTts(intro + txText);
+  }, [step, loading, transactions]);
+
   if (step === 'slot') {
     return (
+      <Pressable style={{flex:1}} onLongPress={activateMic} onPressOut={stopMic} delayLongPress={600}>
       <SafeAreaView style={styles.root}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <TouchableOpacity onPress={() => { stopCurrentTts(); router.back(); }} style={styles.backBtn}>
               <Text style={styles.backIcon}>←</Text>
             </TouchableOpacity>
             <Text style={styles.screenTitle}>지출·수입</Text>
@@ -87,11 +130,15 @@ export default function HistoryScreen() {
               key={p}
               style={[styles.periodBtn, period === p && styles.periodBtnActive]}
               onPress={() => {
+                stopCurrentTts();
                 setPeriod(p);
+                announcedRef.current = false;
                 fetchHistory(periodToDays(p));
+                setCategoriesLoading(true);
                 fetchExpenseSummary(periodToDays(p))
                   .then((s) => setTopCategories(s.top_categories))
-                  .catch(() => setTopCategories([]));
+                  .catch(() => setTopCategories([]))
+                  .finally(() => setCategoriesLoading(false));
                 setStep('result');
               }}
             >
@@ -102,11 +149,13 @@ export default function HistoryScreen() {
           ))}
         </View>
       </SafeAreaView>
+      </Pressable>
     );
   }
 
   if (step === 'result') {
     return (
+      <Pressable style={{flex:1}} onLongPress={activateMic} onPressOut={stopMic} delayLongPress={600}>
       <SafeAreaView style={styles.root}>
         <View style={styles.container}>
           <View style={styles.header}>
@@ -157,15 +206,17 @@ export default function HistoryScreen() {
           )}
         </View>
       </SafeAreaView>
+      </Pressable>
     );
   }
 
   if (step === 'history') {
     return (
+      <Pressable style={{flex:1}} onLongPress={activateMic} onPressOut={stopMic} delayLongPress={600}>
       <SafeAreaView style={styles.root}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <TouchableOpacity onPress={() => { stopCurrentTts(); router.back(); }} style={styles.backBtn}>
               <Text style={styles.backIcon}>←</Text>
             </TouchableOpacity>
             <Text style={styles.screenTitle}>거래내역</Text>
@@ -189,6 +240,9 @@ export default function HistoryScreen() {
                     {new Date(tx.created_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
                   </Text>
                   <Text style={styles.txName}>{tx.to_name}</Text>
+                  {tx.memo ? (
+                    <Text style={styles.txMemo}>📝 {tx.memo}</Text>
+                  ) : null}
                 </View>
                 <Text style={[
                   styles.txAmount,
@@ -201,6 +255,7 @@ export default function HistoryScreen() {
           )}
         </ScrollView>
       </SafeAreaView>
+      </Pressable>
     );
   }
 
@@ -336,9 +391,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  txLeft: { gap: 4 },
+  txLeft: { gap: 4, flex: 1 },
   txDate: { fontSize: FONT_SIZES.caption, color: COLORS.grayLight },
   txName: { fontSize: FONT_SIZES.body, color: COLORS.textMain },
+  txMemo: { fontSize: FONT_SIZES.caption, color: COLORS.grayMedium },
   txAmount: { fontSize: FONT_SIZES.body, fontWeight: 'bold' },
   errorContainer: { justifyContent: 'center', alignItems: 'center' },
   errorTitle: { fontSize: FONT_SIZES.button, color: COLORS.textMain, fontWeight: 'bold' },
