@@ -1,10 +1,13 @@
 import io
+import logging
 
 import httpx
 import mutagen
 
 from app.core.config import settings
 from app.core.exception import STTError
+
+logger = logging.getLogger(__name__)
 
 # CLOVA STT가 지원하는 오디오 MIME 타입, 절대 안바뀌는 값 이므로 frozenset으로 정의
 SUPPORTED_CONTENT_TYPES = frozenset(
@@ -18,6 +21,8 @@ SUPPORTED_CONTENT_TYPES = frozenset(
         "audio/flac",
         "audio/ogg",
         "audio/mp3",
+        "audio/x-caf",
+        "audio/caf",
     }
 )
 
@@ -71,9 +76,12 @@ async def transcribe_audio(
         ) from exc
 
     if response.status_code != 200:
+        print(f"[STT ERROR] status={response.status_code} body={response.text[:200]} "
+              f"content_type={content_type} size={len(audio_bytes)} "
+              f"header_hex={audio_bytes[:12].hex()}", flush=True)
         raise STTError(
             code="STT_FAILED",
-            message=f"Clova Speech API 오류: status={response.status_code}",
+            message=f"Clova Speech API 오류: status={response.status_code}, body={response.text[:200]}",
         )
 
     payload = response.json()

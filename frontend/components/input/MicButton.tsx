@@ -1,36 +1,54 @@
-﻿import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-type MicState = 'idle' | 'listening' | 'error' | 'warning';
+type MicState = 'idle' | 'listening' | 'processing' | 'error' | 'warning';
 
 interface MicButtonProps {
   state?: MicState;
   hint?: string;
   onPress?: () => void;
+  onPressIn?: () => void;
+  onLongPress?: () => void;
+  onPressOut?: () => void;
 }
 
 const STATE_COLOR: Record<MicState, string> = {
-  idle: '#FFD600',
-  listening: '#FFD600',
-  error: '#f87171',
-  warning: '#fbbf24',
+  idle:       '#FFD600',
+  listening:  '#4ADE80',  // 초록: 녹음 잘 되고 있음
+  processing: '#aaaaaa',  // 회색: 처리 중
+  error:      '#ff4444',  // 빨강: 오류
+  warning:    '#fbbf24',
 };
 
 export default function MicButton({
   state = 'idle',
   hint,
   onPress,
+  onPressIn,
+  onLongPress,
+  onPressOut,
 }: MicButtonProps) {
   const color = STATE_COLOR[state];
 
   return (
     <View style={styles.wrap}>
       <TouchableOpacity
-        style={[styles.ring, { borderColor: color, backgroundColor: state === 'idle' || state === 'listening' ? '#191900' : '#111' }]}
+        style={[
+          styles.ring,
+          {
+            borderColor: color,
+            backgroundColor: state === 'listening' ? '#002200' : state === 'error' ? '#1a0000' : '#191900',
+          },
+        ]}
         onPress={onPress}
+        onPressIn={onPressIn}
+        onLongPress={onLongPress}
+        onPressOut={onPressOut}
+        delayLongPress={300}
         activeOpacity={0.7}
       >
-        {/* 마이크 아이콘 (텍스트 대체) */}
-        <Text style={[styles.micIcon, { color }]}>🎙</Text>
+        <Text style={[styles.micIcon, { color }]}>
+          {state === 'processing' ? '⏳' : '🎙'}
+        </Text>
       </TouchableOpacity>
       {hint && <Text style={[styles.hint, { color }]}>{hint}</Text>}
     </View>
@@ -59,4 +77,3 @@ const styles = StyleSheet.create({
     color: '#aaa',
   },
 });
-

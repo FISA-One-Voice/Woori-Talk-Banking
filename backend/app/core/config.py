@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # True: MOCK_TOOLS 사용 (기본값) — 개발/테스트 환경
+    # False: 실제 tool 사용 — Phase 2 화면 담당자 tool 완성 후 전환
+    USE_MOCK_TOOLS: bool = True
+
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
 
 
