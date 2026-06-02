@@ -51,7 +51,7 @@ class ApiResponse(BaseModel):
     success: bool
     data: Any = None
     message: str
-    error_code: str | None = None
+    code: str | None = None
 
 
 class VoiceResponseData(BaseModel):
