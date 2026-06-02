@@ -66,4 +66,8 @@ develop/
 
 # Media / Keys
 *.wav
+!frontend/assets/sounds/beep.wav
 *.pem
+
+# AI Agent
+.agent/
