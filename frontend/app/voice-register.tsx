@@ -273,7 +273,7 @@ export default function DevVoiceRegisterScreen() {
               <View style={styles.listContainer}>
                 {[
                   '조용한 환경에서 진행해 주세요',
-                  '안내 후 삐 소리가 나면 화면의 문장을 읽어주세요',
+                  '안내 후 삐 소리가 나면 화면의 문장을 \n읽어주세요',
                   '총 세 개의 문장을 녹음합니다'
                 ].map((text, idx) => (
                   <View key={idx} style={styles.listItem}>
@@ -425,9 +425,10 @@ const styles = StyleSheet.create({
   },
   infoDesc: {
     color: COLORS.textMain,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
-    lineHeight: 34,
+    lineHeight: 32,
+    flexShrink: 1,
   },
   listContainer: {
     gap: 20,
@@ -454,9 +455,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   listText: {
+    flex: 1,
     color: COLORS.textMain,
     fontSize: 16,
     lineHeight: 22,
+    flexWrap: 'wrap',
   },
   centerAction: {
     flex: 1,
