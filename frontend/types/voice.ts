@@ -36,6 +36,12 @@ export interface VoiceResponseData {
   awaiting_asv_audio: boolean;
 
   /**
+   * 이체 직후 메모 제안 응답 대기.
+   * true이면 VoiceStatusOverlay에 메모 안내 표시.
+   */
+  awaiting_memo_decision: boolean;
+
+  /**
    * STT 변환 결과 텍스트 (사용자가 말한 내용).
    * 정상 흐름에서만 채워지며 ASV 인증 흐름에서는 null.
    */

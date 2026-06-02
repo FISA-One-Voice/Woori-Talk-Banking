@@ -35,6 +35,9 @@ class VoiceState(TypedDict):
             intent_node에서 "네" 수신 후 설정. execute_node 완료 후 False로 초기화.
         recipient_validated: True이면 recipient 슬롯이 resolve_node를 통과한 상태.
             새 인텐트 감지 또는 취소 시 False로 초기화.
+        last_tx_id: execute_transfer 성공 시 저장된 tx_id.
+            add_note 실행 후 None으로 초기화. 최근 거래 DB 조회 대신 사용.
+        awaiting_memo_decision: True이면 이체 직후 메모 제안에 대한 응답 대기 중.
     """
 
     messages: Annotated[list, add_messages]
@@ -43,7 +46,9 @@ class VoiceState(TypedDict):
     collected_slots: dict
     awaiting_confirmation: bool
     awaiting_asv_audio: bool
+    awaiting_memo_decision: bool
     asv_retry_count: int
     navigate_to: str | None
     execution_ready: bool
     recipient_validated: bool
+    last_tx_id: str | None

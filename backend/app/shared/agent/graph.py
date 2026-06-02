@@ -32,10 +32,15 @@ from app.core.config import settings
 from app.core.exception import AgentError
 from app.features.recipients.service import find_recipient_by_voice
 from app.shared.agent.prompts import SYSTEM_PROMPT
+from app.shared.agent.memo_decision import (
+    build_memo_decision_update,
+    last_user_text,
+)
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
     ASV_REQUIRED_ACTIONS,
     COMPLETE_SCREEN_MAP,
+    MEMO_OFFER_SUFFIX,
     RECIPIENT_REQUIRED_ACTIONS,
     SCREEN_MAP,
     SCREEN_ONLY_INTENTS,
@@ -206,6 +211,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
     def _find_tool_for_action(action: str) -> object | None:
         """액션 이름에 해당하는 tool을 registry에서 찾는다."""
         candidates = [
+            action,
             f"mock_execute_{action}",
             f"mock_register_{action}",
             f"mock_get_{action}",
@@ -245,13 +251,22 @@ def build_graph(tools: list) -> CompiledStateGraph:
             )
             return {}
 
+        if state.get("awaiting_memo_decision"):
+            user_text = last_user_text(state.get("messages", []))
+            logger.info(
+                "[Graph →intent_node] awaiting_memo_decision user_text=%s",
+                user_text,
+            )
+            return build_memo_decision_update(user_text)
+
         logger.info(
             "[Graph →intent_node] pending=%s slots=%s"
-            " await_confirm=%s await_asv=%s exec_ready=%s",
+            " await_confirm=%s await_asv=%s await_memo=%s exec_ready=%s",
             state.get("pending_action"),
             state.get("collected_slots", {}),
             state.get("awaiting_confirmation", False),
             state.get("awaiting_asv_audio", False),
+            state.get("awaiting_memo_decision", False),
             state.get("execution_ready", False),
         )
         # 현재 상태 컨텍스트를 시스템 프롬프트에 추가
@@ -273,6 +288,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         if state.get("awaiting_confirmation"):
             context_lines.append("대기 상태: 사용자 확인('네'/'아니오') 대기 중")
+
+        if state.get("awaiting_memo_decision"):
+            context_lines.append(
+                "대기 상태: 이체 완료 후 메모 제안에 대한 응답 대기 중"
+                " (카테고리 말하기 또는 건너뛰기)"
+            )
 
         context_lines += [
             "",
@@ -351,6 +372,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "navigate_to": None,
                 "execution_ready": False,
                 "recipient_validated": False,
+                "last_tx_id": None,
+                "awaiting_memo_decision": False,
                 "messages": [
                     AIMessage(content=result.direct_response or "취소되었습니다.")
                 ],
@@ -386,6 +409,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "execution_ready": False,
                 "recipient_validated": False,
                 "asv_retry_count": 0,
+                "awaiting_memo_decision": False,
                 "navigate_to": "home",
                 "messages": [AIMessage(content="홈 화면으로 이동합니다.")],
             }
@@ -406,6 +430,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "awaiting_asv_audio": False,
                 "execution_ready": False,
                 "asv_retry_count": 0,
+                "awaiting_memo_decision": False,
             }
             # 화면 전환 전용 인텐트: 화면이 자체 TTS를 처리하므로 간단한 안내만 추가
             if result.intent in SCREEN_ONLY_INTENTS:
@@ -420,6 +445,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
             existing.update(result.extracted_slots)
             updates["collected_slots"] = existing
             updates["navigate_to"] = None  # 슬롯 채우기 중 화면 이동 없음
+            if pending == "add_note" and existing.get("memo"):
+                updates["execution_ready"] = True
 
         # ── 챗봇 직접 응답 (인텐트 없음) ───────────────────────────────────────
         if result.direct_response:
@@ -548,6 +575,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "execution_ready": False,
                 "recipient_validated": False,
                 "asv_retry_count": 0,
+                "awaiting_memo_decision": False,
                 "navigate_to": "home",
                 "messages": [
                     AIMessage(
@@ -559,26 +587,75 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 ],
             }
         else:
-            # user_id를 슬롯에 추가 (service 호출에 필요)
+            from app.shared.agent.tools.transfer import run_execute_transfer
+
             invoke_args = {"user_id": state.get("user_id", ""), **slots}
+            new_last_tx_id: str | None = state.get("last_tx_id")
+            completed_slots: dict = {}
+            note_consumed = False
+            awaiting_memo_next = False
+            response_text = ""
+
             try:
-                response_text = tool_obj.invoke(invoke_args)
+                if pending == "transfer" and tool_obj.name == "execute_transfer":
+                    response_text, tx_id = run_execute_transfer(
+                        user_id=invoke_args["user_id"],
+                        recipient=str(invoke_args.get("recipient", "")),
+                        amount=int(invoke_args.get("amount", 0)),
+                    )
+                    if tx_id:
+                        new_last_tx_id = tx_id
+                        awaiting_memo_next = True
+                        response_text = response_text + MEMO_OFFER_SUFFIX
+                        completed_slots = {
+                            "txId": tx_id,
+                            "recipient": slots.get("recipient"),
+                            "amount": slots.get("amount"),
+                        }
+                elif pending == "transfer":
+                    response_text = tool_obj.invoke(invoke_args)
+                elif pending == "add_note":
+                    tx_id = slots.get("tx_id") or state.get("last_tx_id")
+                    if not tx_id:
+                        response_text = (
+                            "메모를 추가할 이체 내역을 찾을 수 없습니다."
+                            " 이체를 먼저 완료해 주세요."
+                        )
+                    else:
+                        response_text = tool_obj.invoke(
+                            {
+                                "user_id": invoke_args["user_id"],
+                                "memo": str(invoke_args.get("memo", "")),
+                                "tx_id": str(tx_id),
+                            }
+                        )
+                        if "추가되었습니다" in response_text:
+                            note_consumed = True
+                else:
+                    response_text = tool_obj.invoke(invoke_args)
             except Exception as e:
                 logger.error("execute_node tool 호출 실패 (%s): %s", pending, e)
                 response_text = (
                     "처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
                 )
+                new_last_tx_id = state.get("last_tx_id")
+                completed_slots = {}
 
         updates: dict = {
             "pending_action": None,
-            "collected_slots": {},
+            "collected_slots": completed_slots,
             "awaiting_confirmation": False,
             "awaiting_asv_audio": False,
+            "awaiting_memo_decision": awaiting_memo_next,
             "execution_ready": False,
+            "recipient_validated": False,
             "messages": [AIMessage(content=response_text)],
+            "last_tx_id": None if note_consumed else new_last_tx_id,
         }
+        if note_consumed:
+            updates["awaiting_memo_decision"] = False
+            updates["navigate_to"] = "home"
         # transfer/auto_transfer 등 완료 화면이 있는 액션만 navigate_to 덮어씀.
-        # balance처럼 COMPLETE_SCREEN_MAP에 없는 액션은 intent_node가 설정한 값 보존.
         if pending in COMPLETE_SCREEN_MAP:
             updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
         return updates
@@ -590,6 +667,11 @@ def build_graph(tools: list) -> CompiledStateGraph:
         # ASV 대기 중 → END (다음 요청은 router.py가 ASV 분기 처리)
         if state.get("awaiting_asv_audio"):
             logger.info("[Graph route] intent_node → END (awaiting_asv_audio)")
+            return END
+
+        # 메모 제안 응답 대기 → END (다음 발화로 intent_node에서 처리)
+        if state.get("awaiting_memo_decision"):
+            logger.info("[Graph route] intent_node → END (awaiting_memo_decision)")
             return END
 
         # 확인 완료 + 즉시 실행 가능 → execute_node

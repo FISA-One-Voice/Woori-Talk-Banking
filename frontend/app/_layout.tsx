@@ -113,6 +113,8 @@ export default function RootLayout() {
 
       if (data.awaiting_asv_audio) {
         setVoiceState('awaiting_asv');
+      } else if (data.awaiting_memo_decision) {
+        setVoiceState('awaiting_memo');
       } else if (data.awaiting_confirmation) {
         setVoiceState('awaiting_confirm');
       } else {
@@ -120,13 +122,21 @@ export default function RootLayout() {
       }
 
       if (data.navigate_to === 'transfer/complete') {
-        const recipientName = (prevSlots.recipient as string) ?? '';
-        const amount = prevSlots.amount ? Number(prevSlots.amount) : 0;
+        const slotsForReceipt = {
+          ...prevSlots,
+          ...(data.collected_slots ?? {}),
+        };
+        const recipientName = (slotsForReceipt.recipient as string) ?? '';
+        const amount = slotsForReceipt.amount ? Number(slotsForReceipt.amount) : 0;
+        const txId =
+          (slotsForReceipt.txId as string) ??
+          (slotsForReceipt.tx_id as string) ??
+          '';
         if (recipientName && amount) {
           transferStore.getState().setTxReceipt({
-            txId: '',
+            txId,
             toName: recipientName,
-            toBankName: '',
+            toBankName: (slotsForReceipt.toBankName as string) ?? '',
             amount,
           });
         }

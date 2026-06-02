@@ -10,7 +10,11 @@ Design Ref (Issue #21):
 SLOT_SCHEMA: dict[str, list[str]] = {
     "transfer": ["recipient", "amount"],
     "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
+    "add_note": ["memo"],
 }
+
+# SCREEN_MAP에 없는 음성 전용 인텐트 (화면 이동 없음)
+VOICE_ONLY_INTENTS: set[str] = {"add_note"}
 
 # ── intent → 프론트엔드 화면 이름 매핑 ────────────────────────────────────────────
 # Expo Router 경로명을 기준으로 정의한다.
@@ -35,6 +39,12 @@ ASV_REQUIRED_ACTIONS: set[str] = {
     "transfer",  # 계좌 이체
     "auto_transfer",  # 자동이체 등록
 }
+
+# ── 이체 완료 후 메모 제안 (에이전트 TTS) ─────────────────────────────────────────
+MEMO_OFFER_SUFFIX: str = (
+    " 메모를 남기시겠어요? 식비, 교통비, 쇼핑, 의료비, 문화생활, 기타 중 말씀해 주시거나, "
+    "건너뛰기라고 말씀해 주세요."
+)
 
 # ── 슬롯별 TTS 질문 템플릿 ────────────────────────────────────────────────────────
 # slot_fill_node에서 첫 번째 누락 슬롯의 질문을 TTS로 반환한다.
@@ -67,4 +77,4 @@ ACTION_LABELS: dict[str, str] = {
 SCREEN_ONLY_INTENTS: set[str] = {"event"}
 
 # ── 유효한 인텐트 목록 ─────────────────────────────────────────────────────────────
-VALID_INTENTS: set[str] = set(SCREEN_MAP.keys())
+VALID_INTENTS: set[str] = set(SCREEN_MAP.keys()) | VOICE_ONLY_INTENTS

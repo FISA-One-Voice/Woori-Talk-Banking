@@ -157,6 +157,7 @@ async def _handle_normal_flow(
         collected_slots=result.get("collected_slots") or {},
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=result.get("awaiting_asv_audio", False),
+        awaiting_memo_decision=result.get("awaiting_memo_decision", False),
         transcript=transcript,
     )
 
@@ -277,6 +278,7 @@ async def _handle_asv_flow(
                 "pending_action": None,
                 "collected_slots": {},
                 "asv_retry_count": 0,
+                "awaiting_memo_decision": False,
                 "navigate_to": "home",
             },
             as_node="intent_node",
@@ -308,6 +310,7 @@ async def _handle_asv_flow(
         collected_slots={},
         awaiting_confirmation=False,
         awaiting_asv_audio=awaiting_asv_next,
+        awaiting_memo_decision=False,
         transcript=None,
     )
 
@@ -360,6 +363,7 @@ async def _proceed_after_asv_success(
         collected_slots=result.get("collected_slots") or {},
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=False,
+        awaiting_memo_decision=result.get("awaiting_memo_decision", False),
         transcript=None,
     )
 

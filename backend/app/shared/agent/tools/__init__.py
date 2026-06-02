@@ -32,7 +32,7 @@ ALL_TOOLS: list = [
 
 from app.core.config import settings
 from app.shared.agent.tools.event import get_event_list
-from app.shared.agent.tools.transfer import execute_transfer
+from app.shared.agent.tools.transfer import add_note, execute_transfer
 from app.shared.agent.tools.mock_tools import (
     mock_execute_transfer,
     mock_get_balance,
@@ -66,6 +66,7 @@ MOCK_TOOLS: list = [
 _REAL_TOOLS: list = [
     get_event_list,  # event 담당자 완료
     execute_transfer,  # transfer 담당자 완료
+    add_note,  # 이체 직후 메모 (tx_id 기반)
     # lookup_recipient,   # 공통 — tools/lookup_recipient.py 완성 후 주석 해제
     # execute_balance,    # balance 담당자 — tools/balance.py 완성 후 주석 해제
     # execute_history,    # history 담당자 — tools/history.py 완성 후 주석 해제
