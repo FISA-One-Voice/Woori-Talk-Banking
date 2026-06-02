@@ -63,6 +63,12 @@ SCR007_DATA_FLOW.md
 *.dbml
 # Documentation
 develop/
+DbTableScheme
+Develop_Guidline.md
+to-do.md
+TRANSFER_API_DEVICE_TEST.md
+voice-pipeline-flow.md
+계좌번호_음성_이체_4ea8c234.plan.md
 
 # Media / Keys
 *.wav
