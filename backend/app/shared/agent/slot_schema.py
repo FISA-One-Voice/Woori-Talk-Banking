@@ -6,7 +6,7 @@ Design Ref:
 
 # ── 액션별 전체 슬롯 템플릿 ───────────────────────────────────────────────────────
 # key: pending_action 값
-# value: 슬롯명 → 기본값(None) 딕셔너리. LLM 추출 컨텍스트 및 collected_slots 초기화에 사용.
+# value: 슬롯명 → 기본값(None) 딕셔너리 또는 슬롯명 리스트
 SLOT_SCHEMA: dict[str, dict | list] = {
     "transfer": ["recipient", "amount"],
     "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
@@ -22,7 +22,6 @@ SLOT_SCHEMA: dict[str, dict | list] = {
 
 # ── 액션별 필수 슬롯 ───────────────────────────────────────────────────────────────
 # _missing_slots()가 이 목록을 기준으로 "아직 못 채운 슬롯"을 판단한다.
-# SLOT_SCHEMA의 전체 슬롯 중 반드시 수집해야 실행 가능한 것만 포함한다.
 REQUIRED_SLOTS: dict[str, list[str]] = {
     "transfer": ["recipient", "amount"],
     "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
@@ -32,23 +31,20 @@ REQUIRED_SLOTS: dict[str, list[str]] = {
 
 # ── intent → 프론트엔드 화면 이름 매핑 ────────────────────────────────────────────
 # Expo Router 경로명을 기준으로 정의한다.
-# intent_node가 navigate_to에 이 값을 설정하면 _layout.tsx가 화면을 이동시킨다.
 SCREEN_MAP: dict[str, str] = {
     "transfer": "transfer",
     "auto_transfer": "auto-transfer",
     "balance": "asset",
     "history": "asset/history",
     "event": "event",
-    # Issue #48: 자산 조회 통합 인텐트 — action 슬롯으로 하위 화면 결정
     "asset": "asset",
+    "home": "home",
 }
 
 # ── 수취인 검증이 필요한 액션 ────────────────────────────────────────────────────
-# recipient 슬롯이 채워지는 즉시 resolve_node를 통해 수취인 존재 여부를 확인한다.
 RECIPIENT_REQUIRED_ACTIONS: set[str] = {"transfer", "auto_transfer"}
 
 # ── ASV 음성 인증이 필요한 액션 ─────────────────────────────────────────────────
-# 금전 이동이 발생하는 액션만 포함한다.
 ASV_REQUIRED_ACTIONS: set[str] = {
     "transfer",
     "auto_transfer",
@@ -56,7 +52,6 @@ ASV_REQUIRED_ACTIONS: set[str] = {
 
 # ── 슬롯별 TTS 질문 템플릿 ────────────────────────────────────────────────────────
 SLOT_QUESTIONS: dict[str, str] = {
-    # 이체 슬롯
     "recipient": "누구에게 보낼까요? 별명이나 이름을 말씀해 주세요.",
     "amount": "얼마를 보낼까요?",
     "cycle": "매월 또는 매주 중 어떤 주기로 보낼까요?",
@@ -70,7 +65,6 @@ SLOT_QUESTIONS: dict[str, str] = {
 }
 
 # ── 실행 완료 화면 경로 ────────────────────────────────────────────────────────────
-# execute_node 실행 후 navigate_to에 설정되어 프론트엔드 완료 화면으로 이동한다.
 COMPLETE_SCREEN_MAP: dict[str, str] = {
     "transfer": "transfer/complete",
     "auto_transfer": "auto-transfer/complete",
@@ -84,8 +78,12 @@ ACTION_LABELS: dict[str, str] = {
 }
 
 # ── 확인 메시지 없이 즉시 실행하는 액션 ────────────────────────────────────────────
-# 금전 이동이 없는 조회성 액션은 "~할까요?" 확인 없이 바로 execute_node로 간다.
 NO_CONFIRM_ACTIONS: set[str] = {"asset", "balance", "history", "event"}
+
+# ── 화면 전환 전용 인텐트 ─────────────────────────────────────────────────────────
+# 화면이 자체적으로 데이터를 가져오고 TTS를 처리하므로
+# intent_node에서 navigate_to만 설정하고 execute_node 없이 바로 END.
+SCREEN_ONLY_INTENTS: set[str] = {"event"}
 
 # ── 유효한 인텐트 목록 ─────────────────────────────────────────────────────────────
 VALID_INTENTS: set[str] = set(SCREEN_MAP.keys())

@@ -2,85 +2,53 @@
 # backend/app/features/event/schema.py
 #
 # [이 파일의 역할]
-# API 가 주고받는 데이터의 모양(형태)을 정의합니다.
-# 잘못된 타입의 데이터가 들어오면 FastAPI 가 자동으로 422 오류를 반환합니다.
-# 예: title 이 숫자로 들어오면 자동 거부 → 서비스 코드에서 검사할 필요가 없습니다.
+# Event API가 주고받는 데이터 형식을 Pydantic 모델로 정의합니다.
 #
-# [다른 파일과의 관계]
-# ├─ router.py  → 함수의 반환 타입(response_model)으로 사용합니다.
-# └─ service.py → 반환값을 이 스키마로 조립합니다.
+# [DB 모델과의 차이]
+# models/event.py  → SQLAlchemy 모델 (DB 테이블 구조)
+# schema.py        → Pydantic 모델 (API 요청/응답 형식)
 #
-# [Pydantic BaseModel 이란?]
-# Python 딕셔너리(dict)와 달리, 필드 타입을 보장하고 JSON 변환을 자동으로 처리합니다.
+# 같은 데이터라도:
+# - DB 모델: DB에 저장하기 위한 형식
+# - 스키마:  API로 클라이언트에게 전달하기 위한 형식
 # =============================================================================
 
 from datetime import datetime
-from typing import Any
 
-from pydantic import BaseModel
-
-
-# ── 이벤트 관련 응답 스키마 ────────────────────────────────────────────────────
-
-class EventSummary(BaseModel):
-    """
-    이벤트 목록에서 한 줄로 보여줄 간략 정보.
-    GET /api/events 의 data 배열 각 항목에 해당합니다.
-    """
-
-    event_id: str
-    title: str
-    start_at: datetime
-    end_at: datetime
-    is_active: bool
+from pydantic import BaseModel, field_validator
 
 
-class EventDetail(BaseModel):
-    """
-    이벤트 상세 화면에서 보여줄 전체 정보.
-    GET /api/events/{event_id} 의 data 에 해당합니다.
+class EventResponse(BaseModel):
+    """이벤트 하나를 API 응답으로 반환할 때 사용하는 스키마.
+
+    DB의 Event 객체를 이 형식으로 변환해서 JSON으로 전달합니다.
     """
 
     event_id: str
     title: str
     description: str | None
-    banner_image_url: str | None
+    banner_image_url: str | None  # 배너 이미지 URL (없으면 null)
+    is_active: bool
     start_at: datetime
     end_at: datetime
-    is_active: bool
-    # DB 컬럼 아님 — event_participations 행 수를 집계한 값
-    participant_count: int
+    has_participated: bool = False  # 현재 사용자의 참여 여부 (토큰 없으면 False)
+
+    # orm_mode(v1) → from_attributes(v2): SQLAlchemy 객체를 직접 변환 가능하게 함
+    model_config = {"from_attributes": True}
+
+    @field_validator("event_id", mode="before")
+    @classmethod
+    def coerce_uuid_to_str(cls, v: object) -> str:
+        """DB가 UUID 객체로 반환할 때 str로 변환합니다.
+
+        events 테이블의 event_id 컬럼이 PostgreSQL UUID 타입이면
+        psycopg2가 Python UUID 객체로 반환합니다. str로 통일합니다.
+        """
+        return str(v)
 
 
-# ── 참여 관련 응답 스키마 ────────────────────────────────────────────────────
+class EventListResponse(BaseModel):
+    """이벤트 목록 API 응답 스키마."""
 
-class ParticipationResult(BaseModel):
-    """
-    이벤트 참여 성공 시 반환하는 데이터.
-    POST /api/events/{event_id}/participate 의 data 에 해당합니다.
-    """
-
-    event_id: str
-    user_id: str
-    participated_at: datetime
-
-
-# ── 공통 API 응답 래퍼 ────────────────────────────────────────────────────────
-# CLAUDE.md 에 정의된 표준 응답 형식입니다.
-# 모든 엔드포인트는 성공/실패 모두 이 형태로 응답해야 합니다.
-#
-# 성공: {"success": true,  "data": {...}, "message": "...", "error_code": null}
-# 실패: {"success": false, "data": null,  "message": "...", "error_code": "ALREADY_PARTICIPATED"}
-
-class ApiResponse(BaseModel):
-    """
-    모든 API 엔드포인트의 공통 응답 형태.
-
-    프론트엔드는 반드시 error_code 로 분기 처리해야 합니다.
-    message 문자열로 분기하면 안 됩니다. (메시지는 언제든 바뀔 수 있기 때문입니다.)
-    """
-
-    success: bool  # 성공: True / 실패: False
-    data: Any = None  # 실제 데이터 (실패 시 null)
-    message: str  # 사람이 읽을 수 있는 안내 문구
-    error_code: str | None = None  # 실패 시 오류 코드 (예: "ALREADY_PARTICIPATED")
+    events: list[EventResponse]
+    total: int  # 전체 이벤트 수 (페이지네이션 대비)

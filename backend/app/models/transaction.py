@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -15,14 +15,21 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
+_KST = timezone(timedelta(hours=9))
+
+
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return (datetime.now(timezone.utc) + timedelta(hours=9)).replace(tzinfo=None)
 
 
 class Transaction(Base):
     """거래내역 테이블 (DB 테이블명: transactions)"""
 
     __tablename__ = "transactions"
+    __table_args__ = (
+        # NULL 값은 UNIQUE 제약 대상 외. PostgreSQL partial index로 NULL 다수 허용.
+        UniqueConstraint("idempotency_key", name="uq_transaction_idempotency_key"),
+    )
 
     tx_id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
@@ -56,6 +63,8 @@ class Transaction(Base):
     status: Mapped[str] = mapped_column(String(10), nullable=False)
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     memo: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # DB DDL에 존재하는 컬럼. 멱등성 보장용. NULL 허용(자동이체 등에서는 불필요).
+    idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
 
     user: Mapped["User"] = relationship("User", back_populates="transactions")

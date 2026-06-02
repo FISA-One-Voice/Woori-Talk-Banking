@@ -32,7 +32,7 @@ export default function DevLoginScreen() {
       formatted = `${completedPhone.slice(0, 3)}-${completedPhone.slice(3, 7)}-${completedPhone.slice(7, 11)}`;
     }
     setPhone(formatted);
-    setStep('PIN'); // 수동 전화번호 입력 후에는 보통 바로 PIN으로 감 (또는 원하면 BIOMETRIC 호출 가능)
+    setStep('PIN');
   };
 
   const triggerBiometric = async () => {
@@ -71,7 +71,7 @@ export default function DevLoginScreen() {
 
       if (result.success && result.data) {
         useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken, phone);
-        router.replace('/home'); 
+        router.replace('/home');
       } else {
         Alert.alert('로그인 실패 🚫', result.message || '인증에 실패했습니다.');
         setStep('PIN');

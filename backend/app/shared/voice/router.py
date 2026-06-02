@@ -1,12 +1,16 @@
 """
 stt_service, tts_service의 로직을 HTTP로 노출하는 창구 역할입니다.
+비즈니스 로직은 없고 요청을 받아서 서비스에 넘기고 결과를 포장해서 돌려줍니다.
+
+엔드포인트:
+    POST /api/voice         — 통합 음성 파이프라인 (Issue #7)
+    POST /api/voice/stt     — STT 단독 변환
+    POST /api/voice/tts     — TTS 단독 변환
 """
 
 import base64
-from typing import Any
 
 from fastapi import APIRouter, Depends, File, UploadFile
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -30,6 +34,7 @@ async def voice_pipeline(
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> ApiResponse:
+    """음성 파이프라인 통합 엔드포인트 (Issue #7)."""
     audio_bytes = await audio.read()
     content_type = audio.content_type or "audio/wav"
     data = await process_voice_pipeline(audio_bytes, user_id, db, content_type)
@@ -42,6 +47,7 @@ async def voice_pipeline(
 
 @router.post("/stt", response_model=ApiResponse)
 async def speech_to_text(file: UploadFile) -> ApiResponse:
+    """업로드된 음성 파일을 텍스트로 변환합니다."""
     audio_bytes = await file.read()
     content_type = file.content_type or "audio/wav"
     transcript = await transcribe_audio(audio_bytes, content_type)
@@ -54,6 +60,7 @@ async def speech_to_text(file: UploadFile) -> ApiResponse:
 
 @router.post("/tts", response_model=ApiResponse)
 async def text_to_speech(body: TTSRequest) -> ApiResponse:
+    """텍스트를 MP3 음성으로 변환합니다."""
     audio_bytes = await synthesize_speech(body.text, body.speed)
     return ApiResponse(
         success=True,

@@ -24,7 +24,6 @@ export default function VoiceQuickMenuGrid({ items }: VoiceQuickMenuGridProps) {
         >
           <Text style={styles.icon}>{item.icon}</Text>
           <Text style={styles.label}>{item.label}</Text>
-          <Text style={styles.voiceHint}>{item.voiceHint}</Text>
         </TouchableOpacity>
       ))}
     </View>

@@ -44,6 +44,9 @@ Thumbs.db
 # Personal
 .claude/
 
+# Seeds (개발용 DB 시드 스크립트)
+backend/seeds/
+
 report/
 .bkit/
 docs/
@@ -60,3 +63,7 @@ SCR007_DATA_FLOW.md
 *.dbml
 # Documentation
 develop/
+
+# Media / Keys
+*.wav
+*.pem

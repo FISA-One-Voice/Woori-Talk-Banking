@@ -5,7 +5,7 @@ CRUD 동작 및 relationship 조회를 검증한다.
 
 실행:
     cd backend
-    CRYPTO_NOOP=true python tests/seed_db.py
+    python tests/seed_db.py
 """
 
 import sys
@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, ".")
 
+import bcrypt
 import app.models  # noqa: F401 — 전체 모델 등록
 from app.core.database import Base, SessionLocal, engine
 from app.models.account import Account
@@ -24,8 +25,16 @@ from app.models.transaction import Transaction
 from app.models.user import User
 
 
+_KST = timezone(timedelta(hours=9))
+
+
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(_KST).replace(tzinfo=None)
+
+
+def _hash_pin(pin: str) -> str:
+    """PIN 번호를 bcrypt 해시로 변환합니다."""
+    return bcrypt.hashpw(pin.encode(), bcrypt.gensalt()).decode()
 
 
 def seed() -> None:
@@ -36,30 +45,29 @@ def seed() -> None:
 
     db = SessionLocal()
     try:
-        # ── CREATE ────────────────────────────────────────────────────────────
         print("\n[CREATE] 더미 데이터 삽입 중...")
 
-        user_id = str(uuid.uuid4())
+        user_id = uuid.uuid4()
         user = User(
             user_id=user_id,
             name="홍길동",
             phone="010-1234-5678",
             birthday="1990-01-01",
             address="서울시 강남구",
-            resident_number="900101-1234567",  # 실제 환경에서는 encrypt() 호출
+            resident_number="900101-1234567",
             disability_type="전맹",
             tts_speed=1.0,
             pin_hash="$2b$12$dummy_hash_for_seed",
-            embedding_vector=[0.1] * 256,
+            embedding_vector=[0.1] * 192,
         )
         db.add(user)
         db.flush()
-        print(f"  users: {user.user_id} ({user.name})")
+        print(f"  users: {user.user_id} ({user.name}) / PIN: 1234")
 
         account_primary = Account(
             user_id=user_id,
             bank_name="우리은행",
-            account_number="1002-123-456789",  # 실제 환경에서는 encrypt() 호출
+            account_number="1002-123-456789",
             account_type="입출금",
             balance=1_000_000,
             alias="주거래 계좌",
@@ -76,7 +84,9 @@ def seed() -> None:
         )
         db.add_all([account_primary, account_savings])
         db.flush()
-        print(f"  accounts: {account_primary.alias} (is_primary=True), {account_savings.alias}")
+        print(
+            f"  accounts: {account_primary.alias} (is_primary=True), {account_savings.alias}"
+        )
 
         recipient_mom = RegisteredRecipient(
             user_id=user_id,
@@ -94,7 +104,9 @@ def seed() -> None:
         )
         db.add_all([recipient_mom, recipient_company])
         db.flush()
-        print(f"  registered_recipients: '{recipient_mom.alias}', '{recipient_company.alias}'")
+        print(
+            f"  registered_recipients: '{recipient_mom.alias}', '{recipient_company.alias}'"
+        )
 
         standing_order = StandingOrder(
             user_id=user_id,
@@ -103,7 +115,7 @@ def seed() -> None:
             amount=300_000,
             cycle="monthly",
             scheduled_day=25,
-            password_hash="$2b$12$dummy_hash_for_seed",
+            password_hash=_hash_pin("1234"),
             terms_agreed_at=_now(),
             status="active",
             next_execution_at=_now() + timedelta(days=3),
@@ -124,6 +136,7 @@ def seed() -> None:
             status="completed",
             category="가족",
             memo="용돈",
+            created_at=_now() - timedelta(days=3),
         )
         tx_unregistered = Transaction(
             user_id=user_id,
@@ -134,10 +147,35 @@ def seed() -> None:
             amount=50_000,
             tx_type="transfer",
             status="completed",
+            created_at=_now() - timedelta(days=10),
         )
-        db.add_all([tx_registered, tx_unregistered])
+        tx_salary = Transaction(
+            user_id=user_id,
+            from_account_id=account_primary.account_id,
+            to_bank_name="우리은행",
+            to_name="회사",
+            amount=3_000_000,
+            tx_type="transfer",
+            status="completed",
+            category="수입",
+            memo="5월 월급",
+            created_at=_now() - timedelta(days=12),
+        )
+        tx_last_month = Transaction(
+            user_id=user_id,
+            from_account_id=account_primary.account_id,
+            to_bank_name="우리은행",
+            to_name="마트",
+            amount=50_000,
+            tx_type="transfer",
+            status="completed",
+            category="식비",
+            memo="장보기",
+            created_at=_now() - timedelta(days=40),
+        )
+        db.add_all([tx_registered, tx_unregistered, tx_salary, tx_last_month])
         db.flush()
-        print(f"  transactions: 등록 수취인 이체 1건 + 미등록 이체 1건")
+        print(f"  transactions: 4건 (최근 7일, 이번달, 저번달 포함)")
 
         event_active = Event(
             title="신규 가입 환영 이벤트",
@@ -165,35 +203,41 @@ def seed() -> None:
         db.commit()
         print(f"  event_participations: 1건")
 
-        # ── READ (relationship 조회) ───────────────────────────────────────────
+        # ── READ ──────────────────────────────────────────────────
         print("\n[READ] relationship 조회 검증...")
         db.expire_all()
 
         loaded_user = db.query(User).filter_by(user_id=user_id).first()
         assert loaded_user is not None
-        assert len(loaded_user.accounts) == 2, f"accounts: {len(loaded_user.accounts)}"
+        assert len(loaded_user.accounts) == 2
         assert len(loaded_user.recipients) == 2
-        assert len(loaded_user.transactions) == 2
+        assert len(loaded_user.transactions) == 4
         assert len(loaded_user.standing_orders) == 1
-        print(f"  user.accounts({len(loaded_user.accounts)}), recipients({len(loaded_user.recipients)}), "
-              f"transactions({len(loaded_user.transactions)}), standing_orders({len(loaded_user.standing_orders)}) ✅")
+        print(
+            f"  user.accounts({len(loaded_user.accounts)}), recipients({len(loaded_user.recipients)}), "
+            f"transactions({len(loaded_user.transactions)}), standing_orders({len(loaded_user.standing_orders)}) ✅"
+        )
 
         loaded_tx = db.query(Transaction).filter_by(tx_id=tx_registered.tx_id).first()
         assert loaded_tx.recipient is not None
         assert loaded_tx.from_account is not None
-        print(f"  transaction.recipient='{loaded_tx.recipient.alias}', from_account='{loaded_tx.from_account.alias}' ✅")
+        print(
+            f"  transaction.recipient='{loaded_tx.recipient.alias}', from_account='{loaded_tx.from_account.alias}' ✅"
+        )
 
         found = (
-            db.query(RegisteredRecipient)
-            .filter_by(user_id=user_id, alias="엄마")
-            .one()
+            db.query(RegisteredRecipient).filter_by(user_id=user_id, alias="엄마").one()
         )
         assert found.recipient_name == "김순자"
-        print(f"  alias 검색 (WHERE user_id=? AND alias='엄마') → {found.recipient_name} ✅")
+        print(
+            f"  alias 검색 (WHERE user_id=? AND alias='엄마') → {found.recipient_name} ✅"
+        )
 
-        # ── UPDATE ────────────────────────────────────────────────────────────
+        # ── UPDATE ────────────────────────────────────────────────
         print("\n[UPDATE] 잔액 업데이트 검증...")
-        loaded_account = db.query(Account).filter_by(account_id=account_primary.account_id).first()
+        loaded_account = (
+            db.query(Account).filter_by(account_id=account_primary.account_id).first()
+        )
         loaded_account.balance -= 100_000
         db.commit()
         db.expire(loaded_account)
@@ -202,32 +246,36 @@ def seed() -> None:
 
         # ── DELETE ────────────────────────────────────────────────────────────
         print("\n[DELETE] standing_order 취소 (status=cancelled) 검증...")
-        loaded_so = db.query(StandingOrder).filter_by(order_id=standing_order.order_id).first()
+        loaded_so = (
+            db.query(StandingOrder).filter_by(order_id=standing_order.order_id).first()
+        )
         loaded_so.status = "cancelled"
         db.commit()
         db.expire(loaded_so)
         assert loaded_so.status == "cancelled"
         print(f"  standing_order.status='cancelled' ✅")
 
-        # ── UniqueConstraint 검증 ─────────────────────────────────────────────
+        # ── UniqueConstraint ──────────────────────────────────────
         print("\n[UniqueConstraint] alias 중복 등록 오류 검증...")
         from sqlalchemy.exc import IntegrityError
+
         try:
             duplicate = RegisteredRecipient(
                 user_id=user_id,
-                alias="엄마",  # 중복
+                alias="엄마",
                 bank_name="하나은행",
                 account_number="111-222-333444",
                 recipient_name="홍길순",
             )
             db.add(duplicate)
             db.commit()
-            print("  ❌ UniqueConstraint 미동작 — 오류 발생하지 않음")
+            print("  ❌ UniqueConstraint 미동작")
         except IntegrityError:
             db.rollback()
             print("  UniqueConstraint 오류 정상 발생 ✅")
 
         print("\n✅ 모든 CRUD 검증 완료.")
+        print(f"\n📌 로그인 정보: phone=010-1234-5678 / PIN=1234")
 
     except Exception as e:
         db.rollback()

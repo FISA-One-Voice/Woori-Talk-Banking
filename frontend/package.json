@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios"
+    "start": "dotenv -e ../.env -- expo start",
+    "android": "dotenv -e ../.env -- expo run:android",
+    "ios": "dotenv -e ../.env -- expo run:ios"
   },
   "dependencies": {
-    "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@expo/vector-icons": "^15.0.3",
     "axios": "^1.16.1",
     "expo": "~54.0.0",
     "expo-av": "~16.0.8",
@@ -17,7 +17,7 @@
     "expo-linking": "~8.0.12",
     "expo-local-authentication": "~17.0.8",
     "expo-router": "~6.0.23",
-    "expo-speech": "~14.0.8",
+    "expo-speech": "~55.0.14",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
     "react-native": "0.81.5",
@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "dotenv-cli": "^11.0.0",
     "typescript": "~5.8.0"
   },
   "expo": {

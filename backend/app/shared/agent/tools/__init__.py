@@ -34,11 +34,26 @@ MOCK_TOOLS: list = [
 ]
 
 # ── 실제 tool 목록 ─────────────────────────────────────────────────────────────
-# Issue #48: query_asset — 자산 조회 슬롯 기반 실제 tool
-from app.shared.agent.tools.asset import query_asset
+from app.shared.agent.tools.event import get_event_list
+from app.shared.agent.tools.transfer import execute_transfer
+from app.shared.agent.tools.balance import get_account_balance_by_id, get_total_balance
+from app.shared.agent.tools.history import (
+    get_category_history,
+    get_monthly_expense,
+    get_recent_history,
+)
 
 _REAL_TOOLS: list = [
-    query_asset,
+    get_event_list,
+    execute_transfer,
+    get_total_balance,
+    get_account_balance_by_id,
+    get_recent_history,
+    get_category_history,
+    get_monthly_expense,
+    # lookup_recipient,   # 공통 — tools/lookup_recipient.py 완성 후 주석 해제
+    # query_asset,        # asset 담당자 — tools/asset.py 완성 후 주석 해제
+    # register_auto_transfer,  # auto_transfer 담당자 완성 후 주석 해제
 ]
 
 # ── 활성 tool 목록 ─────────────────────────────────────────────────────────────

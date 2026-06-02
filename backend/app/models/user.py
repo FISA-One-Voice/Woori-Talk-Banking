@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
@@ -16,8 +16,11 @@ if TYPE_CHECKING:
     from app.models.transaction import Transaction
 
 
+_KST = timezone(timedelta(hours=9))
+
+
 def _now() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return (datetime.now(timezone.utc) + timedelta(hours=9)).replace(tzinfo=None)
 
 
 class User(Base):
@@ -41,13 +44,11 @@ class User(Base):
     disability_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     tts_speed: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
     pin_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    # NOT NULL — 음성 등록 완료 후 계정 생성 가능
-    embedding_vector: Mapped[list] = mapped_column(Vector(256), nullable=False)
+    # 로그인 후 음성을 등록할 수 있으므로 nullable=True 로 변경
+    embedding_vector: Mapped[list | None] = mapped_column(Vector(192), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
 
-    accounts: Mapped[list["Account"]] = relationship(
-        "Account", back_populates="user"
-    )
+    accounts: Mapped[list["Account"]] = relationship("Account", back_populates="user")
     recipients: Mapped[list["RegisteredRecipient"]] = relationship(
         "RegisteredRecipient", back_populates="user"
     )

@@ -1,18 +1,45 @@
-import uuid
-from datetime import datetime, timedelta, timezone
+# =============================================================================
+# backend/app/main.py
+#
+# [이 파일의 역할]
+# FastAPI 앱의 시작점(entry point)입니다.
+# - 앱 객체를 생성합니다.
+# - 각 feature 의 router 를 등록합니다.
+# - DB 테이블을 생성합니다.
+# - 전역 예외 핸들러를 등록합니다.
+#
+# [서버 실행 방법]
+# cd backend
+# uvicorn app.main:app --reload
+#
+# 실행 후 브라우저에서 확인:
+# - API 문서: http://localhost:8000/docs  (Swagger UI, 직접 테스트 가능)
+# - 헬스체크: http://localhost:8000/health
+# =============================================================================
+
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.core.database import Base, SessionLocal, engine
+logger = logging.getLogger(__name__)
+
+from app.core.database import Base, engine
 from app.core.exception import AppError
 from app.core.opensearch import create_indices_if_not_exists
 from app.features.event.router import router as event_router
 from app.features.asset.router import router as asset_router
 from app.features.jwt_auth.router import router as jwt_auth_router
-from app.models.event import Event
+from app.features.recipients.router import router as recipients_router
+from app.features.transfer.router import router as transfer_router
+from app.features.voice.router import router as voice_register_router
 from app.shared.voice.router import router as voice_router
 
 app = FastAPI(
@@ -21,6 +48,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# ── CORS 설정 ───────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,24 +57,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ── 전역 예외 핸들러 ─────────────────────────────────────────────────────────────
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_request: Request, exc: HTTPException):
+    """HTTPException 을 표준 ApiResponse 형식으로 변환합니다."""
     if isinstance(exc.detail, dict) and "error" in exc.detail:
         error_code = exc.detail["error"]
     else:
         error_code = None
 
-    ERROR_MESSAGES: dict[str, str] = {
-        "EVENT_NOT_FOUND": "이벤트를 찾을 수 없습니다.",
-        "ALREADY_PARTICIPATED": "이미 참여한 이벤트입니다.",
-        "EVENT_ENDED": "종료된 이벤트입니다.",
-    }
-
-    message = (
-        ERROR_MESSAGES.get(error_code, str(exc.detail))
-        if error_code
-        else str(exc.detail)
-    )
+    message = str(exc.detail) if not error_code else error_code
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -79,6 +100,12 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
+    logger.error(
+        "[AppError] code=%s status=%s message=%s",
+        exc.code,
+        exc.status_code,
+        exc.message,
+    )
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -90,64 +117,21 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
     )
 
 
+# ── DB 테이블 생성 ──────────────────────────────────────────────────────────────
 Base.metadata.create_all(bind=engine)
 
+# ── 라우터 등록 ─────────────────────────────────────────────────────────────────
+from app.core.config import settings as _settings
 
-def seed_sample_events() -> None:
-    db = SessionLocal()
-    try:
-        if db.query(Event).count() > 0:
-            return
+logger.info("[Startup] ASV_SERVER_URL = %s", _settings.ASV_SERVER_URL)
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
-        sample_events = [
-            Event(
-                event_id=str(uuid.uuid4()),
-                title="신규 가입 환영 이벤트",
-                description=(
-                    "우리톡뱅킹에 처음 가입하신 고객님께 드리는 특별 혜택입니다. "
-                    "이벤트 참여 시 계좌 개설 수수료가 면제됩니다."
-                ),
-                start_at=now - timedelta(days=1),
-                end_at=now + timedelta(days=30),
-                is_active=True,
-            ),
-            Event(
-                event_id=str(uuid.uuid4()),
-                title="첫 이체 캐시백 이벤트",
-                description=(
-                    "첫 이체를 완료하신 고객님께 캐시백 500원을 지급합니다. "
-                    "이체 완료 후 영업일 기준 3일 이내에 지급됩니다."
-                ),
-                start_at=now,
-                end_at=now + timedelta(days=14),
-                is_active=True,
-            ),
-            Event(
-                event_id=str(uuid.uuid4()),
-                title="음성 인증 등록 완료 이벤트",
-                description=(
-                    "음성 보안 등록을 완료하신 고객님께"
-                    " 편의점 상품권 1,000원을 드립니다."
-                ),
-                start_at=now - timedelta(days=10),
-                end_at=now + timedelta(days=5),
-                is_active=True,
-            ),
-        ]
-
-        db.add_all(sample_events)
-        db.commit()
-    finally:
-        db.close()
-
-
-seed_sample_events()
-
-app.include_router(event_router)
-app.include_router(asset_router)
 app.include_router(voice_router)
 app.include_router(jwt_auth_router)
+app.include_router(asset_router)
+app.include_router(event_router)
+app.include_router(voice_register_router)
+app.include_router(recipients_router)
+app.include_router(transfer_router)
 
 
 @app.get("/health", tags=["system"])

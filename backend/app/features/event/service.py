@@ -2,121 +2,220 @@
 # backend/app/features/event/service.py
 #
 # [이 파일의 역할]
-# 이벤트 관련 비즈니스 로직을 모두 담당합니다.
-# "비즈니스 로직"이란 실제 업무 규칙을 코드로 구현한 것입니다.
-# 예: "이미 참여한 이벤트에는 다시 참여할 수 없다"
+# 이벤트 관련 비즈니스 로직을 담당합니다.
+# - DB에서 활성화된 이벤트 목록을 조회합니다.
+# - DB에서 특정 이벤트 상세 정보를 조회합니다.
+# - 이벤트 참여 처리를 합니다.
 #
 # [다른 파일과의 관계]
-# ├─ router.py         → 이 파일의 함수를 호출합니다. (router 는 연결만, 처리는 service)
-# └─ models/event.py   → Event, EventParticipation 클래스로 DB 를 조회·추가합니다.
-#
-# [이 파일에서 하지 않는 것]
-# - HTTP 요청/응답 처리 (그건 router.py 의 일)
-# - 데이터 형태 정의 (그건 schema.py 의 일)
+# router.py → service.py 함수를 호출
+# service.py → models/event.py (DB 테이블)을 사용
 # =============================================================================
 
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timezone, timedelta
 
-from fastapi import HTTPException
-from sqlalchemy.orm import Session  # DB 세션 타입 힌트용
+from sqlalchemy.orm import Session
 
+KST = timezone(timedelta(hours=9))
+
+from app.core.exception import EventNotFoundError, AlreadyParticipatedError
 from app.models.event import Event, EventParticipation
+from app.features.event.schema import EventListResponse, EventResponse
 
 
-def get_event_list(db: Session) -> list[Event]:
+# ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
+
+def _validate_event_id(event_id: str) -> None:
+    """event_id 가 유효한 UUID 형식인지 검증합니다.
+
+    PostgreSQL UUID 컬럼에 잘못된 형식의 문자열을 보내면 DataError가 발생합니다.
+    DB 호출 전에 미리 검증해서 EventNotFoundError(404)로 처리합니다.
+
+    Raises:
+        EventNotFoundError: event_id 가 UUID 형식이 아닌 경우.
     """
-    활성화된 이벤트 전체 목록을 반환합니다.
+    try:
+        uuid.UUID(event_id)
+    except ValueError:
+        raise EventNotFoundError(
+            code="INVALID_EVENT_ID",
+            message="유효하지 않은 이벤트 ID 형식입니다.",
+            status_code=404,
+        )
+
+
+# ── 서비스 함수 ───────────────────────────────────────────────────────────────
+
+def get_active_events(db: Session) -> EventListResponse:
+    """활성화된 이벤트 목록을 반환합니다.
+
+    is_active=True 인 이벤트만 조회하며,
+    최신 이벤트가 먼저 나오도록 start_at 내림차순 정렬합니다.
 
     Args:
-        db: 데이터베이스 세션 (database.py 의 get_db() 가 주입합니다)
+        db: SQLAlchemy DB 세션 (router에서 Depends(get_db)로 주입).
 
     Returns:
-        is_active=True 인 이벤트 목록, 최신순 정렬
+        EventListResponse: 이벤트 목록과 전체 개수.
     """
-    return (
-        db.query(Event)  # Event 테이블 전체를 대상으로
-        .filter(Event.is_active == True)  # is_active 가 True 인 것만 필터링
-        .order_by(Event.created_at.desc())  # 최신 이벤트가 위에 오도록 정렬
-        .all()  # 조건에 맞는 모든 행을 리스트로 반환
+    now = datetime.now(KST).replace(tzinfo=None)
+    events = (
+        db.query(Event)
+        .filter(Event.is_active == True, Event.end_at >= now)  # noqa: E712
+        .order_by(Event.start_at.desc())
+        .all()
+    )
+
+    return EventListResponse(
+        events=[EventResponse.model_validate(e) for e in events],
+        total=len(events),
     )
 
 
-def get_event_detail(db: Session, event_id: str) -> Event:
-    """
-    특정 이벤트의 상세 정보를 반환합니다.
+def get_event_detail(db: Session, event_id: str, user_id: str | None = None) -> EventResponse:
+    """특정 이벤트의 상세 정보를 반환합니다.
 
     Args:
-        db: 데이터베이스 세션
-        event_id: 조회할 이벤트 UUID
+        db: SQLAlchemy DB 세션.
+        event_id: 조회할 이벤트의 UUID 문자열.
+        user_id: JWT에서 추출한 사용자 ID (선택). 있으면 has_participated 를 실제 값으로 반환.
 
     Returns:
-        해당 Event 객체
+        EventResponse: 이벤트 상세 정보. has_participated 포함.
 
     Raises:
-        HTTPException(404): 해당 event_id 의 이벤트가 없을 때
+        EventNotFoundError: event_id 형식이 UUID가 아니거나 이벤트가 없는 경우.
     """
-    # .first() : 조건에 맞는 첫 번째 행을 반환, 없으면 None
-    event = db.query(Event).filter(Event.event_id == event_id).first()
+    _validate_event_id(event_id)
+    now = datetime.now(KST).replace(tzinfo=None)
+    event = (
+        db.query(Event)
+        .filter(
+            Event.event_id == event_id,
+            Event.is_active == True,  # noqa: E712
+            Event.end_at >= now,
+        )
+        .first()
+    )
 
-    # 이벤트가 없으면 404 오류를 발생시킵니다.
-    # detail={"error": "ERROR_CODE"} 형태로 오류 코드를 포함합니다.
-    # main.py 의 전역 예외 핸들러가 이 형태를 표준 ApiResponse 로 변환합니다.
-    if event is None:
-        raise HTTPException(status_code=404, detail={"error": "EVENT_NOT_FOUND"})
+    if not event:
+        raise EventNotFoundError(
+            code="EVENT_NOT_FOUND",
+            message="이벤트를 찾을 수 없습니다.",
+            status_code=404,
+        )
 
-    return event
+    # 로그인 사용자의 참여 여부 확인
+    has_participated = False
+    if user_id:
+        has_participated = (
+            db.query(EventParticipation)
+            .filter(
+                EventParticipation.event_id == event_id,
+                EventParticipation.user_id == user_id,
+            )
+            .first()
+        ) is not None
+
+    response = EventResponse.model_validate(event)
+    return response.model_copy(update={"has_participated": has_participated})
 
 
-def participate_event(db: Session, event_id: str, user_id: str) -> EventParticipation:
-    """
-    이벤트 참여를 처리합니다.
-
-    3단계 검증을 순서대로 통과해야만 참여 기록이 저장됩니다:
-    1. 이벤트가 존재하는가?
-    2. 이벤트가 아직 진행 중인가?
-    3. 이미 참여한 적이 있는가?
+def participate_event(db: Session, event_id: str, user_id: str) -> dict:
+    """이벤트에 참여 처리합니다.
 
     Args:
-        db: 데이터베이스 세션
-        event_id: 참여할 이벤트 UUID
-        user_id: 참여하는 사용자 UUID
+        db: SQLAlchemy DB 세션.
+        event_id: 참여할 이벤트 UUID.
+        user_id: JWT에서 추출한 사용자 UUID.
 
     Returns:
-        생성된 EventParticipation 객체
+        {"participation_id": str}: 생성된 참여 기록 ID.
 
     Raises:
-        HTTPException(404): 이벤트가 없을 때
-        HTTPException(409): 이벤트가 종료되었을 때
-        HTTPException(409): 이미 참여한 이벤트일 때
+        EventNotFoundError: event_id 형식이 UUID가 아니거나 이벤트가 없는 경우.
+        AlreadyParticipatedError: 이미 참여한 경우.
     """
-    # 1단계: 이벤트 존재 여부 확인
-    # 없으면 get_event_detail 내부에서 HTTPException(404) 가 발생합니다.
-    event = get_event_detail(db, event_id)
+    _validate_event_id(event_id)
+    now = datetime.now(KST).replace(tzinfo=None)
+    # 이벤트 존재 여부 확인
+    event = (
+        db.query(Event)
+        .filter(
+            Event.event_id == event_id,
+            Event.is_active == True,  # noqa: E712
+            Event.end_at >= now,
+        )
+        .first()
+    )
+    if not event:
+        raise EventNotFoundError(
+            code="EVENT_NOT_FOUND",
+            message="이벤트를 찾을 수 없습니다.",
+            status_code=404,
+        )
 
-    # 2단계: 이벤트 기간 확인
-    # end_at 이 지났으면 참여 불가
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if now > event.end_at:
-        raise HTTPException(status_code=409, detail={"error": "EVENT_ENDED"})
-
-    # 3단계: 중복 참여 확인
-    # 같은 user_id + 같은 event_id 조합이 이미 있는지 검사합니다.
-    already_joined = (
+    # 중복 참여 확인
+    existing = (
         db.query(EventParticipation)
         .filter(
             EventParticipation.event_id == event_id,
             EventParticipation.user_id == user_id,
         )
-        .first()  # 하나라도 있으면 중복
+        .first()
     )
+    if existing:
+        raise AlreadyParticipatedError(
+            code="ALREADY_PARTICIPATED",
+            message="이미 참여한 이벤트입니다.",
+            status_code=409,
+        )
 
-    if already_joined is not None:
-        raise HTTPException(status_code=409, detail={"error": "ALREADY_PARTICIPATED"})
-
-    # 검증 통과 → 참여 기록 생성
+    # 참여 기록 생성
     participation = EventParticipation(event_id=event_id, user_id=user_id)
-    db.add(participation)  # 세션에 추가 (아직 DB에 저장 안 됨)
-    db.commit()  # DB 에 실제로 저장 (이 시점에 INSERT 쿼리가 실행됩니다)
-    db.refresh(participation)  # DB 에서 최신 상태를 다시 읽어옴 (UUID 등 반영)
+    db.add(participation)
+    db.commit()
+    db.refresh(participation)
 
-    return participation
+    return {"participation_id": participation.participation_id}
+
+
+def get_events_tts_text(db: Session) -> str:
+    """이벤트 목록을 TTS 친화적 문자열로 반환합니다.
+
+    AI 에이전트 tool에서 호출합니다. 마크다운 없이 한국어 자연어로 반환합니다.
+
+    Args:
+        db: SQLAlchemy DB 세션.
+
+    Returns:
+        TTS로 읽힐 자연어 문자열.
+    """
+    result = get_active_events(db)
+    events = result.events
+
+    if not events:
+        return "현재 진행 중인 이벤트가 없습니다."
+
+    count_kor = _to_korean_count(len(events))
+    titles = [f"{_ordinal(i + 1)}, {e.title}" for i, e in enumerate(events)]
+    titles_str = ". ".join(titles)
+
+    return f"현재 진행 중인 이벤트는 {count_kor}입니다. {titles_str}."
+
+
+def _to_korean_count(n: int) -> str:
+    """숫자를 '~개' 형태의 한국어로 변환합니다."""
+    korean = ["", "한", "두", "세", "네", "다섯", "여섯", "일곱", "여덟", "아홉", "열"]
+    if 1 <= n <= 10:
+        return f"{korean[n]} 개"
+    return f"{n}개"
+
+
+def _ordinal(n: int) -> str:
+    """순서를 한국어로 변환합니다."""
+    ordinals = ["", "첫 번째", "두 번째", "세 번째", "네 번째", "다섯 번째"]
+    if 1 <= n <= 5:
+        return ordinals[n]
+    return f"{n}번째"

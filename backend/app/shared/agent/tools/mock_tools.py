@@ -61,7 +61,7 @@ def mock_query_asset(
     )
 
 
-# ── 잔액 조회 (하위 호환 유지) ────────────────────────────────────────────────
+# ── 잔액 조회 ──────────────────────────────────────────────────────────────────
 
 
 @tool
@@ -82,7 +82,7 @@ def mock_get_balance(user_id: str) -> str:
     )
 
 
-# ── 거래 내역 조회 (하위 호환 유지) ──────────────────────────────────────────
+# ── 거래 내역 조회 ─────────────────────────────────────────────────────────────
 
 
 @tool
@@ -152,7 +152,10 @@ def mock_register_auto_transfer(
     """
     formatted = _format_amount(amount)
     freq_label = "매월" if cycle == "monthly" else "매주"
-    return f"{recipient}에게 {freq_label} {scheduled_day}일 {formatted} 자동이체가 등록되었습니다."
+    return (
+        f"{recipient}에게 {freq_label} {scheduled_day}일 {formatted} "
+        "자동이체가 등록되었습니다."
+    )
 
 
 # ── 수취인 조회 (resolve_node용) ─────────────────────────────────────────────

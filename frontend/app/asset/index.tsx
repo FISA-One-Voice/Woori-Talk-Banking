@@ -163,46 +163,6 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
     fontWeight: 'bold',
   },
-  voiceHint: {
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.grayMedium,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  voiceIndicator: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-    marginBottom: 8,
-    padding: 24,
-    borderRadius: LAYOUT.borderRadius,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.surface,
-    gap: 8,
-  },
-  voiceIndicatorListening: {
-    borderColor: '#ff4444',
-    backgroundColor: '#1a0000',
-  },
-  voiceIndicatorProcessing: {
-    borderColor: COLORS.grayMedium,
-    backgroundColor: COLORS.surfaceLight,
-  },
-  voiceIndicatorIcon: {
-    fontSize: 40,
-  },
-  voiceIndicatorText: {
-    fontSize: FONT_SIZES.body,
-    color: COLORS.textMain,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  voiceIndicatorSub: {
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.grayMedium,
-    textAlign: 'center',
-  },
   listenBtn: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
@@ -231,15 +191,4 @@ const styles = StyleSheet.create({
   accountBank: { fontSize: FONT_SIZES.body, color: COLORS.textMain, fontWeight: 'bold' },
   accountAlias: { fontSize: FONT_SIZES.caption, color: COLORS.grayLight },
   accountBalance: { fontSize: FONT_SIZES.body, color: COLORS.textMain, fontWeight: 'bold' },
-  bottomBtns: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  actionBtn: {
-    flex: 1,
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: LAYOUT.borderRadius,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  actionBtnText: { fontSize: FONT_SIZES.body, color: COLORS.textMain, fontWeight: 'bold' },
 });
