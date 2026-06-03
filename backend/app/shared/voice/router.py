@@ -21,7 +21,7 @@ from app.shared.voice.schema import (
     TTSRequest,
     TTSResult,
 )
-from app.shared.voice.service import process_voice_pipeline
+from app.shared.voice.service import process_voice_pipeline, reset_voice_state
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
 
@@ -69,6 +69,22 @@ async def voice_pipeline(
         success=True,
         data=data.model_dump(),
         message="음성 처리가 완료되었습니다.",
+    )
+
+
+@router.post("/reset-state", response_model=ApiResponse)
+async def reset_voice_session(
+    user_id: str = Depends(get_current_user_id),
+) -> ApiResponse:
+    """LangGraph 음성 세션(슬롯·대기 상태)을 초기화한다.
+
+    홈 이동·취소 후 프론트엔드가 호출해 이전 송금 컨텍스트를 제거한다.
+    """
+    await reset_voice_state(user_id)
+    return ApiResponse(
+        success=True,
+        data=None,
+        message="음성 세션이 초기화되었습니다.",
     )
 
 

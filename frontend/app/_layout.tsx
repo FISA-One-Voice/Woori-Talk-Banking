@@ -2,14 +2,24 @@ import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay'
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { useTransferStore as transferStore } from '@/store/transferStore';
+import { useAuthStore } from '@/store/authStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { apiClient, ApiResponse } from '@/utils/api';
+import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { getTtsMessage } from '@/utils/errorHandler';
-import { registerSound, stopAllTts } from '@/utils/ttsManager';
+import {
+  needsYesNoVoicePrompt,
+  YES_NO_CONFIRM_INSTRUCTION,
+} from '@/constants/voicePrompts';
+import { registerSound, speakText, stopAllTts } from '@/utils/ttsManager';
+import {
+  agentPathFromNavigateTo,
+  shouldNavigateToRoute,
+} from '@/utils/voiceNavigation';
 import { Audio } from 'expo-av';
-import { Stack, useRouter } from 'expo-router';
+import { Href, Stack, useRouter, useSegments } from 'expo-router';
 import * as Speech from 'expo-speech';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
 
 // ── Azure TTS(base64) 재생 ────────────────────────────────────────────────────
@@ -42,13 +52,11 @@ async function playBase64Audio(base64: string): Promise<void> {
 function isVGesture(pts: Array<{ x: number; y: number }>): boolean {
   if (pts.length < 8) return false;
 
-  // 최저점(V의 꼭짓점) 인덱스 탐색
   let bottomIdx = 0;
   for (let i = 1; i < pts.length; i++) {
     if (pts[i].y > pts[bottomIdx].y) bottomIdx = i;
   }
 
-  // 최저점이 전체 경로의 20%~80% 구간에 있어야 한다 (시작/끝이 아닌 중간)
   const ratio = bottomIdx / (pts.length - 1);
   if (ratio < 0.2 || ratio > 0.8) return false;
 
@@ -56,13 +64,55 @@ function isVGesture(pts: Array<{ x: number; y: number }>): boolean {
   const bottomY = pts[bottomIdx].y;
   const endY = pts[pts.length - 1].y;
 
-  // 아래로 80px 이상 내려가야 한다
   if (bottomY - startY < 80) return false;
-
-  // 다시 위로 60px 이상 올라와야 한다
   if (bottomY - endY < 60) return false;
 
   return true;
+}
+
+function segmentsToPath(segments: string[]): string {
+  if (!segments.length) return '/';
+  return `/${segments.join('/')}`;
+}
+
+function navigateFromAgent(
+  router: ReturnType<typeof useRouter>,
+  navigateTo: string,
+  currentPathRef: MutableRefObject<string>,
+): void {
+  if (!shouldNavigateToRoute(currentPathRef.current, navigateTo)) {
+    return;
+  }
+
+  const targetPath = agentPathFromNavigateTo(navigateTo);
+
+  if (navigateTo === 'home') {
+    resetVoiceSessionOnHome();
+    router.replace('/home' as Href);
+    currentPathRef.current = '/home';
+    return;
+  }
+
+  router.replace(targetPath as Href);
+  currentPathRef.current = targetPath;
+}
+
+function buildTxReceiptFromSlots(
+  prevSlots: Record<string, unknown>,
+  newSlots: Record<string, unknown> | undefined,
+) {
+  const merged = { ...prevSlots, ...(newSlots ?? {}) };
+  const recipientName = (merged.recipient as string) ?? '';
+  const amount = merged.amount ? Number(merged.amount) : 0;
+  const txId =
+    (merged.txId as string) ?? (merged.tx_id as string) ?? '';
+  if (!recipientName || !amount) return;
+  transferStore.getState().setTxReceipt({
+    txId,
+    toName: recipientName,
+    toBankName: (merged.toBankName as string) ?? '',
+    amount,
+  });
 }
 
 // ── 루트 레이아웃 ─────────────────────────────────────────────────────────────
@@ -70,8 +120,13 @@ function isVGesture(pts: Array<{ x: number; y: number }>): boolean {
 export default function RootLayout() {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const router = useRouter();
+  const segments = useSegments();
+  const currentPathRef = useRef('/');
 
-  // V 제스처: 터치 경로를 수집한다
+  useEffect(() => {
+    currentPathRef.current = segmentsToPath(segments as string[]);
+  }, [segments]);
+
   const touchPts = useRef<Array<{ x: number; y: number }>>([]);
 
   function handleTouchStart(e: GestureResponderEvent): void {
@@ -98,51 +153,47 @@ export default function RootLayout() {
     }
   }
 
-  // ── 음성 응답 처리 ──────────────────────────────────────────────────────────
-  // 1) 음성 상태 즉시 업데이트
-  // 2) 기존 expo-speech 중단 후 Azure TTS 재생 (await)
-  // 3) 재생 완료 후 화면 전환 → useScreenAnnounce 와 겹치지 않는다
-
   const handleResponse = useCallback(
     async (data: VoiceResponseData) => {
-      // execute_node는 collected_slots를 {}로 초기화하므로
-      // setLastResponse 이전에 이전 슬롯을 저장해 이체 완료 화면에 전달한다.
-      const prevSlots = useVoiceResponseStore.getState().lastResponse?.collected_slots ?? {};
+      const prevSlots =
+        (useVoiceResponseStore.getState().lastResponse?.collected_slots as
+          | Record<string, unknown>
+          | undefined) ?? {};
 
-      useVoiceResponseStore.getState().setLastResponse(data);
+      const isCompleteNav = data.navigate_to === 'transfer/complete';
+
+      if (isCompleteNav) {
+        buildTxReceiptFromSlots(prevSlots, data.collected_slots);
+        navigateFromAgent(router, 'transfer/complete', currentPathRef);
+        useVoiceResponseStore.getState().setLastResponse({
+          ...data,
+          collected_slots: { ...prevSlots, ...(data.collected_slots ?? {}) },
+        });
+      } else {
+        useVoiceResponseStore.getState().setLastResponse(data);
+      }
 
       if (data.awaiting_asv_audio) {
         setVoiceState('awaiting_asv');
-      } else if (data.awaiting_confirmation) {
+      } else if (data.awaiting_memo_decision) {
+        setVoiceState('awaiting_memo');
+      } else if (data.awaiting_confirmation || data.awaiting_transfer_clarification) {
         setVoiceState('awaiting_confirm');
       } else {
         setVoiceState('idle');
       }
 
-      if (data.navigate_to === 'transfer/complete') {
-        const recipientName = (prevSlots.recipient as string) ?? '';
-        const amount = prevSlots.amount ? Number(prevSlots.amount) : 0;
-        if (recipientName && amount) {
-          transferStore.getState().setTxReceipt({
-            txId: '',
-            toName: recipientName,
-            toBankName: '',
-            amount,
-          });
-        }
-      }
-
       if (data.audio) {
-        Speech.stop(); // 화면 안내 TTS가 재생 중이면 먼저 중단
+        Speech.stop();
         await playBase64Audio(data.audio).catch(() => undefined);
       }
 
-      if (data.navigate_to) {
-        if (data.navigate_to === 'home') {
-          router.replace('/home');
-        } else {
-          router.push(`/${data.navigate_to}`);
-        }
+      if (needsYesNoVoicePrompt(data) && !data.audio) {
+        speakText(YES_NO_CONFIRM_INSTRUCTION);
+      }
+
+      if (data.navigate_to && !isCompleteNav) {
+        navigateFromAgent(router, data.navigate_to, currentPathRef);
       }
     },
     [router],
@@ -172,15 +223,17 @@ export default function RootLayout() {
     setVoiceState,
   );
 
+  const hasVoiceRegistered = useAuthStore((state) => state.hasVoiceRegistered);
+
   return (
     <Pressable
       style={styles.root}
-      onLongPress={handleLongPress}
-      onPressOut={handlePressOut}
+      onLongPress={hasVoiceRegistered ? handleLongPress : undefined}
+      onPressOut={hasVoiceRegistered ? handlePressOut : undefined}
       delayLongPress={500}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onTouchStart={hasVoiceRegistered ? handleTouchStart : undefined}
+      onTouchMove={hasVoiceRegistered ? handleTouchMove : undefined}
+      onTouchEnd={hasVoiceRegistered ? handleTouchEnd : undefined}
     >
       <Stack screenOptions={{ headerShown: false }} />
       <VoiceStatusOverlay state={voiceState} />

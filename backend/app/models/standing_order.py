@@ -52,6 +52,7 @@ class StandingOrder(Base):
     # 'active' | 'paused' | 'cancelled'
     status: Mapped[str] = mapped_column(String(10), default="active", nullable=False)
     next_execution_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    transfer_note: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)
 
     user: Mapped["User"] = relationship("User", back_populates="standing_orders")

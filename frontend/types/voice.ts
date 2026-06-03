@@ -36,10 +36,29 @@ export interface VoiceResponseData {
   awaiting_asv_audio: boolean;
 
   /**
+   * 이체 직후 메모 제안 응답 대기.
+   * true이면 VoiceStatusOverlay에 메모 안내 표시.
+   */
+  awaiting_memo_decision: boolean;
+
+  /**
+   * 전화·계좌만 말한 뒤 송금 여부(네/아니오) 확인 대기.
+   */
+  awaiting_transfer_clarification?: boolean;
+
+  /**
    * STT 변환 결과 텍스트 (사용자가 말한 내용).
    * 정상 흐름에서만 채워지며 ASV 인증 흐름에서는 null.
    */
   transcript: string | null;
+
+  /**
+   * 현재 진행 중인 액션 이름.
+   * - "auto_transfer": 자동이체 등록 흐름
+   * - "cancel_auto_transfer": 자동이체 해지 흐름
+   * - null이면 액션 없음
+   */
+  pending_action: string | null;
 }
 
 /**
