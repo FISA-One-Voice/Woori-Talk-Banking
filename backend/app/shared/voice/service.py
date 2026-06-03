@@ -251,9 +251,6 @@ async def _handle_asv_flow(
     Raises:
         ASVError: 사용자 음성 미등록 또는 ASV EC2 서버 통신 오류.
     """
-    if settings.MOCK_ASV:
-        logger.info("MOCK_ASV=true — ASV 인증 우회, 즉시 성공 처리")
-        return await _proceed_after_asv_success(user_id, config, graph)
 
     state_snapshot = graph.get_state(config)
     retry_count = (
