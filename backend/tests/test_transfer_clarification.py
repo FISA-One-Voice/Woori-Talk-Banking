@@ -42,6 +42,12 @@ class TestTransferClarificationFlow:
         update = build_transfer_clarification_response("아니요", "010 1111 0003")
         assert update["awaiting_transfer_clarification"] is False
         assert update.get("pending_action") is None
+        assert update["navigate_to"] == "home"
+
+    def test_home_request_navigates_home(self):
+        update = build_transfer_clarification_response("홈으로", "010 1111 0003")
+        assert update["navigate_to"] == "home"
+        assert update.get("pending_action") is None
 
     def test_should_offer_when_idle(self):
         assert (

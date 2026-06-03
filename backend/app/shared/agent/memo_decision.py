@@ -2,7 +2,10 @@
 
 from langchain_core.messages import AIMessage
 
-from app.shared.agent.slot_schema import SLOT_QUESTIONS
+_MEMO_CATEGORY_PROMPT = (
+    "식비, 교통비, 쇼핑, 의료비, 문화생활, 기타 중 말씀해 주시거나, "
+    "건너뛰기라고 말씀해 주세요."
+)
 
 _SKIP_KEYWORDS = (
     "건너뛰",
@@ -68,11 +71,18 @@ def is_memo_accept_without_category(text: str) -> bool:
 def build_memo_decision_update(text: str) -> dict:
     """메모 제안 대기 중 사용자 발화를 상태 갱신 dict로 변환한다."""
     if is_memo_skip(text):
+        from app.shared.agent.session_reset import clear_conversation_messages
+
         return {
             "awaiting_memo_decision": False,
             "pending_action": None,
+            "collected_slots": {},
+            "last_tx_id": None,
             "navigate_to": "home",
-            "messages": [AIMessage(content="알겠습니다. 홈으로 이동합니다.")],
+            "messages": [
+                *clear_conversation_messages(),
+                AIMessage(content="메모를 건너뛰었습니다."),
+            ],
         }
 
     category = match_memo_category(text)
@@ -87,20 +97,13 @@ def build_memo_decision_update(text: str) -> dict:
 
     if is_memo_accept_without_category(text):
         return {
-            "awaiting_memo_decision": False,
-            "pending_action": "add_note",
+            "awaiting_memo_decision": True,
+            "pending_action": None,
             "collected_slots": {},
-            "messages": [AIMessage(content=SLOT_QUESTIONS["memo"])],
+            "messages": [AIMessage(content=_MEMO_CATEGORY_PROMPT)],
         }
 
     return {
         "awaiting_memo_decision": True,
-        "messages": [
-            AIMessage(
-                content=(
-                    "식비, 교통비, 쇼핑, 의료비, 문화생활, 기타 중 말씀해 주시거나, "
-                    "건너뛰기라고 말씀해 주세요."
-                )
-            )
-        ],
+        "messages": [AIMessage(content=_MEMO_CATEGORY_PROMPT)],
     }

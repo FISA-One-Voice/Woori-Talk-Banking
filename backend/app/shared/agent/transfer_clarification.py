@@ -62,7 +62,12 @@ def has_amount_hint(text: str) -> bool:
     if _AMOUNT_PATTERN.search(text):
         return True
     normalized = _normalize(text)
-    return any(token in normalized for token in ("만원", "천원", "억원", "원을", "원보내"))
+    if any(token in normalized for token in ("만원", "천원", "억원", "원을", "원보내")):
+        return True
+    digits_only = re.sub(r"\D", "", text)
+    if re.fullmatch(r"01[0-9]{8,9}", digits_only):
+        return False
+    return bool(re.search(r"\d{4,}", text))
 
 
 def is_recipient_only_utterance(text: str) -> bool:
@@ -134,21 +139,39 @@ def build_transfer_clarification_offer(user_text: str) -> dict:
     }
 
 
+def is_home_request(text: str) -> bool:
+    """홈 화면 이동 의도 발화인지."""
+    normalized = _normalize(text)
+    home_keywords = ("홈", "처음", "홈화면", "홈으로", "home")
+    return any(kw in normalized for kw in home_keywords)
+
+
+def build_home_reset_update(message: str = "홈 화면으로 이동합니다.") -> dict:
+    """홈 이동 + LangGraph 상태 전체 초기화."""
+    return {
+        "pending_action": None,
+        "collected_slots": {},
+        "awaiting_confirmation": False,
+        "awaiting_asv_audio": False,
+        "execution_ready": False,
+        "recipient_validated": False,
+        "asv_retry_count": 0,
+        "awaiting_memo_decision": False,
+        "awaiting_transfer_clarification": False,
+        "draft_recipient": None,
+        "last_tx_id": None,
+        "navigate_to": "home",
+        "messages": [AIMessage(content=message)],
+    }
+
+
 def build_transfer_clarification_response(user_text: str, draft_recipient: str) -> dict:
     """송금 확인 대기 중 사용자 발화 처리."""
+    if is_home_request(user_text):
+        return build_home_reset_update()
+
     if is_clarification_no(user_text):
-        return {
-            "awaiting_transfer_clarification": False,
-            "draft_recipient": None,
-            "pending_action": None,
-            "collected_slots": {},
-            "navigate_to": None,
-            "messages": [
-                AIMessage(
-                    content="알겠습니다. 이체, 잔액 조회, 홈 이동 중 필요하신 것을 말씀해 주세요."
-                )
-            ],
-        }
+        return build_home_reset_update("알겠습니다. 홈 화면으로 이동합니다.")
 
     if is_balance_request(user_text):
         return {

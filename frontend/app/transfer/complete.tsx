@@ -6,6 +6,7 @@ import { COLORS, LAYOUT } from '@/constants/theme';
 import { useTransferStore } from '@/store/transferStore';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { saveMemo } from '@/services/transferService';
+import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { resolveCompletePhase, type CompletePhase } from './completeStepResolver';
 import { CompleteSummaryView } from './views/CompleteSummaryView';
 import { CompleteMemoDoneView } from './views/CompleteMemoDoneView';
@@ -25,9 +26,9 @@ export default function TransferCompleteScreen() {
   const bankName = txReceipt?.toBankName ?? '';
 
   const goHome = useCallback(() => {
-    reset();
+    resetVoiceSessionOnHome();
     router.replace('/home');
-  }, [reset]);
+  }, []);
 
   useEffect(() => {
     if (!txId && !recipient) {
@@ -37,9 +38,9 @@ export default function TransferCompleteScreen() {
 
   useEffect(() => {
     if (lastResponse?.navigate_to === 'home') {
-      reset();
+      resetVoiceSessionOnHome();
     }
-  }, [lastResponse?.navigate_to, reset]);
+  }, [lastResponse?.navigate_to]);
 
   const handleMemoSave = async (category: string) => {
     if (!txId) {

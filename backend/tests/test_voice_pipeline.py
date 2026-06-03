@@ -32,7 +32,9 @@ from app.shared.voice.service import (
     _get_user_embedding,
     _handle_asv_flow,
     _handle_normal_flow,
+    _resolve_navigate_to,
     process_voice_pipeline,
+    reset_voice_state,
 )
 
 
@@ -52,6 +54,7 @@ def _make_agent_result(
     collected_slots: dict | None = None,
     awaiting_confirmation: bool = False,
     awaiting_asv_audio: bool = False,
+    pending_action: str | None = None,
 ):
     """graph.ainvoke() 반환값 모의 객체 생성 헬퍼."""
     from langchain_core.messages import AIMessage
@@ -62,6 +65,7 @@ def _make_agent_result(
         "collected_slots": collected_slots or {},
         "awaiting_confirmation": awaiting_confirmation,
         "awaiting_asv_audio": awaiting_asv_audio,
+        "pending_action": pending_action,
     }
 
 
@@ -216,12 +220,98 @@ class TestNormalFlow:
 
         assert result.navigate_to == "balance"
 
+    @pytest.mark.asyncio
+    async def test_confirm_flow_keeps_navigate_to_transfer(self) -> None:
+        """awaiting_confirmation=True여도 navigate_to=transfer가 유지되어야 한다."""
+        mock_graph = _make_mock_graph(
+            state_values={"awaiting_asv_audio": False},
+            invoke_result=_make_agent_result(
+                response_text="안유민님 3천원 이체할까요?",
+                navigate_to="transfer",
+                collected_slots={"recipient": "안유민", "amount": "3000"},
+                awaiting_confirmation=True,
+                pending_action="transfer",
+            ),
+        )
+
+        with (
+            patch("app.shared.voice.service._get_graph", return_value=mock_graph),
+            patch(
+                "app.shared.voice.service.transcribe_audio",
+                new=AsyncMock(return_value=FAKE_TRANSCRIPT),
+            ),
+            patch(
+                "app.shared.voice.service.synthesize_speech",
+                new=AsyncMock(return_value=b"MP3"),
+            ),
+        ):
+            result = await process_voice_pipeline(
+                FAKE_AUDIO, FAKE_USER_ID, db=MagicMock()
+            )
+
+        assert result.navigate_to == "transfer"
+        assert result.awaiting_confirmation is True
+
+    @pytest.mark.asyncio
+    async def test_asv_awaiting_resolves_navigate_to_transfer(self) -> None:
+        """awaiting_asv + pending transfer → navigate_to fallback transfer."""
+        mock_graph = _make_mock_graph(
+            state_values={"awaiting_asv_audio": False},
+            invoke_result=_make_agent_result(
+                response_text="목소리로 인증해 주세요.",
+                navigate_to=None,
+                awaiting_asv_audio=True,
+                pending_action="transfer",
+                collected_slots={"recipient": "안유민", "amount": "3000"},
+            ),
+        )
+
+        with (
+            patch("app.shared.voice.service._get_graph", return_value=mock_graph),
+            patch(
+                "app.shared.voice.service.transcribe_audio",
+                new=AsyncMock(return_value=FAKE_TRANSCRIPT),
+            ),
+            patch(
+                "app.shared.voice.service.synthesize_speech",
+                new=AsyncMock(return_value=b"MP3"),
+            ),
+        ):
+            result = await process_voice_pipeline(
+                FAKE_AUDIO, FAKE_USER_ID, db=MagicMock()
+            )
+
+        assert result.navigate_to == "transfer"
+        assert result.awaiting_asv_audio is True
+
+
+class TestResolveNavigateTo:
+    def test_fallback_pending_transfer(self) -> None:
+        assert _resolve_navigate_to({"pending_action": "transfer"}) == "transfer"
+
+    def test_explicit_home(self) -> None:
+        assert _resolve_navigate_to({"navigate_to": "home"}) == "home"
+
 
 # ── Layer A: ASV 흐름 테스트 ─────────────────────────────────────────────────────
 
 
 class TestAsvFlow:
     """awaiting_asv_audio=True일 때 ASV 인증 흐름 검증."""
+
+    _ASV_TRANSCRIPT = "목소리 인증"
+
+    def _asv_stt_patch(self):
+        return patch(
+            "app.shared.voice.service.transcribe_audio",
+            new=AsyncMock(return_value=self._ASV_TRANSCRIPT),
+        )
+
+    def _asv_wav_patch(self):
+        return patch(
+            "app.shared.voice.service._to_wav_bytes",
+            return_value=b"FAKE_WAV_BYTES",
+        )
 
     def _make_db_with_user(self, embedding: list[float] = None) -> MagicMock:
         """embedding_vector를 가진 사용자가 있는 DB 모의 객체."""
@@ -241,6 +331,8 @@ class TestAsvFlow:
 
         with (
             patch("app.shared.voice.service._get_graph", return_value=mock_graph),
+            self._asv_stt_patch(),
+            self._asv_wav_patch(),
             patch(
                 "app.shared.voice.service._call_asv_ec2",
                 new=AsyncMock(return_value=ASVResult(verified=True, score=0.85)),
@@ -277,6 +369,8 @@ class TestAsvFlow:
 
         with (
             patch("app.shared.voice.service._get_graph", return_value=mock_graph),
+            self._asv_stt_patch(),
+            self._asv_wav_patch(),
             patch(
                 "app.shared.voice.service._call_asv_ec2",
                 new=AsyncMock(return_value=ASVResult(verified=False, score=0.3)),
@@ -312,6 +406,8 @@ class TestAsvFlow:
 
         with (
             patch("app.shared.voice.service._get_graph", return_value=mock_graph),
+            self._asv_stt_patch(),
+            self._asv_wav_patch(),
             patch(
                 "app.shared.voice.service._call_asv_ec2",
                 new=AsyncMock(return_value=ASVResult(verified=False, score=0.2)),
@@ -343,6 +439,8 @@ class TestAsvFlow:
 
         with (
             patch("app.shared.voice.service._get_graph", return_value=mock_graph),
+            self._asv_stt_patch(),
+            self._asv_wav_patch(),
             patch(
                 "app.shared.voice.service._call_asv_ec2",
                 new=AsyncMock(return_value=ASVResult(verified=False, score=0.1)),
@@ -371,6 +469,32 @@ class TestAsvFlow:
 
         assert result.awaiting_asv_audio is False
         assert result.awaiting_confirmation is False
+        assert result.navigate_to == "home"
+
+    @pytest.mark.asyncio
+    async def test_asv_home_keyword_skips_verify(self) -> None:
+        """ASV 대기 중 '홈' 발화 → verify 생략, home navigate."""
+        mock_graph = _make_mock_graph(
+            state_values={"awaiting_asv_audio": True, "asv_retry_count": 0},
+        )
+
+        with (
+            patch("app.shared.voice.service._get_graph", return_value=mock_graph),
+            patch(
+                "app.shared.voice.service.transcribe_audio",
+                new=AsyncMock(return_value="홈으로"),
+            ),
+            patch(
+                "app.shared.voice.service.synthesize_speech",
+                new=AsyncMock(return_value=b"MP3"),
+            ),
+        ):
+            result = await process_voice_pipeline(
+                FAKE_AUDIO, FAKE_USER_ID, db=self._make_db_with_user()
+            )
+
+        assert result.navigate_to == "home"
+        mock_graph.aupdate_state.assert_called()
 
     @pytest.mark.asyncio
     async def test_asv_not_enrolled_raises_error(self) -> None:
@@ -386,6 +510,7 @@ class TestAsvFlow:
 
         with (
             patch("app.shared.voice.service._get_graph", return_value=mock_graph),
+            self._asv_stt_patch(),
             patch(
                 "app.shared.voice.service.synthesize_speech",
                 new=AsyncMock(return_value=b"MP3"),
@@ -405,7 +530,10 @@ class TestAsvFlow:
         mock_db = MagicMock()
         mock_db.get.return_value = None  # 사용자 없음
 
-        with patch("app.shared.voice.service._get_graph", return_value=mock_graph):
+        with (
+            patch("app.shared.voice.service._get_graph", return_value=mock_graph),
+            self._asv_stt_patch(),
+        ):
             with pytest.raises(ASVError) as exc_info:
                 await process_voice_pipeline(FAKE_AUDIO, FAKE_USER_ID, db=mock_db)
 

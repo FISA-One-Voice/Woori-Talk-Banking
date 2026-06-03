@@ -228,6 +228,7 @@ class TestStateTransitionLogic:
 
         assert result["pending_action"] is None
         assert result["collected_slots"] == {}
+        assert result.get("navigate_to") == "home"
         # 마지막 AI 메시지 확인
         ai_messages = [m for m in result["messages"] if isinstance(m, AIMessage)]
         assert len(ai_messages) > 0
@@ -481,14 +482,11 @@ class TestIntegrationMultiTurn:
             f"awaiting={result3.get('awaiting_confirmation')}, slots={slots3}"
         )
 
-<<<<<<< HEAD
-=======
     @pytest.mark.xfail(
         reason="invoke() 반환 dict에 pending_action 누락 — MemorySaver에는 저장되나 "
                "반환값에서 확인 불가. 실제 이체 흐름(test_asv_success_then_llm_executes_transfer)은 정상.",
         strict=False,
     )
->>>>>>> 9c027ee2e60d2f2073f491b64a8fffa88afbf770
     def test_state_persisted_across_turns(self, graph_with_mocks):
         """동일 thread_id로 2턴 호출 시 1턴의 슬롯 상태가 유지되어야 한다."""
         tid = _new_thread_id()

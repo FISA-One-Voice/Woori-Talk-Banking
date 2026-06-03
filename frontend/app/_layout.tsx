@@ -5,6 +5,7 @@ import { useTransferStore as transferStore } from '@/store/transferStore';
 import { useAuthStore } from '@/store/authStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { apiClient, ApiResponse } from '@/utils/api';
+import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { getTtsMessage } from '@/utils/errorHandler';
 import { registerSound, stopAllTts } from '@/utils/ttsManager';
 import { Audio } from 'expo-av';
@@ -69,7 +70,7 @@ function isVGesture(pts: Array<{ x: number; y: number }>): boolean {
 /** 에이전트 navigate_to → Expo Router replace (스택 단일 유지) */
 function navigateFromAgent(router: ReturnType<typeof useRouter>, navigateTo: string): void {
   if (navigateTo === 'home') {
-    transferStore.getState().reset();
+    resetVoiceSessionOnHome();
     router.replace('/home' as Href);
     return;
   }
