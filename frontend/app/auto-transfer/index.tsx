@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppScreenHeader, StepIndicator } from '@/components/layout';
 import { TtsBubble } from '@/components/feedback';
+import { YES_NO_CONFIRM_INSTRUCTION } from '@/constants/voicePrompts';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
@@ -329,10 +330,11 @@ function ConfirmView({
       <TtsBubble
         message={
           awaitingConfirmation
-            ? '네 또는 아니요로 말씀해 주세요.'
+            ? YES_NO_CONFIRM_INSTRUCTION
             : `${slots.alias}님께 ${scheduleText}에 ${formatAmount(slots.amount)} 자동이체할까요?`
         }
         variant={awaitingConfirmation ? 'warning' : 'default'}
+        autoPlay={awaitingConfirmation}
       />
     </>
   );
@@ -375,10 +377,11 @@ function CancelConfirmView({
       <TtsBubble
         message={
           awaitingConfirmation
-            ? '네 또는 아니요로 말씀해 주세요.'
+            ? YES_NO_CONFIRM_INSTRUCTION
             : `${slots.recipient}에게 설정된 자동이체를 해지할까요?`
         }
         variant={awaitingConfirmation ? 'warning' : 'default'}
+        autoPlay={awaitingConfirmation}
       />
     </>
   );

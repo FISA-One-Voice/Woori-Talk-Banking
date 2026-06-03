@@ -58,7 +58,9 @@ from app.shared.agent.transfer_clarification import (
 from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
+    ACTIONS_WITH_YES_NO_CONFIRM,
     ASV_REQUIRED_ACTIONS,
+    CONFIRM_YES_NO_SUFFIX,
     COMPLETE_SCREEN_MAP,
     MEMO_OFFER_SUFFIX,
     RECIPIENT_REQUIRED_ACTIONS,
@@ -209,7 +211,10 @@ def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
             parts.append(str(amount))
 
     summary = " ".join(parts)
-    return f"{summary} {action_label}할까요?"
+    msg = f"{summary} {action_label}할까요?"
+    if pending_action in ACTIONS_WITH_YES_NO_CONFIRM:
+        msg += CONFIRM_YES_NO_SUFFIX
+    return msg
 
 
 def _amount_to_korean(amount: int) -> str:
@@ -652,7 +657,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             existing = dict(state.get("collected_slots", {}))
             existing.update(result.extracted_slots)
             updates["collected_slots"] = existing
-            updates["navigate_to"] = SCREEN_MAP.get(pending)
+            # 슬롯만 채운 턴: navigate_to 생략 (프론트가 슬롯으로 step 전환, replace 중복 방지)
             if pending == "add_note" and existing.get("memo"):
                 updates["execution_ready"] = True
 

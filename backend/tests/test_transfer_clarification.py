@@ -2,10 +2,12 @@
 
 from langchain_core.messages import AIMessage, HumanMessage
 
+from app.shared.agent.slot_schema import CONFIRM_YES_NO_SUFFIX
 from app.shared.agent.transfer_clarification import (
     _recipient_hint_from_state,
     build_transfer_clarification_offer,
     build_transfer_clarification_response,
+    clarification_offer_message,
     is_recipient_only_utterance,
     should_offer_transfer_clarification,
 )
@@ -30,6 +32,11 @@ class TestTransferClarificationFlow:
         assert update["draft_recipient"] == "010 1111 0003"
         assert update["collected_slots"]["recipient"] == "010 1111 0003"
         assert "송금" in update["messages"][0].content
+        assert CONFIRM_YES_NO_SUFFIX.strip() in update["messages"][0].content
+
+    def test_clarification_offer_uses_unified_yes_no_phrase(self):
+        assert "아니오라고" in clarification_offer_message("phone")
+        assert "아니오라고" in clarification_offer_message("account")
 
     def test_yes_starts_transfer(self):
         update = build_transfer_clarification_response("네", "010 1111 0003")

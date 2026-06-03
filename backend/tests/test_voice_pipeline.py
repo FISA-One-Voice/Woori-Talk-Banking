@@ -286,11 +286,33 @@ class TestNormalFlow:
 
 
 class TestResolveNavigateTo:
-    def test_fallback_pending_transfer(self) -> None:
-        assert _resolve_navigate_to({"pending_action": "transfer"}) == "transfer"
+    def test_slot_fill_pending_transfer_no_fallback(self) -> None:
+        """슬롯만 보충된 턴(pending만 있음)은 navigate_to fallback 없음."""
+        assert _resolve_navigate_to({"pending_action": "transfer"}) is None
+
+    def test_awaiting_asv_fallback_transfer(self) -> None:
+        assert _resolve_navigate_to(
+            {
+                "pending_action": "transfer",
+                "awaiting_asv_audio": True,
+            }
+        ) == "transfer"
+
+    def test_awaiting_confirmation_fallback_transfer(self) -> None:
+        assert _resolve_navigate_to(
+            {
+                "pending_action": "transfer",
+                "awaiting_confirmation": True,
+            }
+        ) == "transfer"
 
     def test_explicit_home(self) -> None:
         assert _resolve_navigate_to({"navigate_to": "home"}) == "home"
+
+    def test_explicit_complete(self) -> None:
+        assert _resolve_navigate_to({"navigate_to": "transfer/complete"}) == (
+            "transfer/complete"
+        )
 
 
 # ── Layer A: ASV 흐름 테스트 ─────────────────────────────────────────────────────

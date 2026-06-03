@@ -90,14 +90,25 @@ def _voice_state_reset_payload() -> dict:
 
 
 def _resolve_navigate_to(result: dict) -> str | None:
-    """graph navigate_to 또는 pending·슬롯·대기 상태 기준 fallback."""
+    """graph navigate_to 또는 대기 상태 기준 fallback.
+
+    슬롯만 보충된 턴에는 pending_action만 남고 navigate_to가 없을 수 있다.
+    이 경우 None을 반환해 프론트가 같은 라우트로 replace 하지 않게 한다.
+    """
     explicit = result.get("navigate_to")
     if explicit:
         return explicit
 
     pending = result.get("pending_action")
-    if pending and pending in SCREEN_MAP:
+
+    if result.get("awaiting_asv_audio") and pending in SCREEN_MAP:
         return SCREEN_MAP[pending]
+
+    if result.get("awaiting_confirmation") and pending in SCREEN_MAP:
+        return SCREEN_MAP[pending]
+
+    if pending in ("balance", "history", "event", "auto_transfer"):
+        return SCREEN_MAP.get(pending)
 
     return None
 

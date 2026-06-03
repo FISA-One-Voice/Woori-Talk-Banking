@@ -5,6 +5,7 @@ import re
 from langchain_core.messages import AIMessage
 
 from app.features.recipients.service import classify_recipient_input
+from app.shared.agent.slot_schema import CONFIRM_YES_NO_SUFFIX
 
 _TRANSFER_KEYWORDS = (
     "이체",
@@ -103,10 +104,10 @@ def clarification_offer_message(kind: str) -> str:
     if kind == "account":
         return (
             "송금을 도와드릴까요? "
-            "등록된 별명이나 전화번호를 말씀해 주셔도 됩니다. "
-            "네 또는 아니오로 말씀해 주세요."
+            "등록된 별명이나 전화번호를 말씀해 주셔도 됩니다."
+            f"{CONFIRM_YES_NO_SUFFIX}"
         )
-    return "송금을 도와드릴까요? 네 또는 아니오로 말씀해 주세요."
+    return f"송금을 도와드릴까요?{CONFIRM_YES_NO_SUFFIX}"
 
 
 def _recipient_hint_from_state(draft_recipient: str, collected_slots: dict | None) -> str:
