@@ -44,11 +44,7 @@ from app.shared.agent.memo_decision import (
     last_user_text,
 )
 from app.shared.agent.session_reset import clear_conversation_messages
-from app.shared.agent.transfer_intent import (
-    build_bare_transfer_start_update,
-    is_plain_transfer_start,
-    should_use_bare_transfer_fast_start,
-)
+from app.shared.agent.transfer_intent import is_plain_transfer_start
 from app.shared.agent.transfer_clarification import (
     _recipient_hint_from_state,
     build_transfer_clarification_offer,
@@ -522,6 +518,11 @@ def build_graph(tools: list) -> CompiledStateGraph:
             " '한달에 한번', '매월', '매주' 등 주기만 말하고"
             " 날짜·요일을 언급하지 않으면 scheduled_day를 절대 설정하지 말 것."
             " monthly일 때 날짜 정수(1-31). '15일'→15, '말일'→31."
+            " ★ STT 오류 보정: 한국어 '일'(日)이 숫자 '1'로 잘못 인식됨."
+            " monthly 날짜 추출 시 숫자 끝 '1'은 '일'(日) 오인식이므로"
+            " 제거 후 나머지를 날짜로 사용."
+            " 예: '61'→6, '71'→7, '91'→9, '11'→1, '21'→2, '31'→3, '211'→21, '311'→31."
+            " '61'을 '6월 1일'로 해석하거나 '1'을 날짜로 추출하면 절대 안 됨."
             " ★ 자동이체에서 'N월마다'는 달(月)이 아닌 날짜로 해석:"
             " '10월마다'→scheduled_day=10, '5월마다'→scheduled_day=5."
             " weekly일 때도 scheduled_day에 요일 정수(0=월,1=화,2=수,3=목,4=금,5=토,6=일)를 저장."
@@ -639,8 +640,10 @@ def build_graph(tools: list) -> CompiledStateGraph:
             return {
                 "messages": [
                     AIMessage(
-                        content="네 또는 아니오로 말씀해 주세요."
-                        " 변경하실 내용이 있으면 말씀해 주시면 반영해 드립니다."
+                        content=(
+                            CONFIRM_YES_NO_SUFFIX.strip()
+                            + " 변경하실 내용이 있으면 말씀해 주시면 반영해 드립니다."
+                        )
                     )
                 ]
             }
@@ -713,8 +716,25 @@ def build_graph(tools: list) -> CompiledStateGraph:
             existing = dict(state.get("collected_slots", {}))
             missing_now = _missing_slots(pending, existing)
             for key, val in result.extracted_slots.items():
-                # 이미 채워진 슬롯은 덮어쓰지 않음 (LLM 오파싱 방어)
-                if key in missing_now or existing.get(key) is None:
+                # scheduled_day는 사용자 수정 가능 — 항상 허용
+                # 나머지는 이미 채워진 슬롯 덮어쓰기 방지 (LLM 오파싱 방어)
+                if (
+                    key == "scheduled_day"
+                    or key in missing_now
+                    or existing.get(key) is None
+                ):
+                    if key == "scheduled_day" and val is not None:
+                        try:
+                            day_int = int(val)
+                        except (ValueError, TypeError):
+                            day_int = None
+                        # STT가 '6일'→'61'처럼 '일'(日)을 '1'로 인식하는 오류 보정
+                        if (
+                            day_int is not None
+                            and 32 <= day_int <= 91
+                            and day_int % 10 == 1
+                        ):
+                            val = day_int // 10
                     existing[key] = val
             updates["collected_slots"] = existing
             updates["navigate_to"] = None  # 슬롯 채우기 중 화면 이동 없음
@@ -842,11 +862,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 ],
             }
 
+        pending_action = state.get("pending_action", "transfer")
         slots["recipient"] = None
         return {
             "collected_slots": slots,
             "recipient_validated": False,
-            "navigate_to": SCREEN_MAP.get("transfer"),
+            "navigate_to": SCREEN_MAP.get(pending_action, SCREEN_MAP.get("transfer")),
             "messages": [
                 AIMessage(
                     content=(

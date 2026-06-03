@@ -119,7 +119,7 @@ class Settings(BaseSettings):
     # ── ASV mock 설정 ─────────────────────────────────────────────────────────────
     # True : ASV 인증을 항상 성공으로 처리 — 화자 인증 서버 없이 개발/테스트용
     # False: 실제 ASV EC2 서버 호출
-    MOCK_ASV: bool = True
+    MOCK_ASV: bool = False
 
     # ── ASV 화자 인증 서버 설정 (Issue #7, ai/asv/) ───────────────────────────────
     # ASV_SERVER_URL: CAM++ 기반 화자 인증 서버 주소 (POST /verify)

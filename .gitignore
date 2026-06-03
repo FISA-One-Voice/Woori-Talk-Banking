@@ -79,3 +79,4 @@ voice-pipeline-flow.md
 .agent/
 
 .cursorrules
+kill_connections.py

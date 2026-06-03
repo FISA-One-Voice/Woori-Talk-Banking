@@ -80,7 +80,9 @@ COMPLETE_SCREEN_MAP: dict[str, str] = {
 
 # ── 확인(네/아니오) TTS 안내 ─────────────────────────────────────────────────────
 # confirm_node·transfer_clarification·프론트 오버레이와 동일 문구.
-CONFIRM_YES_NO_SUFFIX: str = " 네 또는 아니오라고 말씀해 주세요."
+CONFIRM_YES_NO_SUFFIX: str = (
+    " 네 또는 아니오라고 말씀하시거나, 수정사항을 말씀해 주세요."
+)
 
 ACTIONS_WITH_YES_NO_CONFIRM: set[str] = {
     "transfer",

@@ -116,6 +116,14 @@ export default function AutoTransferCompleteScreen() {
         `/api/auto-transfer/${orderId}/label`,
         { transferNote: category },
       );
+      // 버튼 저장 후 awaiting_memo_decision 해제 → phase가 memo-done으로 전환됨
+      const current = useVoiceResponseStore.getState().lastResponse;
+      if (current) {
+        useVoiceResponseStore.getState().setLastResponse({
+          ...current,
+          awaiting_memo_decision: false,
+        });
+      }
       setSavedCategory(category);
       setLocalPhase('memo-done');
     } catch {

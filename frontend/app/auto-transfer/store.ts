@@ -11,17 +11,13 @@ export interface AutoTransferReceipt {
 }
 
 interface AutoTransferFlowState {
-  fromAccountId: string | null;
   receipt: AutoTransferReceipt | null;
-  setFromAccountId: (id: string) => void;
   setReceipt: (r: AutoTransferReceipt | null) => void;
   reset: () => void;
 }
 
 export const useAutoTransferFlowStore = create<AutoTransferFlowState>((set) => ({
-  fromAccountId: null,
   receipt: null,
-  setFromAccountId: (id) => set({ fromAccountId: id }),
   setReceipt: (receipt) => set({ receipt }),
-  reset: () => set({ fromAccountId: null, receipt: null }),
+  reset: () => set({ receipt: null }),
 }));
