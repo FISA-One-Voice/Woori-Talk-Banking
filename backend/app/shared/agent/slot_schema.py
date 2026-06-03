@@ -100,7 +100,7 @@ ACTION_LABELS: dict[str, str] = {
 # 화면이 자체적으로 데이터를 가져오고 TTS를 처리하므로
 # intent_node에서 navigate_to만 설정하고 execute_node 없이 바로 END.
 # balance/history는 에이전트가 잔액·내역을 TTS로 읽어주므로 여기에 포함하지 않음.
-SCREEN_ONLY_INTENTS: set[str] = {"event"}
+SCREEN_ONLY_INTENTS: set[str] = set()
 
 # ── 유효한 인텐트 목록 ─────────────────────────────────────────────────────────────
 VALID_INTENTS: set[str] = set(SCREEN_MAP.keys()) | VOICE_ONLY_INTENTS

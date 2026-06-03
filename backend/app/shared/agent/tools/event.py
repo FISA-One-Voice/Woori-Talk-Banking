@@ -39,6 +39,7 @@ def get_event_list(user_id: str) -> str:  # noqa: D401
     """
     db = next(get_db())
     try:
-        return get_events_tts_text(db)
+        result = get_events_tts_text(db)
+        return f"이벤트 화면으로 이동합니다. {result}"
     finally:
         db.close()

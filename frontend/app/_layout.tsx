@@ -5,6 +5,7 @@ import { useTransferStore as transferStore } from '@/store/transferStore';
 import { useAutoTransferFlowStore } from './auto-transfer/store';
 import { useAuthStore } from '@/store/authStore';
 import type { VoiceResponseData } from '@/types/voice';
+import { playBase64Audio } from '@/utils/audioPlayer';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { getTtsMessage } from '@/utils/errorHandler';
@@ -12,39 +13,15 @@ import {
   needsYesNoVoicePrompt,
   YES_NO_CONFIRM_INSTRUCTION,
 } from '@/constants/voicePrompts';
-import { registerSound, speakText, stopAllTts } from '@/utils/ttsManager';
+import { speakText, stopAllTts } from '@/utils/ttsManager';
 import {
   agentPathFromNavigateTo,
   shouldNavigateToRoute,
 } from '@/utils/voiceNavigation';
-import { Audio } from 'expo-av';
 import { Href, Stack, useRouter, useSegments } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
-
-// ── Azure TTS(base64) 재생 ────────────────────────────────────────────────────
-
-async function playBase64Audio(base64: string): Promise<void> {
-  const { sound } = await Audio.Sound.createAsync({
-    uri: `data:audio/mpeg;base64,${base64}`,
-  });
-  registerSound(sound);
-
-  return new Promise<void>((resolve) => {
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.isLoaded && status.didJustFinish) {
-        sound.unloadAsync();
-        registerSound(null);
-        resolve();
-      }
-    });
-    sound.playAsync().catch(() => {
-      registerSound(null);
-      resolve();
-    });
-  });
-}
 
 // ── V 제스처 감지 ─────────────────────────────────────────────────────────────
 
@@ -167,6 +144,11 @@ export default function RootLayout() {
     }
   }
 
+  // ── 음성 응답 처리 ──────────────────────────────────────────────────────────
+  // 1) 음성 상태 즉시 업데이트
+  // 2) expo-speech 폴백 중단 후 Azure TTS 재생 (await)
+  // 3) 재생 완료 후 화면 전환 → useScreenAnnounce 와 겹치지 않는다
+
   const handleResponse = useCallback(
     async (data: VoiceResponseData) => {
       const prevSlots =
@@ -220,20 +202,8 @@ export default function RootLayout() {
 
   const handleError = useCallback((code: string) => {
     setVoiceState('idle');
-
     const errorMessage = getTtsMessage(code);
-
-    apiClient
-      .post<ApiResponse<{ audio_base64: string }>>('/api/voice/tts', {
-        text: errorMessage,
-        speed: 1.0,
-      })
-      .then(({ data }) => {
-        if (data.success && data.data?.audio_base64) {
-          playBase64Audio(data.data.audio_base64).catch(() => undefined);
-        }
-      })
-      .catch(() => undefined);
+    speakText(errorMessage);
   }, []);
 
   const { handleLongPress, handlePressOut } = useVoiceInput(
