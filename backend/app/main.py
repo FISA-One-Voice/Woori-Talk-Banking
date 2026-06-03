@@ -34,6 +34,9 @@ logger = logging.getLogger(__name__)
 
 from app.core.database import Base, engine
 from app.core.exception import AppError
+
+# from app.features.event.router import router as event_router  # TODO: event 기능 재구현 후 주석 해제
+from app.features.auto_transfer.router import router as auto_transfer_router
 from app.core.opensearch import create_indices_if_not_exists
 from app.features.asset.router import router as asset_router
 from app.features.event.router import router as event_router
@@ -144,6 +147,7 @@ app.include_router(asset_router)  # 자산 화면 — 잔액 조회 + 거래 내
 app.include_router(event_router)
 app.include_router(voice_register_router)
 app.include_router(recipients_router)
+app.include_router(auto_transfer_router)
 app.include_router(transfer_router)
 
 
@@ -152,3 +156,29 @@ app.include_router(transfer_router)
 def health_check():
     """서버가 정상 실행 중인지 확인하는 엔드포인트."""
     return {"status": "ok"}
+
+
+from apscheduler.schedulers.background import BackgroundScheduler
+
+from app.core.database import SessionLocal
+from app.features.auto_transfer.service import run_due_auto_transfers
+
+scheduler = BackgroundScheduler()
+
+
+@app.on_event("startup")
+def start_scheduler():
+    def job():
+        db = SessionLocal()
+        try:
+            run_due_auto_transfers(db, user_id=None)  # 전체 유저 실행
+        finally:
+            db.close()
+
+    scheduler.add_job(job, "cron", hour=14, minute=30)  # 매일 14:30 실행
+    scheduler.start()
+
+
+@app.on_event("shutdown")
+def stop_scheduler():
+    scheduler.shutdown()
