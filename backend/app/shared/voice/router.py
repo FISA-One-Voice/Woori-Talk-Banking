@@ -21,7 +21,7 @@ from app.shared.voice.schema import (
     TTSRequest,
     TTSResult,
 )
-from app.shared.voice.service import process_voice_pipeline
+from app.shared.voice.service import process_voice_pipeline, reset_voice_state
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
 
@@ -70,6 +70,18 @@ async def voice_pipeline(
         data=data.model_dump(),
         message="음성 처리가 완료되었습니다.",
     )
+
+
+@router.post("/reset", response_model=ApiResponse)
+async def reset_state(
+    user_id: str = Depends(get_current_user_id),
+) -> ApiResponse:
+    """대화 상태를 초기화합니다.
+
+    자동이체 화면 진입 시 호출하여 이전 세션 슬롯을 제거합니다.
+    """
+    await reset_voice_state(user_id)
+    return ApiResponse(success=True, data=None, message="대화 상태가 초기화되었습니다.")
 
 
 @router.post("/stt", response_model=ApiResponse)

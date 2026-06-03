@@ -37,6 +37,7 @@ from app.shared.agent.tools.lookup_recipient import lookup_recipient
 from app.shared.agent.tools.execute_auto_transfer import execute_auto_transfer
 from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
 from app.shared.agent.tools.transfer import add_note, execute_transfer
+from app.shared.agent.tools.auto_transfer import add_auto_transfer_note
 from app.shared.agent.tools.mock_tools import (
     mock_execute_transfer,
     mock_get_balance,
@@ -76,7 +77,8 @@ _REAL_TOOLS: list = [
     # execute_balance,
     # execute_history,
 
-    add_note,  # 이체 직후 메모 (tx_id 기반)
+    add_note,                # 이체 직후 메모 (tx_id 기반)
+    add_auto_transfer_note,  # 자동이체 직후 메모 (order_id 기반)
     # lookup_recipient,   # 공통 — tools/lookup_recipient.py 완성 후 주석 해제
     # execute_balance,    # balance 담당자 — tools/balance.py 완성 후 주석 해제
     # execute_history,    # history 담당자 — tools/history.py 완성 후 주석 해제

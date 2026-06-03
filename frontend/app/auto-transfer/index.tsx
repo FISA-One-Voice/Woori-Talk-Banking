@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -292,7 +292,7 @@ function CycleInputView({ slots }: { slots: Record<string, unknown> }) {
 }
 
 function DayInputView({ slots }: { slots: Record<string, unknown> }) {
-  const isMonthly = slots.cycle === 'monthly';
+  const isMonthly = slots.cycle === 'monthly' || slots.cycle === '매월' || slots.cycle === '매달';
   return (
     <>
       <View style={styles.slotBox}>
@@ -391,11 +391,24 @@ export default function AutoTransferScreen() {
   const { fromAccountId } = useAutoTransferFlowStore();
   const lastResponse = useVoiceResponseStore((s) => s.lastResponse);
 
+  useEffect(() => {
+    if (!token) return;
+    apiClient.post('/api/voice/reset').catch(() => undefined);
+  }, [token]);
+
   const slots = lastResponse?.collected_slots ?? {};
   const awaitingAsv = lastResponse?.awaiting_asv_audio ?? false;
   const awaitingConfirmation = lastResponse?.awaiting_confirmation ?? false;
   const pendingAction = lastResponse?.pending_action ?? null;
   const hasSlots = Object.keys(slots).length > 0;
+
+  // ASV 인증 진입 시 슬롯 정보를 보존 — execute_node가 slots를 초기화해도 화면 유지
+  const frozenSlots = useRef<Record<string, unknown>>({});
+  useEffect(() => {
+    if (awaitingAsv && Object.keys(slots).length > 0) {
+      frozenSlots.current = slots;
+    }
+  }, [awaitingAsv, slots]);
 
   const isCancel = pendingAction === 'cancel_auto_transfer';
 
@@ -436,7 +449,7 @@ export default function AutoTransferScreen() {
         {phase === 'select-account' && <AccountSelectPhase />}
         {phase === 'voice-guide'    && <VoiceGuidePhase />}
 
-        {phase === 'slot-filling' && step === 'asv-pending'  && <AsvPendingView slots={slots} />}
+        {phase === 'slot-filling' && step === 'asv-pending'  && <AsvPendingView slots={frozenSlots.current} />}
         {phase === 'slot-filling' && step === 'input-alias'  && <AliasInputView />}
         {phase === 'slot-filling' && step === 'input-amount' && <AmountInputView slots={slots} />}
         {phase === 'slot-filling' && step === 'input-cycle'  && <CycleInputView slots={slots} />}

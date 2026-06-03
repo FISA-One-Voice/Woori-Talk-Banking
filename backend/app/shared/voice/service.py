@@ -81,6 +81,9 @@ async def reset_voice_state(user_id: str) -> None:
             "recipient_validated": False,
             "asv_retry_count": 0,
             "navigate_to": None,
+            "last_tx_id": None,
+            "last_order_id": None,
+            "awaiting_memo_decision": False,
         },
         as_node="intent_node",
     )
@@ -348,11 +351,16 @@ async def _handle_asv_flow(
         navigate_to_next = None
         awaiting_asv_next = True
 
+    current_slots = (
+        state_snapshot.values.get("collected_slots", {})
+        if state_snapshot.values
+        else {}
+    )
     audio_mp3 = await synthesize_speech(tts_text)
     return VoiceResponseData(
         audio=base64.b64encode(audio_mp3).decode(),
         navigate_to=navigate_to_next,
-        collected_slots={},
+        collected_slots=current_slots,
         awaiting_confirmation=False,
         awaiting_asv_audio=awaiting_asv_next,
         awaiting_memo_decision=False,

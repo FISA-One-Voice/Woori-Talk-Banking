@@ -15,7 +15,7 @@ from app.core.database import SessionLocal
 from app.core.exception import AutoTransferError, RecipientError
 from app.features.auto_transfer.schema import AutoTransferRequest
 from app.features.auto_transfer.service import register_auto_transfer
-from app.features.recipients.service import lookup_recipient_by_voice
+from app.features.recipients.service import classify_recipient_input, lookup_recipient_by_voice
 from app.models.account import Account
 
 _DOW_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
@@ -85,6 +85,12 @@ def execute_auto_transfer(
                 nums = re.findall(r"\d+", val)
                 slots[key] = int(nums[0]) if nums else None
 
+        # weekly일 때 scheduled_day → scheduled_dow 매핑
+        # LLM이 weekly도 scheduled_day에 0~6으로 저장하므로 변환 필요
+        if slots.get("cycle") == "weekly" and slots.get("scheduled_day") is not None:
+            slots["scheduled_dow"] = slots["scheduled_day"]
+            slots["scheduled_day"] = None
+
         # amount: 문자열 → 정수
         if isinstance(slots.get("amount"), str):
             nums = re.findall(r"\d+", str(slots["amount"]))
@@ -98,6 +104,9 @@ def execute_auto_transfer(
                 resolved = lookup_recipient_by_voice(db, uuid.UUID(user_id), alias)
                 if resolved and resolved.recipient_id:
                     recipient_id = str(resolved.recipient_id)
+                elif classify_recipient_input(alias) == "account":
+                    # 미등록 계좌번호 직접 입력 — DIRECT 경로로 auto_transfer service가 처리
+                    slots["to_account_number"] = alias
 
         # from_account_id — 슬롯에 없으면 주계좌 자동 조회
         from_account_id = slots.get("fromAccountId") or slots.get("from_account_id")

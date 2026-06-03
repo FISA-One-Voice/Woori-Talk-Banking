@@ -65,8 +65,14 @@ def is_memo_accept_without_category(text: str) -> bool:
     return any(kw in normalized for kw in _YES_KEYWORDS)
 
 
-def build_memo_decision_update(text: str) -> dict:
-    """메모 제안 대기 중 사용자 발화를 상태 갱신 dict로 변환한다."""
+def build_memo_decision_update(text: str, note_action: str = "add_note") -> dict:
+    """메모 제안 대기 중 사용자 발화를 상태 갱신 dict로 변환한다.
+
+    Args:
+        text: 사용자 발화 텍스트.
+        note_action: 메모 저장 액션 이름. 일반 이체는 "add_note",
+            자동이체는 "add_auto_transfer_note".
+    """
     if is_memo_skip(text):
         return {
             "awaiting_memo_decision": False,
@@ -79,7 +85,7 @@ def build_memo_decision_update(text: str) -> dict:
     if category:
         return {
             "awaiting_memo_decision": False,
-            "pending_action": "add_note",
+            "pending_action": note_action,
             "collected_slots": {"memo": category},
             "execution_ready": True,
             "messages": [AIMessage(content=f"{category}로 메모를 남기겠습니다.")],
@@ -88,7 +94,7 @@ def build_memo_decision_update(text: str) -> dict:
     if is_memo_accept_without_category(text):
         return {
             "awaiting_memo_decision": False,
-            "pending_action": "add_note",
+            "pending_action": note_action,
             "collected_slots": {},
             "messages": [AIMessage(content=SLOT_QUESTIONS["memo"])],
         }

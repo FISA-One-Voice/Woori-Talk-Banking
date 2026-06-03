@@ -40,7 +40,7 @@ from app.models.account import Account
 from app.models.standing_order import StandingOrder
 from app.models.transaction import Transaction
 from app.models.user import User
-from app.shared.crypto import encrypt
+from app.shared.crypto import decrypt, encrypt
 
 _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "active": {"paused", "cancelled"},
@@ -87,8 +87,8 @@ def _calc_next_execution(
         last_day = calendar.monthrange(today.year, today.month)[1]
         actual_day = min(scheduled_day, last_day)
         candidate = today.replace(day=actual_day)
-        if candidate <= today:
-            # 이번 달 지정일이 이미 지났으면 다음 달로 이동
+        if candidate < today:
+            # 이번 달 지정일이 지났으면 다음 달로 이동 (오늘은 포함하여 실행)
             year = today.year + (1 if today.month == 12 else 0)
             month = 1 if today.month == 12 else today.month + 1
             last_day = calendar.monthrange(year, month)[1]
@@ -97,8 +97,8 @@ def _calc_next_execution(
 
     # weekly — Python weekday(): 0=월, 6=일
     days_ahead = scheduled_dow - today.weekday()
-    if days_ahead <= 0:
-        # 오늘 포함 이미 지난 요일이면 다음 주로 이동
+    if days_ahead < 0:
+        # 지난 요일이면 다음 주로 이동 (오늘 요일은 포함하여 실행)
         days_ahead += 7
     candidate = today + timedelta(days=days_ahead)
     return datetime(candidate.year, candidate.month, candidate.day)
@@ -451,6 +451,16 @@ def _execute_single_order(db: Session, order: StandingOrder) -> None:
     if is_success:
         from_account.balance -= order.amount
 
+        # 받는 사람 계좌 잔액 증가 (같은 DB에 있는 경우)
+        to_accounts = db.query(Account).all()
+        for acc in to_accounts:
+            try:
+                if decrypt(acc.account_number) == resolved.account_number:
+                    acc.balance += order.amount
+                    break
+            except Exception:
+                continue
+
     tx = Transaction(
         user_id=order.user_id,
         from_account_id=order.from_account_id,
@@ -462,6 +472,7 @@ def _execute_single_order(db: Session, order: StandingOrder) -> None:
         amount=order.amount,
         tx_type="auto_transfer",
         status="completed" if is_success else "failed",
+        memo=order.transfer_note,
     )
     db.add(tx)
 

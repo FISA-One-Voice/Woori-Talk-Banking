@@ -1,52 +1,15 @@
-// =============================================================================
-// utils/ttsManager.ts
-//
-// 앱 전체 expo-speech TTS를 한 곳에서 관리합니다.
-//
-// [속도 설정]
-//   TTS_RATE — Speech.speak의 rate. 1.0 = 기본 속도. 여기서만 바꾸면 된다.
-//
-// [함수]
-//   speakText(msg, opts?) — 모든 expo-speech 호출은 이 함수를 경유한다.
-//   registerSound(sound)  — expo-av Sound 인스턴스를 등록한다.
-//   stopAllTts()          — 재생 중인 모든 TTS(expo-speech + expo-av)를 중단한다.
-// =============================================================================
-
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
-
-// ── TTS 속도 ──────────────────────────────────────────────────────────────────
-
-/** expo-speech 재생 속도. 1.0 = 기본. 앱 전체 속도는 여기서만 수정한다. */
-export const TTS_RATE = 1.4;
-
-// ── expo-speech 래퍼 ──────────────────────────────────────────────────────────
-
-/**
- * 앱 전체 expo-speech TTS 호출 래퍼.
- * language, rate 는 자동 적용되며 추가 옵션은 opts 로 전달한다.
- */
-export function speakText(
-  message: string,
-  opts?: Omit<Speech.SpeechOptions, 'language' | 'rate'>,
-): void {
-  Speech.speak(message, {
-    language: 'ko-KR',
-    rate: TTS_RATE,
-    ...opts,
-  });
-}
+import { apiClient, ApiResponse } from '@/utils/api';
 
 // ── expo-av Sound 추적 ────────────────────────────────────────────────────────
 
 let _sound: Audio.Sound | null = null;
 
-/** expo-av Sound 인스턴스를 등록합니다. 재생 시작 직전에 호출하세요. */
 export function registerSound(sound: Audio.Sound | null): void {
   _sound = sound;
 }
 
-/** 재생 중인 모든 TTS(expo-speech + expo-av)를 중단합니다. */
 export async function stopAllTts(): Promise<void> {
   Speech.stop();
   if (_sound) {
@@ -54,3 +17,63 @@ export async function stopAllTts(): Promise<void> {
     _sound = null;
   }
 }
+
+// ── Azure TTS 재생 ────────────────────────────────────────────────────────────
+
+async function playBase64Audio(base64: string): Promise<void> {
+  const { sound } = await Audio.Sound.createAsync({
+    uri: `data:audio/mpeg;base64,${base64}`,
+  });
+  registerSound(sound);
+
+  return new Promise<void>((resolve) => {
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded && status.didJustFinish) {
+        sound.unloadAsync();
+        registerSound(null);
+        resolve();
+      }
+    });
+    sound.playAsync().catch(() => {
+      registerSound(null);
+      resolve();
+    });
+  });
+}
+
+/**
+ * 앱 전체 TTS 호출 함수 — Azure TTS API 사용.
+ * expo-speech 대신 Azure TTS로 재생하여 음성 겹침을 방지한다.
+ */
+export function speakText(
+  message: string,
+  opts?: { onDone?: () => void; onStopped?: () => void },
+): void {
+  stopAllTts().then(() => {
+    apiClient
+      .post<ApiResponse<{ audio_base64: string }>>('/api/voice/tts', {
+        text: message,
+        speed: 1.0,
+      })
+      .then(({ data }) => {
+        if (data.success && data.data?.audio_base64) {
+          playBase64Audio(data.data.audio_base64)
+            .then(() => opts?.onDone?.())
+            .catch(() => opts?.onDone?.());
+        } else {
+          opts?.onDone?.();
+        }
+      })
+      .catch(() => {
+        // Azure 실패 시 expo-speech 폴백
+        Speech.speak(message, {
+          language: 'ko-KR',
+          rate: 1.4,
+          onDone: opts?.onDone,
+          onStopped: opts?.onStopped,
+        });
+      });
+  });
+}
+
+export const TTS_RATE = 1.4;

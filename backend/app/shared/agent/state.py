@@ -37,6 +37,8 @@ class VoiceState(TypedDict):
             새 인텐트 감지 또는 취소 시 False로 초기화.
         last_tx_id: execute_transfer 성공 시 저장된 tx_id.
             add_note 실행 후 None으로 초기화. 최근 거래 DB 조회 대신 사용.
+        last_order_id: execute_auto_transfer 성공 시 저장된 order_id.
+            add_auto_transfer_note 실행 후 None으로 초기화.
         awaiting_memo_decision: True이면 이체 직후 메모 제안에 대한 응답 대기 중.
         awaiting_transfer_clarification: True이면 전화·계좌만 말한 뒤 송금 여부 확인 대기 중.
         draft_recipient: 송금 확인 대기 중 보관한 수취인 힌트(전화·계좌 등).
@@ -56,3 +58,4 @@ class VoiceState(TypedDict):
     execution_ready: bool
     recipient_validated: bool
     last_tx_id: str | None
+    last_order_id: str | None
