@@ -228,6 +228,7 @@ class TestStateTransitionLogic:
 
         assert result["pending_action"] is None
         assert result["collected_slots"] == {}
+        assert result.get("navigate_to") == "home"
         # 마지막 AI 메시지 확인
         ai_messages = [m for m in result["messages"] if isinstance(m, AIMessage)]
         assert len(ai_messages) > 0

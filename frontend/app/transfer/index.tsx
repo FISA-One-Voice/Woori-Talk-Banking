@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { TopBar, StepIndicator } from '@/components/layout';
 import { COLORS, LAYOUT } from '@/constants/theme';
 import { useTransferStore } from '@/store/transferStore';
+import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { fetchRecentRecipients, executeTransfer } from '@/services/transferService';
 import type { RecipientItem } from '@/components/display';
@@ -44,10 +45,11 @@ export default function TransferScreen() {
 
   const slots = lastResponse?.collected_slots ?? {};
   const awaitingAsv = lastResponse?.awaiting_asv_audio ?? false;
+  const awaitingConfirmation = lastResponse?.awaiting_confirmation ?? false;
 
   const voiceStep = useMemo(
-    () => resolveTransferStep(slots, awaitingAsv),
-    [lastResponse, slots, awaitingAsv],
+    () => resolveTransferStep(slots, awaitingAsv, awaitingConfirmation, lastResponse?.pending_action),
+    [lastResponse, slots, awaitingAsv, awaitingConfirmation],
   );
 
   const [touchStep, setTouchStep] = useState<TransferStep | null>(null);
@@ -66,8 +68,16 @@ export default function TransferScreen() {
 
   useEffect(() => {
     const fromSlots = recipientFromSlots(slots);
-    if (fromSlots) setSelectedRecipient(fromSlots);
-    if (slots.amount != null) setAmount(Number(slots.amount));
+    if (fromSlots) {
+      setSelectedRecipient(fromSlots);
+    } else {
+      setSelectedRecipient(null);
+    }
+    if (slots.amount != null) {
+      setAmount(Number(slots.amount));
+    } else {
+      setAmount(null);
+    }
   }, [lastResponse, slots.recipient, slots.amount, setSelectedRecipient, setAmount]);
 
   const step = touchStep ?? voiceStep;
@@ -111,6 +121,7 @@ export default function TransferScreen() {
     else if (step === 'asv-pending') setTouchStep('confirm');
     else {
       reset();
+      resetVoiceSessionOnHome();
       router.replace('/home');
     }
   };

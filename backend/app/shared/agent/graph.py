@@ -22,7 +22,7 @@ import logging
 import uuid
 
 import openai
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
@@ -43,6 +43,12 @@ from app.shared.agent.memo_decision import (
     build_memo_decision_update,
     last_user_text,
 )
+from app.shared.agent.session_reset import clear_conversation_messages
+from app.shared.agent.transfer_intent import (
+    build_bare_transfer_start_update,
+    is_plain_transfer_start,
+    should_use_bare_transfer_fast_start,
+)
 from app.shared.agent.transfer_clarification import (
     _recipient_hint_from_state,
     build_transfer_clarification_offer,
@@ -52,7 +58,9 @@ from app.shared.agent.transfer_clarification import (
 from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
+    ACTIONS_WITH_YES_NO_CONFIRM,
     ASV_REQUIRED_ACTIONS,
+    CONFIRM_YES_NO_SUFFIX,
     COMPLETE_SCREEN_MAP,
     MEMO_OFFER_SUFFIX,
     RECIPIENT_REQUIRED_ACTIONS,
@@ -91,6 +99,24 @@ class IntentResult(BaseModel):
 
 
 # ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
+
+def _is_transfer_restart_utterance(text: str) -> bool:
+    """홈 등에서 새 송금을 시작하는 발화인지."""
+    return is_plain_transfer_start(text)
+
+
+def _should_restart_transfer_flow(
+    intent: str | None,
+    pending: str | None,
+    user_text: str,
+    state: dict,
+) -> bool:
+    """이전 transfer 세션이 남아 있어도 동일 intent로 새 송금을 시작한다."""
+    if intent != "transfer" or pending != "transfer":
+        return False
+    if state.get("awaiting_confirmation") or state.get("awaiting_asv_audio"):
+        return False
+    return _is_transfer_restart_utterance(user_text)
 
 
 def _all_slots_filled(pending_action: str, collected_slots: dict) -> bool:
@@ -205,7 +231,10 @@ def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
             parts.append(str(amount))
 
     summary = " ".join(parts)
-    return f"{summary} {action_label}할까요?"
+    msg = f"{summary} {action_label}할까요?"
+    if pending_action in ACTIONS_WITH_YES_NO_CONFIRM:
+        msg += CONFIRM_YES_NO_SUFFIX
+    return msg
 
 
 def _amount_to_korean(amount: int) -> str:
@@ -350,6 +379,14 @@ def build_graph(tools: list) -> CompiledStateGraph:
             )
             return build_memo_decision_update(user_text, note_action=note_action)
 
+        if state.get("pending_action") == "add_note":
+            user_text = last_user_text(state.get("messages", []))
+            logger.info(
+                "[Graph →intent_node] pending=add_note (memo recovery) user_text=%s",
+                user_text,
+            )
+            return build_memo_decision_update(user_text)
+
         if state.get("awaiting_transfer_clarification"):
             user_text = last_user_text(state.get("messages", []))
             draft = _recipient_hint_from_state(
@@ -452,7 +489,9 @@ def build_graph(tools: list) -> CompiledStateGraph:
             f"- 유효한 인텐트 목록: {list(VALID_INTENTS)}",
             "- intent: 진행 중인 액션이 없을 때만 설정."
             " 진행 중인 액션이 있으면 반드시 null.",
-            "  transfer    : 일회성 이체 ('이체해줘', '보내줘', '송금해줘')",
+            "  transfer    : 일회성 이체 ('이체해줘', '보내줘', '송금해줘',"
+            " '송금하고 싶어', '이체하고 싶어', '돈 보내고 싶어')",
+            "  ★ 이체·송금 의도가 보이면 슬롯 없어도 반드시 intent=transfer.",
             "  auto_transfer: 정기·반복 이체 ("
             "'자동이체', '자동 송금', '정기 이체', '정기 송금',"
             " '매달', '매월', '한달에 한번', '한달에 한번씩', '월 1회', '월마다',"
@@ -474,7 +513,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "- cycle 슬롯: 반드시 'monthly' 또는 'weekly' 영문으로 설정"
             " ('매월'·'한달에한번'→'monthly',"
             " '매주'·'일주일에한번'·'7일마다'→'weekly')."
-            " ★ '7일마다', '일주일마다' 등은 cycle=weekly로만 설정하고"
+            " ★ '7일마다', '일주일마다','주마다','매주','일주일마다 한번씩' 등은 cycle=weekly로만 설정하고"
             " scheduled_day는 설정하지 말 것 (요일 미명시).",
             "- scheduled_day: 사용자가 날짜·요일을 명시한 경우에만 추출할 것."
             " '한달에 한번', '매월', '매주' 등 주기만 말하고"
@@ -530,13 +569,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         # ── 취소 처리 ──────────────────────────────────────────────────────────
         if result.user_cancelled:
-            updates = {
+            return {
                 "pending_action": None,
                 "collected_slots": {},
                 "awaiting_confirmation": False,
                 "awaiting_asv_audio": False,
                 "asv_retry_count": 0,
-                "navigate_to": None,
+                "navigate_to": "home",
                 "execution_ready": False,
                 "recipient_validated": False,
                 "last_tx_id": None,
@@ -545,10 +584,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "awaiting_transfer_clarification": False,
                 "draft_recipient": None,
                 "messages": [
-                    AIMessage(content=result.direct_response or "취소되었습니다.")
+                    *clear_conversation_messages(),
+                    AIMessage(
+                        content=result.direct_response
+                        or "취소되었습니다. 홈 화면으로 이동합니다."
+                    ),
                 ],
             }
-            return updates
 
         # ── 확인 수신 처리 ─────────────────────────────────────────────────────
         if state.get("awaiting_confirmation") and result.user_confirmed:
@@ -558,6 +600,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 updates = {
                     "awaiting_confirmation": False,
                     "awaiting_asv_audio": True,
+                    "navigate_to": SCREEN_MAP.get(action),
                     "messages": [AIMessage(content="목소리로 인증해 주세요.")],
                 }
             else:
@@ -610,21 +653,31 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "execution_ready": False,
                 "recipient_validated": False,
                 "asv_retry_count": 0,
+                "last_tx_id": None,
                 "awaiting_memo_decision": False,
                 "awaiting_transfer_clarification": False,
                 "draft_recipient": None,
                 "navigate_to": "home",
-                "messages": [AIMessage(content="홈 화면으로 이동합니다.")],
+                "messages": [
+                    *clear_conversation_messages(),
+                    AIMessage(content="홈 화면으로 이동합니다."),
+                ],
             }
+
+        user_text = last_user_text(state.get("messages", []))
+        restart_transfer = _should_restart_transfer_flow(
+            result.intent, pending, user_text, state
+        )
 
         # ── 새 인텐트 감지 ──────────────────────────────────────────────────────
         # 확인·ASV 대기 중에는 인텐트 감지를 무시 (슬롯 초기화 방지)
-        # 그 외에는 항상 슬롯·상태를 초기화하고 새로 시작
+        # 다른 인텐트이거나 transfer 재시작 케이스일 때 슬롯·상태 초기화
         if (
             result.intent
             and result.intent in VALID_INTENTS
             and not state.get("awaiting_confirmation")
             and not state.get("awaiting_asv_audio")
+            and (result.intent != pending or restart_transfer)
         ):
             updates = {
                 "pending_action": result.intent,
@@ -638,7 +691,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "awaiting_memo_decision": False,
                 "awaiting_transfer_clarification": False,
                 "draft_recipient": None,
+                "last_tx_id": None if result.intent == "transfer" else state.get("last_tx_id"),
             }
+            if result.intent == "transfer":
+                updates["messages"] = [
+                    *clear_conversation_messages(),
+                    HumanMessage(content=user_text),
+                ]
             # 화면 전환 전용 인텐트: 화면이 자체 TTS를 처리하므로 간단한 안내만 추가
             if result.intent in SCREEN_ONLY_INTENTS:
                 screen_name = SCREEN_MAP.get(result.intent, result.intent)
@@ -660,7 +719,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 updates["execution_ready"] = True
 
         # ── 챗봇 직접 응답 (인텐트 없음) ───────────────────────────────────────
-        user_text = last_user_text(state.get("messages", []))
         pending_after = updates.get("pending_action") or state.get("pending_action")
         if should_offer_transfer_clarification(
             user_text,
@@ -675,7 +733,11 @@ def build_graph(tools: list) -> CompiledStateGraph:
             updates = {**updates, **build_transfer_clarification_offer(user_text)}
         elif result.direct_response:
             updates["messages"] = [AIMessage(content=result.direct_response)]
-        elif not updates.get("messages") and not pending_after:
+        elif (
+            not updates.get("messages")
+            and not pending_after
+            and not is_plain_transfer_start(user_text)
+        ):
             updates["messages"] = [AIMessage(content=_DEFAULT_TTS_FALLBACK)]
 
         return updates
@@ -715,7 +777,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         return {
             "awaiting_confirmation": True,
-            # navigate_to는 intent_node가 이미 초기화(None)했으므로 재설정 불필요
+            "navigate_to": SCREEN_MAP.get(pending),
             "messages": [AIMessage(content=confirm_msg)],
         }
 
@@ -781,11 +843,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
         return {
             "collected_slots": slots,
             "recipient_validated": False,
+            "navigate_to": SCREEN_MAP.get("transfer"),
             "messages": [
                 AIMessage(
                     content=(
-                        f"'{recipient_input}'을(를) 찾을 수 없습니다."
-                        " 다시 알려주세요."
+                        f"'{recipient_input}'은(는) 등록되지 않은 수취인입니다. "
+                        "누구에게 보낼까요?"
                     )
                 )
             ],
@@ -888,11 +951,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
                         new_last_tx_id = tx_id
                         awaiting_memo_next = True
                         response_text = response_text + MEMO_OFFER_SUFFIX
-                        completed_slots = {
-                            "txId": tx_id,
-                            "recipient": slots.get("recipient"),
-                            "amount": slots.get("amount"),
-                        }
+                        # 영수증은 프론트 prevSlots로 처리; 세션 슬롯은 비움
+                        completed_slots = {}
                 elif pending == "transfer":
                     response_text = tool_obj.invoke(invoke_args)
                 elif pending == "auto_transfer":
@@ -910,16 +970,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                             new_last_order_id = order_id
                             awaiting_memo_next = True
                             response_text = response_text + MEMO_OFFER_SUFFIX
-                            completed_slots = {
-                                "orderId": order_id,
-                                "recipient": slots.get("recipient"),
-                                "amount": slots.get("amount"),
-                                "cycle": slots.get("cycle"),
-                                "scheduled_day": slots.get("scheduled_day"),
-                                "scheduled_dow": slots.get("scheduled_dow"),
-                                "bank_name": slots.get("bank_name"),
-                                "account_number": slots.get("account_number"),
-                            }
+                        completed_slots = {}
                 elif pending == "add_note":
                     tx_id = slots.get("tx_id") or state.get("last_tx_id")
                     if not tx_id:
@@ -980,6 +1031,10 @@ def build_graph(tools: list) -> CompiledStateGraph:
         if note_consumed:
             updates["awaiting_memo_decision"] = False
             updates["navigate_to"] = "home"
+            updates["messages"] = [
+                *clear_conversation_messages(),
+                AIMessage(content=response_text),
+            ]
         # transfer/auto_transfer 등 완료 화면이 있는 액션만 navigate_to 덮어씀.
         if pending in COMPLETE_SCREEN_MAP:
             updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
@@ -1028,6 +1083,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "[Graph route] intent_node → resolve_node (recipient unvalidated)"
             )
             return "resolve_node"
+
+        if pending == "add_note":
+            logger.info(
+                "[Graph route] intent_node → END (add_note — memo_decision only)"
+            )
+            return END
 
         missing = _missing_slots(pending, slots)
 

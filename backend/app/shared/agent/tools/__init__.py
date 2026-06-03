@@ -79,6 +79,7 @@ _REAL_TOOLS: list = [
 
     add_note,                # 이체 직후 메모 (tx_id 기반)
     add_auto_transfer_note,  # 자동이체 직후 메모 (order_id 기반)
+    add_note,  # 이체 직후 메모 (tx_id 기반)
     # lookup_recipient,   # 공통 — tools/lookup_recipient.py 완성 후 주석 해제
     # execute_balance,    # balance 담당자 — tools/balance.py 완성 후 주석 해제
     # execute_history,    # history 담당자 — tools/history.py 완성 후 주석 해제

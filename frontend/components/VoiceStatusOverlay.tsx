@@ -1,3 +1,4 @@
+import { YES_NO_CONFIRM_INSTRUCTION } from '@/constants/voicePrompts';
 import { StyleSheet, Text, View } from 'react-native';
 import VoiceWaveAnimation from '@/components/feedback/VoiceWaveAnimation';
 
@@ -11,7 +12,7 @@ export type VoiceState =
 
 const OVERLAY_MESSAGES: Partial<Record<VoiceState, string>> = {
   processing: '처리 중...',
-  awaiting_confirm: '네 또는 아니오라고 말씀해 주세요',
+  awaiting_confirm: YES_NO_CONFIRM_INSTRUCTION,
   awaiting_asv: '음성 인증을 위해 말씀해 주세요',
   awaiting_memo: '메모 카테고리를 말씀하거나 건너뛰기라고 하세요',
 };

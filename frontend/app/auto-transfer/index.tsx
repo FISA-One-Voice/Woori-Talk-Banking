@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppScreenHeader, StepIndicator } from '@/components/layout';
 import { TtsBubble } from '@/components/feedback';
+import { YES_NO_CONFIRM_INSTRUCTION } from '@/constants/voicePrompts';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
@@ -329,10 +330,11 @@ function ConfirmView({
       <TtsBubble
         message={
           awaitingConfirmation
-            ? '네 또는 아니요로 말씀해 주세요.'
+            ? YES_NO_CONFIRM_INSTRUCTION
             : `${slots.alias}님께 ${scheduleText}에 ${formatAmount(slots.amount)} 자동이체할까요?`
         }
         variant={awaitingConfirmation ? 'warning' : 'default'}
+        autoPlay={awaitingConfirmation}
       />
     </>
   );
@@ -375,10 +377,11 @@ function CancelConfirmView({
       <TtsBubble
         message={
           awaitingConfirmation
-            ? '네 또는 아니요로 말씀해 주세요.'
+            ? YES_NO_CONFIRM_INSTRUCTION
             : `${slots.recipient}에게 설정된 자동이체를 해지할까요?`
         }
         variant={awaitingConfirmation ? 'warning' : 'default'}
+        autoPlay={awaitingConfirmation}
       />
     </>
   );
@@ -393,7 +396,7 @@ export default function AutoTransferScreen() {
 
   useEffect(() => {
     if (!token) return;
-    apiClient.post('/api/voice/reset').catch(() => undefined);
+    apiClient.post('/api/voice/reset-state').catch(() => undefined);
   }, [token]);
 
   const slots = lastResponse?.collected_slots ?? {};
@@ -401,14 +404,6 @@ export default function AutoTransferScreen() {
   const awaitingConfirmation = lastResponse?.awaiting_confirmation ?? false;
   const pendingAction = lastResponse?.pending_action ?? null;
   const hasSlots = Object.keys(slots).length > 0;
-
-  // ASV 인증 진입 시 슬롯 정보를 보존 — execute_node가 slots를 초기화해도 화면 유지
-  const frozenSlots = useRef<Record<string, unknown>>({});
-  useEffect(() => {
-    if (awaitingAsv && Object.keys(slots).length > 0) {
-      frozenSlots.current = slots;
-    }
-  }, [awaitingAsv, slots]);
 
   const isCancel = pendingAction === 'cancel_auto_transfer';
 
@@ -449,7 +444,7 @@ export default function AutoTransferScreen() {
         {phase === 'select-account' && <AccountSelectPhase />}
         {phase === 'voice-guide'    && <VoiceGuidePhase />}
 
-        {phase === 'slot-filling' && step === 'asv-pending'  && <AsvPendingView slots={frozenSlots.current} />}
+        {phase === 'slot-filling' && step === 'asv-pending'  && <AsvPendingView slots={slots} />}
         {phase === 'slot-filling' && step === 'input-alias'  && <AliasInputView />}
         {phase === 'slot-filling' && step === 'input-amount' && <AmountInputView slots={slots} />}
         {phase === 'slot-filling' && step === 'input-cycle'  && <CycleInputView slots={slots} />}

@@ -6,6 +6,7 @@ import { ActionButton, SummaryBox } from '@/components/display';
 import { ResultScreen, StatusBadge } from '@/components/feedback';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
+import { useAutoTransferFlowStore } from './store';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { formatAmount, formatSchedule } from './stepResolver';
 
@@ -86,7 +87,7 @@ function MemoDoneView({
 export default function AutoTransferCompleteScreen() {
   const router = useRouter();
   const lastResponse = useVoiceResponseStore((s) => s.lastResponse);
-  const slots = lastResponse?.collected_slots ?? {};
+  const receipt = useAutoTransferFlowStore((s) => s.receipt);
 
   const awaitingMemo = lastResponse?.awaiting_memo_decision ?? false;
   const [localPhase, setLocalPhase] = useState<CompletePhase>(
@@ -94,20 +95,18 @@ export default function AutoTransferCompleteScreen() {
   );
   const [savedCategory, setSavedCategory] = useState<string | null>(null);
 
-  // 음성 응답으로 awaiting_memo_decision 변화 감지
   useEffect(() => {
     if (awaitingMemo) {
       setLocalPhase('memo-pending');
     }
   }, [awaitingMemo]);
 
-  // 홈 이동 (음성 navigate_to="home" 처리는 _layout이 담당, 수동 버튼용)
   const goHome = useCallback(() => {
     router.replace('/home');
   }, [router]);
 
   const handleMemoSave = async (category: string) => {
-    const orderId = slots.orderId as string | undefined;
+    const orderId = receipt?.orderId;
     if (!orderId) {
       goHome();
       return;
@@ -124,9 +123,19 @@ export default function AutoTransferCompleteScreen() {
     }
   };
 
+  const slots = receipt
+    ? {
+        recipient: receipt.recipient,
+        amount: receipt.amount,
+        cycle: receipt.cycle,
+        scheduled_day: receipt.scheduledDay,
+        scheduled_dow: receipt.scheduledDow,
+      }
+    : {};
+
   const summaryRows = [
-    { label: '수취인', value: String(slots.recipient ?? '') },
-    { label: '금액', value: formatAmount(slots.amount), variant: 'yellow' as const },
+    { label: '수취인', value: receipt?.recipient ?? '' },
+    { label: '금액', value: formatAmount(receipt?.amount), variant: 'yellow' as const },
     { label: '일정', value: formatSchedule(slots) },
   ].filter((r) => r.value);
 

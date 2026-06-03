@@ -21,10 +21,18 @@ class TestMemoDecisionParsing:
         assert update["collected_slots"]["memo"] == "식비"
         assert update["execution_ready"] is True
 
-    def test_yes_asks_memo_slot(self):
+    def test_yes_keeps_memo_awaiting_without_slot_fill_trap(self):
         update = build_memo_decision_update("네 남길게")
-        assert update["pending_action"] == "add_note"
+        assert update["awaiting_memo_decision"] is True
+        assert update.get("pending_action") is None
         assert "execution_ready" not in update
+
+    def test_skip_clears_tx_and_slots(self):
+        update = build_memo_decision_update("건너뛰기")
+        assert update["pending_action"] is None
+        assert update["collected_slots"] == {}
+        assert update["last_tx_id"] is None
+        assert "건너뛰" in update["messages"][-1].content
 
     def test_unclear_reprompts(self):
         update = build_memo_decision_update("음...")

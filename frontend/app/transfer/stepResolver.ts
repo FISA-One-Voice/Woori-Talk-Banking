@@ -12,6 +12,7 @@ export type TransferStep =
 export function resolveTransferStep(
   slots: Record<string, unknown>,
   awaitingAsv: boolean,
+  awaitingConfirmation = false,
   pendingAction?: string | null,
 ): TransferStep {
   if (awaitingAsv) return 'asv-pending';
@@ -20,6 +21,7 @@ export function resolveTransferStep(
 
   if (!slots.recipient) return 'input-alias';
   if (!slots.amount) return 'input-amount';
+  if (awaitingConfirmation) return 'confirm';
   return 'confirm';
 }
 
