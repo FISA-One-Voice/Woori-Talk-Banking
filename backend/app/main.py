@@ -104,7 +104,7 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
             "success": False,
             "data": None,
             "message": message,
-            "error_code": "INVALID_REQUEST",
+            "code": "INVALID_REQUEST",
         },
     )
 
