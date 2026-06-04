@@ -304,11 +304,13 @@ async def _handle_asv_flow(
     Raises:
         ASVError: 사용자 음성 미등록 또는 ASV EC2 서버 통신 오류.
     """
-    if settings.MOCK_ASV:
-        logger.info("MOCK_ASV=true — ASV 인증 우회, 즉시 성공 처리")
-        return await _proceed_after_asv_success(user_id, config, graph)
-    transcript = await transcribe_audio(audio_bytes, content_type)
-    if is_home_request(transcript) or is_clarification_no(transcript):
+    # ASV 인증음은 짧아 STT가 텍스트를 못 뽑을 수 있으므로 실패 시 무시하고 ASV로 진행
+    try:
+        transcript = await transcribe_audio(audio_bytes, content_type)
+    except Exception:
+        transcript = ""
+
+    if transcript and (is_home_request(transcript) or is_clarification_no(transcript)):
         await reset_voice_state(user_id)
         tts_text = "홈 화면으로 이동합니다."
         audio_mp3 = await synthesize_speech(tts_text)

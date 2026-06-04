@@ -116,11 +116,6 @@ class Settings(BaseSettings):
     # False: 실제 tool 사용 — 각 화면 담당자의 features/*/tools 완성 후 (기본값)
     USE_MOCK_TOOLS: bool = False
 
-    # ── ASV mock 설정 ─────────────────────────────────────────────────────────────
-    # True : ASV 인증을 항상 성공으로 처리 — 화자 인증 서버 없이 개발/테스트용
-    # False: 실제 ASV EC2 서버 호출
-    MOCK_ASV: bool = False
-
     # ── ASV 화자 인증 서버 설정 (Issue #7, ai/asv/) ───────────────────────────────
     # ASV_SERVER_URL: CAM++ 기반 화자 인증 서버 주소 (POST /verify)
     #   로컬 개발: ai/asv/main.py 실행 시 포트 8000

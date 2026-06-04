@@ -513,11 +513,15 @@ def build_graph(tools: list) -> CompiledStateGraph:
             " ('매월'·'한달에한번'→'monthly',"
             " '매주'·'일주일에한번'·'7일마다'→'weekly')."
             " ★ '7일마다', '일주일마다','주마다','매주','일주일마다 한번씩' 등은 cycle=weekly로만 설정하고"
-            " scheduled_day는 설정하지 말 것 (요일 미명시).",
+            " scheduled_day는 설정하지 말 것 (요일 미명시)."
+            " ★ '3일마다','5일마다','10일마다' 등 7일이 아닌 'N일마다'는 cycle=monthly,"
+            " scheduled_day=N으로 설정. '삼일마다'→cycle=monthly,scheduled_day=3.",
             "- scheduled_day: 사용자가 날짜·요일을 명시한 경우에만 추출할 것."
             " '한달에 한번', '매월', '매주' 등 주기만 말하고"
             " 날짜·요일을 언급하지 않으면 scheduled_day를 절대 설정하지 말 것."
-            " monthly일 때 날짜 정수(1-31). '15일'→15, '말일'→31."
+            " monthly일 때 날짜 정수(1-31). '15일'→15, '3일'→3, '말일'→31."
+            " ★ cycle=monthly 상태에서 후속 발화로 날짜만 말한 경우 반드시 scheduled_day로 추출."
+            " 예: (cycle=monthly 진행 중) '3일'→scheduled_day=3, '15일'→scheduled_day=15."
             " ★ STT 오류 보정: 한국어 '일'(日)이 숫자 '1'로 잘못 인식됨."
             " monthly 날짜 추출 시 숫자 끝 '1'은 '일'(日) 오인식이므로"
             " 제거 후 나머지를 날짜로 사용."
