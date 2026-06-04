@@ -82,7 +82,7 @@ export default function DevLoginScreen() {
   const handleLogin = async (pinValue: string) => {
     try {
       const response = await apiClient.post<
-        ApiResponse<{ accessToken: string; refreshToken: string; hasVoiceRegistered: boolean }>
+        ApiResponse<{ accessToken: string; refreshToken: string; hasVoiceRegistered: boolean; ttsSpeed?: number }>
       >('/api/users/login', {
         phone,
         pin: pinValue,
@@ -91,7 +91,7 @@ export default function DevLoginScreen() {
       const result = response.data;
 
       if (result.success && result.data) {
-        useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken, result.data.hasVoiceRegistered);
+        useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken, result.data.hasVoiceRegistered, result.data.ttsSpeed);
 
         if (result.data.hasVoiceRegistered) {
           router.replace('/home');

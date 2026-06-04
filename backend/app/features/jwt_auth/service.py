@@ -57,6 +57,7 @@ def login(db: Session, req: JwtLoginRequest) -> JwtTokenResponse:
         refresh_token=refresh_token,
         user_id=str(user.user_id),
         has_voice_registered=is_voice_registered,
+        tts_speed=user.tts_speed,
     )
 
 
