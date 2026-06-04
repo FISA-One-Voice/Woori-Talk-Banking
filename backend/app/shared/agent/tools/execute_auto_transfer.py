@@ -179,7 +179,7 @@ def execute_auto_transfer(
 
     except (AutoTransferError, RecipientError) as e:
         return json.dumps(
-            {"success": False, "error_code": e.code, "tts_text": e.message},
+            {"success": False, "error_code": e.code, "tts_text": e.user_message or e.message},
             ensure_ascii=False,
         )
     except Exception:

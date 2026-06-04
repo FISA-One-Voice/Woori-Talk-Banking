@@ -15,6 +15,7 @@ import logging
 from langchain_core.tools import tool
 
 from app.core.database import get_db
+from app.core.exception import AppError
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,9 @@ def add_auto_transfer_note(user_id: str, memo: str, order_id: str) -> str:
             data=AutoTransferMemoRequest(transfer_note=memo),
         )
         return f"'{memo}' 메모가 추가되었습니다."
+    except AppError as e:
+        logger.warning("add_auto_transfer_note AppError: user=%s code=%s", user_id, e.code)  # noqa: E501
+        return e.user_message or e.message
     except Exception as e:
         logger.error(
             "add_auto_transfer_note 실패: user=%s order_id=%s error=%s",

@@ -14,6 +14,7 @@
 from langchain_core.tools import tool
 
 from app.core.database import get_db
+from app.core.exception import AppError
 from app.features.event.service import get_events_tts_text
 
 
@@ -41,5 +42,7 @@ def get_event_list(user_id: str) -> str:  # noqa: D401
     try:
         result = get_events_tts_text(db)
         return f"이벤트 화면으로 이동합니다. {result}"
+    except AppError as e:
+        return e.user_message or e.message
     finally:
         db.close()
