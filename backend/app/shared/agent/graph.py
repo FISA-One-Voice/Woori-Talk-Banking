@@ -247,7 +247,9 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "  예) '어떤 거에 제일 많이 지출했어', '뭐에 돈 많이 썼어', '카테고리별 지출 순위' → intent='asset', extracted_slots={'action': 'top_category'}",
             "  예) '이번달 식비 얼마야' → intent='asset', extracted_slots={'action': 'category', 'period': '이번달', 'category': '식비'}",
             "  예) '이번달 지출 수입 얼마야', '지난달 소비 얼마야' → intent='asset', extracted_slots={'action': 'history', 'period': '이번달'}",
-            "  예) '거래내역 보여줘', '최근 거래 목록', '내역 보여줘' → intent='history' (화면 이동만, 음성 응답 없음)",
+            "  예) '최근 7일 거래내역 알려줘', '지난달 내역 말해줘' → intent='asset', extracted_slots={'action': 'history', 'period': '최근7일'} (기간+알려줘/말해줘 조합은 반드시 asset)",
+            "  예) '거래내역 보여줘', '내역 보여줘' (기간 없음) → intent='history' (화면 이동만, 음성 응답 없음)",
+            "  ★ '알려줘', '말해줘', '얼마야' + 기간('이번달','지난달','최근7일') → 반드시 intent='asset'",
             "  예) '홈 화면', '처음으로', '홈으로 가줘' → intent='home'",
             "- extracted_slots: 발화에서 파악한 슬롯 값.",
             "  asset 인텐트 슬롯: action('balance'|'history'|'category'|'top_category'), period('이번달'|'지난달'|'최근7일'만 허용), category(카테고리명)",
@@ -328,13 +330,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
             # asset 인텐트: 액션별 화면 이동 분기
             if result.intent == "asset":
                 action = new_slots.get("action")
-                if action in ("history", "category"):
+                if action in ("history", "category", "top_category"):
                     period_val = new_slots.get("period", "")
                     nav = f"asset/history?period={period_val}" if period_val else "asset/history"
                     updates["navigate_to"] = nav
                 else:
-                    # balance 등 조회만 하는 경우 화면 이동 없음 (현재 화면 유지)
-                    updates["navigate_to"] = None
+                    # balance → 자산 홈 화면으로 이동
+                    updates["navigate_to"] = "asset"
             else:
                 updates["navigate_to"] = SCREEN_MAP.get(result.intent)
             updates["collected_slots"] = new_slots
@@ -359,6 +361,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         if result.direct_response:
             updates["messages"] = [AIMessage(content=result.direct_response)]
+        elif "messages" not in updates:
+            # intent도 슬롯도 direct_response도 없는 경우 — HumanMessage가 마지막에 남아
+            # "죄송합니다" fallback이 나오지 않도록 안내 메시지 추가
+            updates["messages"] = [
+                AIMessage(content="이체, 잔액 조회, 거래내역 확인 등 필요한 것을 말씀해 주세요.")
+            ]
 
         return updates
 
