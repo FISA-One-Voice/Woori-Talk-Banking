@@ -42,6 +42,7 @@ export default function HistoryScreen() {
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const announcedRef = useRef(false);
+  const pressInTimeRef = useRef<number>(0);
   const [resultAnnounceText, setResultAnnounceText] = useState('');
   const [historyAnnounceText, setHistoryAnnounceText] = useState('');
 
@@ -214,8 +215,8 @@ export default function HistoryScreen() {
 
           {topCategories.length > 0 && (
             <View style={styles.categoryCard}>
-              <Text style={styles.categoryTitle}>카테고리별 지출 Top 5</Text>
-              {topCategories.map((item) => (
+              <Text style={styles.categoryTitle}>카테고리별 지출 Top 3</Text>
+              {topCategories.slice(0, 3).map((item) => (
                 <View key={item.category} style={styles.categoryRow}>
                   <Text style={styles.categoryName}>{item.category}</Text>
                   <Text style={styles.categoryAmount}>{item.amount.toLocaleString()}원</Text>
@@ -256,6 +257,7 @@ export default function HistoryScreen() {
           ) : (
             transactions.map((tx) => {
               const speakTx = () => {
+                if (Date.now() - pressInTimeRef.current >= 450) return;
                 const date = new Date(tx.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
                 const sign = tx.amount > 0 ? '입금' : '출금';
                 const memo = tx.memo ? `. 메모 ${tx.memo}` : '';
@@ -265,6 +267,7 @@ export default function HistoryScreen() {
                 <TouchableOpacity
                   key={tx.tx_id}
                   style={styles.txCard}
+                  onPressIn={() => { pressInTimeRef.current = Date.now(); }}
                   onPress={speakTx}
                   activeOpacity={0.8}
                 >
