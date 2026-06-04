@@ -10,6 +10,7 @@
 """
 
 import sys
+
 sys.path.insert(0, ".")
 
 import bcrypt
@@ -21,7 +22,7 @@ from app.models.user import User
 
 
 PHONE = "010-0000-0001"
-PIN   = "111111"
+PIN = "111111"
 
 
 def main() -> None:
@@ -55,17 +56,19 @@ def main() -> None:
         db.add(account)
 
         for alias, name, bank, acct in [
-            ("엄마",   "김순자",   "신한은행", "110-123-456789"),
-            ("회사",   "(주)워리톡", "국민은행", "123-456-789012"),
-            ("친구",   "이철수",   "카카오뱅크", "3333-01-000001"),
+            ("엄마", "김순자", "신한은행", "110-123-456789"),
+            ("회사", "(주)워리톡", "국민은행", "123-456-789012"),
+            ("친구", "이철수", "카카오뱅크", "3333-01-000001"),
         ]:
-            db.add(RegisteredRecipient(
-                user_id=user.user_id,
-                alias=alias,
-                bank_name=bank,
-                account_number=acct,
-                recipient_name=name,
-            ))
+            db.add(
+                RegisteredRecipient(
+                    user_id=user.user_id,
+                    alias=alias,
+                    bank_name=bank,
+                    account_number=acct,
+                    recipient_name=name,
+                )
+            )
 
         db.commit()
         print("✅ 테스트 계정 생성 완료")

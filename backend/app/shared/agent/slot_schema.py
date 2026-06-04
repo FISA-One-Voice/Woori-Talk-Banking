@@ -7,29 +7,28 @@ Design Ref:
 # ── 액션별 전체 슬롯 템플릿 ───────────────────────────────────────────────────────
 # key: pending_action 값
 # value: 슬롯명 → 기본값(None) 딕셔너리 또는 슬롯명 리스트
-SLOT_SCHEMA: dict[str, dict | list] = {
-    "transfer": ["recipient", "amount", "memo"],      # memo 선택 수집
-    "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day", "memo"],  # memo 선택 수집
+
+from app.features.recipients.service import classify_recipient_input
+
+# ── 액션별 필요 슬롯 ─────────────────────────────────────────────────────────────
+# key: pending_action 값 (intent_node가 설정)
+# value: 슬롯 이름 목록 (각 슬롯명은 service.py 파라미터명과 일치)
+SLOT_SCHEMA: dict[str, list[str]] = {
+    "transfer": ["recipient", "amount"],
+    "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
     "add_note": ["memo"],
-    "transfer_history": [],  # 슬롯 없음
-    # Issue #48: 자산 조회 — 가능한 모든 슬롯 정의
     "asset": {
         "action": None,      # "balance" / "history" / "category"
         "period": None,      # "이번달" / "지난달" / "최근7일"
         "date_range": None,  # 시작일 ISO "YYYY-MM-DD"
         "category": None,    # "식비" / "문화생활" / "교통" (action=category 시 사용)
     },
+
+
 }
 
-# ── 액션별 필수 슬롯 ───────────────────────────────────────────────────────────────
-# _missing_slots()가 이 목록을 기준으로 "아직 못 채운 슬롯"을 판단한다.
-REQUIRED_SLOTS: dict[str, list[str]] = {
-    "transfer": ["recipient", "amount"],              # memo는 선택 → 필수 아님
-    "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
-    "add_note": ["memo"],
-    "transfer_history": [],
-    "asset": ["action"],  # action만 필수, period/date_range/category는 optional
-}
+# SCREEN_MAP에 없는 음성 전용 인텐트 (화면 이동 없음)
+VOICE_ONLY_INTENTS: set[str] = {"add_note"}
 
 # ── intent → 프론트엔드 화면 이름 매핑 ────────────────────────────────────────────
 # Expo Router 경로명을 기준으로 정의한다.
@@ -42,10 +41,16 @@ SCREEN_MAP: dict[str, str] = {
     "asset": "asset",
     "home": "home",
     "transfer_history": "asset/history?type=history",
+    "cancel_auto_transfer": "auto-transfer"
 }
 
 # ── 수취인 검증이 필요한 액션 ────────────────────────────────────────────────────
-RECIPIENT_REQUIRED_ACTIONS: set[str] = {"transfer", "auto_transfer"}
+# recipient 슬롯이 채워지는 즉시 resolve_node를 통해 수취인 존재 여부를 확인한다.
+RECIPIENT_REQUIRED_ACTIONS: set[str] = {
+    "transfer",
+    "auto_transfer",
+    "cancel_auto_transfer",
+}
 
 # ── ASV 음성 인증이 필요한 액션 ─────────────────────────────────────────────────
 ASV_REQUIRED_ACTIONS: set[str] = {
@@ -53,9 +58,16 @@ ASV_REQUIRED_ACTIONS: set[str] = {
     "auto_transfer",
 }
 
+# ── 이체 완료 후 메모 제안 (에이전트 TTS) ─────────────────────────────────────────
+MEMO_OFFER_SUFFIX: str = (
+    " 메모를 남기시겠어요? 식비, 교통비, 쇼핑, 의료비, 문화생활, 기타 중 말씀해 주시거나, "
+    "건너뛰기라고 말씀해 주세요."
+)
+
 # ── 슬롯별 TTS 질문 템플릿 ────────────────────────────────────────────────────────
 SLOT_QUESTIONS: dict[str, str] = {
     "recipient": "누구에게 보낼까요? 별명이나 이름을 말씀해 주세요.",
+    "bank_name": ("어느 은행 계좌인가요? 우리은행, 국민은행처럼 말씀해 주세요."),
     "amount": "얼마를 보낼까요?",
     "cycle": "매월 또는 매주 중 어떤 주기로 보낼까요?",
     "scheduled_day": "매월 며칠에 이체할까요?",
@@ -67,10 +79,29 @@ SLOT_QUESTIONS: dict[str, str] = {
     "date_range": "조회 시작 날짜를 말씀해 주세요. 예: 삼월 오일.",
 }
 
+SLOT_QUESTIONS_BY_ACTION: dict[str, dict[str, str]] = {
+    "cancel_auto_transfer": {
+        "recipient": "누구의 자동이체를 해지할까요? 이름이나 별명을 말씀해 주세요.",
+    },
+}
+
 # ── 실행 완료 화면 경로 ────────────────────────────────────────────────────────────
 COMPLETE_SCREEN_MAP: dict[str, str] = {
     "transfer": "transfer/complete",
     "auto_transfer": "auto-transfer/complete",
+    "cancel_auto_transfer": "auto-transfer",
+}
+
+# ── 확인(네/아니오) TTS 안내 ─────────────────────────────────────────────────────
+# confirm_node·transfer_clarification·프론트 오버레이와 동일 문구.
+CONFIRM_YES_NO_SUFFIX: str = (
+    " 네 또는 아니오라고 말씀하시거나, 수정사항을 말씀해 주세요."
+)
+
+ACTIONS_WITH_YES_NO_CONFIRM: set[str] = {
+    "transfer",
+    "auto_transfer",
+    "cancel_auto_transfer",
 }
 
 # ── 액션 한국어 레이블 ────────────────────────────────────────────────────────────
@@ -78,6 +109,7 @@ ACTION_LABELS: dict[str, str] = {
     "transfer": "이체",
     "auto_transfer": "자동이체 등록",
     "asset": "자산 조회",
+    "cancel_auto_transfer": "자동이체 해지",
 }
 
 # ── 확인 메시지 없이 즉시 실행하는 액션 ────────────────────────────────────────────
@@ -86,7 +118,25 @@ NO_CONFIRM_ACTIONS: set[str] = {"asset", "balance", "history", "event", "transfe
 # ── 화면 전환 전용 인텐트 ─────────────────────────────────────────────────────────
 # 화면이 자체적으로 데이터를 가져오고 TTS를 처리하므로
 # intent_node에서 navigate_to만 설정하고 execute_node 없이 바로 END.
-SCREEN_ONLY_INTENTS: set[str] = {"event", "history"}  # history는 화면이 자체 TTS 처리
+# balance/history는 에이전트가 잔액·내역을 TTS로 읽어주므로 여기에 포함하지 않음.
+SCREEN_ONLY_INTENTS: set[str] = set()
 
 # ── 유효한 인텐트 목록 ─────────────────────────────────────────────────────────────
-VALID_INTENTS: set[str] = set(SCREEN_MAP.keys())
+VALID_INTENTS: set[str] = set(SCREEN_MAP.keys()) | VOICE_ONLY_INTENTS
+
+
+def transfer_missing_slots(collected_slots: dict) -> list[str]:
+    """transfer 액션의 누락 슬롯 (미등록 계좌는 bank_name 동적 포함)."""
+    missing: list[str] = []
+    recipient = collected_slots.get("recipient")
+    if not recipient:
+        missing.append("recipient")
+    elif (
+        classify_recipient_input(str(recipient)) == "account"
+        and not collected_slots.get("recipient_id")
+        and not collected_slots.get("bank_name")
+    ):
+        missing.append("bank_name")
+    if not collected_slots.get("amount"):
+        missing.append("amount")
+    return missing

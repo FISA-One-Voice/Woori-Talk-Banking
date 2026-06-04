@@ -11,7 +11,7 @@ export interface HomeMenuItem {
 export const HOME_MENU_ITEMS: HomeMenuItem[] = [
   { icon: '💸', label: '이체하기', voiceHint: '"이체해줘"', route: '/transfer' },
   { icon: '📊', label: '내 자산', voiceHint: '"내 자산"', route: '/asset' },
-  { icon: '🔁', label: '자동이체', voiceHint: '"자동이체"', route: null },
+  { icon: '🔁', label: '자동이체', voiceHint: '"자동이체"', route: '/auto-transfer' },
   { icon: '🎁', label: '이벤트', voiceHint: '"이벤트"', route: '/event' },
 ];
 

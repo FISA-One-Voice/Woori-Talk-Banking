@@ -1,10 +1,17 @@
 class AppError(Exception):
     """모든 커스텀 에러의 최상위 부모 클래스입니다."""
 
-    def __init__(self, code: str, message: str, status_code: int = 400):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        status_code: int = 400,
+        user_message: str | None = None,
+    ):
         self.code = code
         self.message = message
         self.status_code = status_code
+        self.user_message = user_message  # TTS 전용. None이면 message로 폴백
         super().__init__(message)
 
 
@@ -129,3 +136,7 @@ class TransferError(AppError):
     """
 
     pass
+
+
+class AutoTransferError(AppError):
+    """자동이체 등록·실행 중 발생하는 예외."""

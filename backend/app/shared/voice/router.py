@@ -17,14 +17,16 @@ logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.exception import AppError, TTSError
 from app.core.jwt_utils import get_current_user_id
 from app.shared.voice.schema import (
     ApiResponse,
     STTResult,
     TTSRequest,
     TTSResult,
+    VoiceResponseData,
 )
-from app.shared.voice.service import process_voice_pipeline
+from app.shared.voice.service import process_voice_pipeline, reset_voice_state
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
 
@@ -39,15 +41,47 @@ async def voice_pipeline(
 ) -> ApiResponse:
     """음성 파이프라인 통합 엔드포인트 (Issue #7)."""
     audio_bytes = await audio.read()
-    raw_ct = audio.content_type or ""
-    logger.info("[Voice] received content_type=%r size=%d", raw_ct, len(audio_bytes))
-    # React Native FormData가 content_type을 임의로 바꾸는 경우 대응 — WAV로 고정
-    content_type = "audio/wav"
-    data = await process_voice_pipeline(audio_bytes, user_id, db, content_type)
+    content_type = audio.content_type or "audio/wav"
+    try:
+        data = await process_voice_pipeline(audio_bytes, user_id, db, content_type)
+        return ApiResponse(
+            success=True,
+            data=data.model_dump(),
+            message="음성 처리가 완료되었습니다.",
+        )
+    except TTSError:
+        raise  # global handler로 폴백 — TTS 자체 불가, 프론트 expo-speech 처리
+    except AppError as exc:
+        audio_mp3 = await synthesize_speech(exc.user_message or exc.message)
+        error_data = VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to=None,
+            collected_slots={},
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            transcript=None,
+        )
+        return ApiResponse(
+            success=False,
+            data=error_data.model_dump(),
+            message=exc.message,
+            code=exc.code,
+        )
+
+
+@router.post("/reset-state", response_model=ApiResponse)
+async def reset_voice_session(
+    user_id: str = Depends(get_current_user_id),
+) -> ApiResponse:
+    """LangGraph 음성 세션(슬롯·대기 상태)을 초기화한다.
+
+    홈 이동·취소 후 프론트엔드가 호출해 이전 송금 컨텍스트를 제거한다.
+    """
+    await reset_voice_state(user_id)
     return ApiResponse(
         success=True,
-        data=data.model_dump(),
-        message="음성 처리가 완료되었습니다.",
+        data=None,
+        message="음성 세션이 초기화되었습니다.",
     )
 
 

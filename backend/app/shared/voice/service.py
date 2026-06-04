@@ -21,8 +21,14 @@ from app.core.config import settings
 from app.core.exception import ASVError
 from app.models.user import User
 from app.shared.agent import build_graph
+from app.shared.agent.slot_schema import SCREEN_MAP
 from app.shared.agent.tools import ALL_TOOLS
+from app.shared.agent.transfer_clarification import (
+    is_clarification_no,
+    is_home_request,
+)
 from app.shared.voice.schema import AntiSpoofResult, ASVResult, VoiceResponseData
+from app.shared.voice.message_utils import tts_text_from_messages
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
 
@@ -39,6 +45,69 @@ def _get_graph():
 
 
 _MAX_ASV_RETRIES = 3
+
+
+# ── 상태 초기화 ─────────────────────────────────────────────────────────────────
+
+
+def _voice_state_reset_payload() -> dict:
+    """LangGraph 음성 세션 전체 초기화 필드 (graph home intent와 동일)."""
+    from app.shared.agent.session_reset import clear_conversation_messages
+
+    return {
+        "pending_action": None,
+        "collected_slots": {},
+        "awaiting_confirmation": False,
+        "awaiting_asv_audio": False,
+        "execution_ready": False,
+        "recipient_validated": False,
+        "asv_retry_count": 0,
+        "navigate_to": None,
+        "awaiting_memo_decision": False,
+        "awaiting_transfer_clarification": False,
+        "draft_recipient": None,
+        "last_tx_id": None,
+        "last_order_id": None,
+        "messages": clear_conversation_messages(),
+    }
+
+
+def _resolve_navigate_to(result: dict) -> str | None:
+    """graph navigate_to 또는 대기 상태 기준 fallback.
+
+    슬롯만 보충된 턴에는 pending_action만 남고 navigate_to가 없을 수 있다.
+    이 경우 None을 반환해 프론트가 같은 라우트로 replace 하지 않게 한다.
+    """
+    explicit = result.get("navigate_to")
+    if explicit:
+        return explicit
+
+    pending = result.get("pending_action")
+
+    if result.get("awaiting_asv_audio") and pending in SCREEN_MAP:
+        return SCREEN_MAP[pending]
+
+    if result.get("awaiting_confirmation") and pending in SCREEN_MAP:
+        return SCREEN_MAP[pending]
+
+    if pending in ("balance", "history", "event", "auto_transfer"):
+        return SCREEN_MAP.get(pending)
+
+    return None
+
+
+async def reset_voice_state(user_id: str) -> None:
+    """유저의 LangGraph 대화 상태를 초기화한다."""
+    graph = _get_graph()
+    config = {"configurable": {"thread_id": user_id}}
+    await graph.aupdate_state(
+        config,
+        _voice_state_reset_payload(),
+        as_node="intent_node",
+    )
+
+
+# ── 공개 진입점 ─────────────────────────────────────────────────────────────────
 
 
 async def process_voice_pipeline(
@@ -64,7 +133,9 @@ async def process_voice_pipeline(
     )
 
     if awaiting_asv:
-        return await _handle_asv_flow(audio_bytes, user_id, config, db, graph)
+        return await _handle_asv_flow(
+            audio_bytes, user_id, config, db, graph, content_type
+        )
     else:
         return await _handle_normal_flow(
             audio_bytes, user_id, config, graph, content_type
@@ -88,22 +159,45 @@ async def _handle_normal_flow(
         config=config,
     )
 
-    last_msg = result["messages"][-1]
-    # HumanMessage가 마지막이면 에이전트 응답 없이 끝난 것 — 유저 발화를 TTS로 읽지 않음
-    if last_msg.type == "human":
-        response_text = "죄송합니다, 다시 한 번 말씀해 주세요."
-    else:
-        response_text = last_msg.content
+    response_text = tts_text_from_messages(result["messages"])
+
+    # 3. TTS: 텍스트 → MP3
     audio_mp3 = await synthesize_speech(response_text)
     audio_b64 = base64.b64encode(audio_mp3).decode()
 
+    navigate_to = _resolve_navigate_to(result)
+
+    if navigate_to == "home":
+        await reset_voice_state(user_id)
+        reset_fields = _voice_state_reset_payload()
+        collected_slots = reset_fields["collected_slots"]
+        pending_action = reset_fields["pending_action"]
+        awaiting_confirmation = reset_fields["awaiting_confirmation"]
+        awaiting_asv_audio = reset_fields["awaiting_asv_audio"]
+        awaiting_memo_decision = reset_fields["awaiting_memo_decision"]
+        awaiting_transfer_clarification = reset_fields[
+            "awaiting_transfer_clarification"
+        ]
+    else:
+        collected_slots = result.get("collected_slots") or {}
+        pending_action = result.get("pending_action")
+        awaiting_confirmation = result.get("awaiting_confirmation", False)
+        awaiting_asv_audio = result.get("awaiting_asv_audio", False)
+        awaiting_memo_decision = result.get("awaiting_memo_decision", False)
+        awaiting_transfer_clarification = result.get(
+            "awaiting_transfer_clarification", False
+        )
+
     return VoiceResponseData(
         audio=audio_b64,
-        navigate_to=result.get("navigate_to"),
-        collected_slots=result.get("collected_slots") or {},
-        awaiting_confirmation=result.get("awaiting_confirmation", False),
-        awaiting_asv_audio=result.get("awaiting_asv_audio", False),
+        navigate_to=navigate_to,
+        collected_slots=collected_slots,
+        awaiting_confirmation=awaiting_confirmation,
+        awaiting_asv_audio=awaiting_asv_audio,
+        awaiting_memo_decision=awaiting_memo_decision,
+        awaiting_transfer_clarification=awaiting_transfer_clarification,
         transcript=transcript,
+        pending_action=pending_action,
     )
 
 
@@ -124,8 +218,53 @@ async def _handle_asv_flow(
     config: dict,
     db: Session,
     graph,
+    content_type: str = "audio/wav",
 ) -> VoiceResponseData:
+    """ASV 화자 인증 처리 흐름.
+
+    ASV EC2 서버와 anti-spoofing 서버를 asyncio.gather로 병렬 호출한다.
+    성공 시 aupdate_state()로 execution_ready=True를 설정하고 에이전트를 실행한다.
+    실패 시 retry_count를 증가시키고 남은 횟수를 TTS로 안내한다.
+    3회 초과 실패 시 작업을 취소하고 상태를 초기화한다.
+
+    Args:
+        audio_bytes: ASV 검증용 원시 오디오 바이트 (WAV 권장).
+        user_id: JWT 사용자 ID.
+        config: LangGraph thread_id 설정.
+        db: SQLAlchemy 세션 (사용자 임베딩 조회용).
+        graph: 컴파일된 StateGraph 인스턴스.
+
+    Returns:
+        VoiceResponseData: 인증 결과에 따른 TTS 응답.
+
+    Raises:
+        ASVError: 사용자 음성 미등록 또는 ASV EC2 서버 통신 오류.
+    """
+    # ASV 인증음은 짧아 STT가 텍스트를 못 뽑을 수 있으므로 실패 시 무시하고 ASV로 진행
+    try:
+        transcript = await transcribe_audio(audio_bytes, content_type)
+    except Exception:
+        transcript = ""
+
+    if transcript and (is_home_request(transcript) or is_clarification_no(transcript)):
+        await reset_voice_state(user_id)
+        tts_text = "홈 화면으로 이동합니다."
+        audio_mp3 = await synthesize_speech(tts_text)
+        return VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to="home",
+            collected_slots={},
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            awaiting_memo_decision=False,
+            transcript=transcript,
+            pending_action=None,
+        )
+
     state_snapshot = graph.get_state(config)
+    pending_action = (
+        state_snapshot.values.get("pending_action") if state_snapshot.values else None
+    )
     retry_count = (
         state_snapshot.values.get("asv_retry_count", 0) if state_snapshot.values else 0
     )
@@ -160,6 +299,7 @@ async def _handle_asv_flow(
             code="ASV_SERVER_ERROR",
             message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
             status_code=502,
+            user_message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
         )
 
     auth_success = asv_ok and spoof_ok
@@ -187,6 +327,7 @@ async def _handle_asv_flow(
                 "pending_action": None,
                 "collected_slots": {},
                 "asv_retry_count": 0,
+                "awaiting_memo_decision": False,
                 "navigate_to": "home",
             },
             as_node="intent_node",
@@ -207,17 +348,24 @@ async def _handle_asv_flow(
             f"본인 확인에 실패했습니다. {remaining}번 더 시도하실 수 있습니다. "
             "다시 한번 말씀해 주세요."
         )
-        navigate_to_next = None
+        navigate_to_next = SCREEN_MAP.get(pending_action) if pending_action else None
         awaiting_asv_next = True
 
+    fail_slots = (
+        state_snapshot.values.get("collected_slots", {})
+        if state_snapshot.values
+        else {}
+    )
     audio_mp3 = await synthesize_speech(tts_text)
     return VoiceResponseData(
         audio=base64.b64encode(audio_mp3).decode(),
         navigate_to=navigate_to_next,
-        collected_slots={},
+        collected_slots=fail_slots if awaiting_asv_next else {},
         awaiting_confirmation=False,
         awaiting_asv_audio=awaiting_asv_next,
-        transcript=None,
+        awaiting_memo_decision=False,
+        transcript=transcript,
+        pending_action=pending_action if awaiting_asv_next else None,
     )
 
 
@@ -244,16 +392,21 @@ async def _proceed_after_asv_success(
         config=config,
     )
 
-    response_text = result["messages"][-1].content
+    response_text = tts_text_from_messages(result["messages"])
     audio_mp3 = await synthesize_speech(response_text)
 
     return VoiceResponseData(
         audio=base64.b64encode(audio_mp3).decode(),
-        navigate_to=result.get("navigate_to"),
+        navigate_to=_resolve_navigate_to(result),
         collected_slots=result.get("collected_slots") or {},
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=False,
+        awaiting_memo_decision=result.get("awaiting_memo_decision", False),
+        awaiting_transfer_clarification=result.get(
+            "awaiting_transfer_clarification", False
+        ),
         transcript=None,
+        pending_action=result.get("pending_action"),
     )
 
 

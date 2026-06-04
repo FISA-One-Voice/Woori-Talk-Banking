@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
+import re
 
 from app.core.database import Base
 
@@ -51,3 +52,10 @@ class RegisteredRecipient(Base):
     standing_orders: Mapped[list["StandingOrder"]] = relationship(
         "StandingOrder", back_populates="recipient"
     )
+
+    @validates("account_number")
+    def validate_account_number(self, key, value):
+        if value:
+            if re.fullmatch(r"[\d\-]+", value):
+                return value.replace("-", "")
+        return value

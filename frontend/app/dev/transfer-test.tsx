@@ -17,6 +17,7 @@ const SCENARIOS = [
       collected_slots: { recipient: '김하나' },
       awaiting_confirmation: false,
       awaiting_asv_audio: false,
+      awaiting_memo_decision: false,
       transcript: '김하나한테 보내줘',
     },
   },
@@ -28,6 +29,7 @@ const SCENARIOS = [
       collected_slots: { recipient: '김하나', amount: 50000 },
       awaiting_confirmation: true,
       awaiting_asv_audio: false,
+      awaiting_memo_decision: false,
       transcript: '5만원 보내줘',
     },
   },
@@ -39,6 +41,7 @@ const SCENARIOS = [
       collected_slots: { recipient: '김하나', amount: 50000 },
       awaiting_confirmation: false,
       awaiting_asv_audio: true,
+      awaiting_memo_decision: false,
       transcript: null,
     },
   },
@@ -50,6 +53,7 @@ const SCENARIOS = [
       collected_slots: { recipient: '김하나', amount: 50000, txId: 'test-tx-001' },
       awaiting_confirmation: false,
       awaiting_asv_audio: false,
+      awaiting_memo_decision: true,
       transcript: '네',
     },
     receipt: {
@@ -71,7 +75,7 @@ export default function TransferTestScreen() {
       setTxReceipt(scenario.receipt);
     }
     const target = scenario.data.navigate_to ?? 'transfer';
-    router.push(`/${target}` as any);
+    router.replace(`/${target}` as any);
   };
 
   return (

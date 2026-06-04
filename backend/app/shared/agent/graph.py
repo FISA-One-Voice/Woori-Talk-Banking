@@ -19,9 +19,10 @@ Design Ref (Issue #21):
 
 import json
 import logging
+import uuid
 
 import openai
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
@@ -30,22 +31,46 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exception import AgentError
-from app.features.recipients.service import find_recipient_by_voice
+from app.features.recipients.schema import ResolvedRecipient
+from app.features.recipients.service import (
+    classify_recipient_input,
+    find_recipient_by_voice,
+    match_by_registered_account,
+)
+from app.features.transfer.service import _mask_account
+from app.shared.agent.memo_decision import (
+    build_memo_decision_update,
+    last_user_text,
+)
 from app.shared.agent.prompts import SYSTEM_PROMPT
+from app.shared.agent.session_reset import clear_conversation_messages
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
+    ACTIONS_WITH_YES_NO_CONFIRM,
     ASV_REQUIRED_ACTIONS,
     COMPLETE_SCREEN_MAP,
     NO_CONFIRM_ACTIONS,
+    CONFIRM_YES_NO_SUFFIX,
+    MEMO_OFFER_SUFFIX,
     RECIPIENT_REQUIRED_ACTIONS,
     REQUIRED_SLOTS,
     SCREEN_MAP,
     SCREEN_ONLY_INTENTS,
     SLOT_QUESTIONS,
+    SLOT_QUESTIONS_BY_ACTION,
     SLOT_SCHEMA,
     VALID_INTENTS,
+    transfer_missing_slots,
 )
 from app.shared.agent.state import VoiceState
+from app.shared.agent.transfer_clarification import (
+    _recipient_hint_from_state,
+    build_transfer_clarification_offer,
+    build_transfer_clarification_response,
+    should_offer_transfer_clarification,
+)
+from app.shared.agent.transfer_intent import is_plain_transfer_start
+from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 
 logger = logging.getLogger(__name__)
 
@@ -74,15 +99,88 @@ class IntentResult(BaseModel):
 # ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
 
 
+def _is_transfer_restart_utterance(text: str) -> bool:
+    """홈 등에서 새 송금을 시작하는 발화인지."""
+    return is_plain_transfer_start(text)
+
+
+def _should_restart_transfer_flow(
+    intent: str | None,
+    pending: str | None,
+    user_text: str,
+    state: dict,
+) -> bool:
+    """이전 transfer 세션이 남아 있어도 동일 intent로 새 송금을 시작한다."""
+    if intent != "transfer" or pending != "transfer":
+        return False
+    if state.get("awaiting_confirmation") or state.get("awaiting_asv_audio"):
+        return False
+    return _is_transfer_restart_utterance(user_text)
+
+
 def _all_slots_filled(pending_action: str, collected_slots: dict) -> bool:
-    required = REQUIRED_SLOTS.get(pending_action, [])
+    """pending_action에 필요한 슬롯이 모두 수집되었는지 확인한다."""
+    if pending_action == "transfer":
+        return len(transfer_missing_slots(collected_slots)) == 0
+    required = SLOT_SCHEMA.get(pending_action, [])
     return all(collected_slots.get(slot) for slot in required)
 
 
 def _missing_slots(pending_action: str, collected_slots: dict) -> list[str]:
     """수집되지 않은 슬롯 이름 목록을 반환한다."""
-    required = REQUIRED_SLOTS.get(pending_action, [])
-    return [s for s in required if not collected_slots.get(s)]
+    if pending_action == "transfer":
+        return transfer_missing_slots(collected_slots)
+    required = SLOT_SCHEMA.get(pending_action, [])
+    missing = []
+    for s in required:
+        val = collected_slots.get(s)
+        if s == "scheduled_day":
+            cycle = collected_slots.get("cycle")
+            valid = False
+            if val is not None:
+                try:
+                    n = int(val)
+                    if cycle == "monthly":
+                        valid = 1 <= n <= 31
+                    elif cycle == "weekly":
+                        valid = 0 <= n <= 6
+                    else:
+                        valid = True
+                except (TypeError, ValueError):
+                    pass
+            if not valid:
+                missing.append(s)
+        else:
+            if not val:
+                missing.append(s)
+    return missing
+
+
+def _enrich_slots_from_resolved(
+    slots: dict,
+    resolved: ResolvedRecipient,
+    recipient_input: str,
+    user_id: str,
+) -> dict:
+    """resolve 결과를 collected_slots에 반영한다."""
+    from app.core.database import get_db
+
+    display = resolved.recipient_name or "수취인"
+    if resolved.recipient_id and classify_recipient_input(recipient_input) == "account":
+        db = next(get_db())
+        try:
+            row = match_by_registered_account(db, uuid.UUID(user_id), recipient_input)
+            if row and row.alias:
+                display = row.alias
+        finally:
+            db.close()
+
+    slots["recipient"] = display
+    slots["bank_name"] = resolved.bank_name
+    slots["account_number"] = resolved.account_number
+    if resolved.recipient_id:
+        slots["recipient_id"] = str(resolved.recipient_id)
+    return slots
 
 
 def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
@@ -91,17 +189,30 @@ def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
     parts: list[str] = []
 
     recipient = collected_slots.get("recipient")
+    bank_name = collected_slots.get("bank_name")
+    account_number = collected_slots.get("account_number")
     amount = collected_slots.get("amount")
     cycle = collected_slots.get("cycle")
     scheduled_day = collected_slots.get("scheduled_day")
 
-    if recipient:
+    if bank_name and account_number:
+        masked = _mask_account(str(account_number))
+        target = f"{recipient}님 " if recipient else ""
+        parts.append(f"{target}{bank_name} 계좌 {masked}로")
+    elif recipient:
         parts.append(f"{recipient}에게")
-    if cycle:
-        freq_label = "매월" if cycle == "monthly" else "매주"
-        parts.append(freq_label)
-    if scheduled_day:
-        parts.append(f"{scheduled_day}일")
+    _DOW_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
+    if cycle == "monthly":
+        parts.append("매월")
+        if scheduled_day is not None:
+            parts.append(f"{scheduled_day}일")
+    elif cycle == "weekly":
+        parts.append("매주")
+        if scheduled_day is not None:
+            try:
+                parts.append(f"{_DOW_LABELS[int(scheduled_day)]}요일")
+            except (IndexError, ValueError):
+                parts.append(f"{scheduled_day}요일")
     if amount:
         try:
             parts.append(_amount_to_korean(int(amount)))
@@ -109,10 +220,10 @@ def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
             parts.append(str(amount))
 
     summary = " ".join(parts)
-    memo = collected_slots.get("memo")
-    if memo:
-        return f"{summary} {action_label}할까요? 메모 '{memo}'도 함께 저장합니다."
-    return f"{summary} {action_label}할까요?"
+    msg = f"{summary} {action_label}할까요?"
+    if pending_action in ACTIONS_WITH_YES_NO_CONFIRM:
+        msg += CONFIRM_YES_NO_SUFFIX
+    return msg
 
 
 def _amount_to_korean(amount: int) -> str:
@@ -170,6 +281,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             code="AGENT_CONFIG_ERROR",
             message="AI 에이전트 설정 오류가 발생했습니다.",
             status_code=500,
+            user_message="AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         ) from e
 
     # ── tool registry ───────────────────────────────────────────────────────────
@@ -178,6 +290,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
     def _find_tool_for_action(action: str) -> object | None:
         """액션 이름에 해당하는 tool을 registry에서 찾는다."""
         candidates = [
+            action,
             f"mock_execute_{action}",
             f"mock_register_{action}",
             f"mock_get_{action}",
@@ -206,13 +319,75 @@ def build_graph(tools: list) -> CompiledStateGraph:
             )
             return {}
 
+        if state.get("awaiting_memo_decision"):
+            user_text = last_user_text(state.get("messages", []))
+            note_action = (
+                "add_auto_transfer_note" if state.get("last_order_id") else "add_note"
+            )
+            logger.info(
+                "[Graph →intent_node] awaiting_memo_decision"
+                " user_text=%s note_action=%s",
+                user_text,
+                note_action,
+            )
+            return build_memo_decision_update(user_text, note_action=note_action)
+
+        if state.get("pending_action") == "add_note":
+            user_text = last_user_text(state.get("messages", []))
+            logger.info(
+                "[Graph →intent_node] pending=add_note (memo recovery) user_text=%s",
+                user_text,
+            )
+            return build_memo_decision_update(user_text)
+
+        if state.get("awaiting_transfer_clarification"):
+            user_text = last_user_text(state.get("messages", []))
+            draft = _recipient_hint_from_state(
+                state.get("draft_recipient") or "",
+                state.get("collected_slots"),
+            )
+            logger.info(
+                "[Graph →intent_node] awaiting_transfer_clarification"
+                " user_text=%s draft=%s",
+                user_text,
+                draft,
+            )
+            return build_transfer_clarification_response(user_text, draft)
+
         logger.info(
-            "[Graph →intent_node] pending=%s slots=%s await_confirm=%s",
+            "[Graph →intent_node] pending=%s slots=%s"
+            " await_confirm=%s await_asv=%s await_memo=%s exec_ready=%s",
             state.get("pending_action"),
             state.get("collected_slots", {}),
             state.get("awaiting_confirmation", False),
+            state.get("awaiting_asv_audio", False),
+            state.get("awaiting_memo_decision", False),
+            state.get("execution_ready", False),
         )
-        context_lines = [SYSTEM_PROMPT, "", "=== 현재 대화 상태 ==="]
+
+        user_text = last_user_text(state.get("messages", []))
+        if should_offer_transfer_clarification(
+            user_text,
+            pending_action=state.get("pending_action"),
+            awaiting_memo_decision=state.get("awaiting_memo_decision", False),
+            awaiting_transfer_clarification=state.get(
+                "awaiting_transfer_clarification", False
+            ),
+            awaiting_confirmation=state.get("awaiting_confirmation", False),
+            awaiting_asv_audio=state.get("awaiting_asv_audio", False),
+        ):
+            logger.info(
+                "[Graph →intent_node] transfer_clarification offer (pre-LLM) text=%s",
+                user_text,
+            )
+            return build_transfer_clarification_offer(user_text)
+
+        # 현재 상태 컨텍스트를 시스템 프롬프트에 추가
+        context_lines = [
+            SYSTEM_PROMPT,
+            "",
+            "=== 현재 대화 상태 ===",
+        ]
         pending = state.get("pending_action")
         slots = state.get("collected_slots", {})
 
@@ -223,9 +398,33 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 f"수집된 슬롯: {json.dumps(slots, ensure_ascii=False)}"
             )
             context_lines.append(f"누락된 슬롯: {missing}")
+            if missing:
+                context_lines.append(
+                    f"★ 슬롯 채우기 진행 중 — intent는 반드시 null로 설정하고,"
+                    f" 누락 슬롯 {missing}의 값만 extracted_slots에 포함할 것."
+                    " 이미 수집된 슬롯은 extracted_slots에 절대 포함하지 말 것."
+                    " 사용자 발화가 새 인텐트처럼 보여도 절대 intent를 설정하지 말 것."
+                )
 
         if state.get("awaiting_confirmation"):
-            context_lines.append("대기 상태: 사용자 확인('네'/'아니오') 대기 중")
+            context_lines.append(
+                "★ 대기 상태: 사용자 확인('네'/'아니오') 대기 중."
+                " '네', '응', '맞아', '그렇게 해줘' → user_confirmed=true 반드시 설정."
+                " '취소', '됐어', '하지 마' → user_cancelled=true 반드시 설정."
+                " '아니' 단독 또는 '아니 + [새 값]' 패턴은 슬롯 수정으로 처리:"
+                " user_cancelled=false 유지하고 extracted_slots에 바꿀 슬롯만 설정."
+                " 예: '아니 6만원으로'→{\"amount\":60000},"
+                " '아니 화요일로'→{\"scheduled_day\":1},"
+                " '아니 10일로'→{\"scheduled_day\":10},"
+                ' \'아니 월요일마다\'→{"cycle":"weekly","scheduled_day":0}.'
+                " 수정할 슬롯이 불명확하면 direct_response에 무엇을 바꿀지 질문할 것."
+            )
+
+        if state.get("awaiting_memo_decision"):
+            context_lines.append(
+                "대기 상태: 이체 완료 후 메모 제안에 대한 응답 대기 중"
+                " (카테고리 말하기 또는 건너뛰기)"
+            )
 
         context_lines += [
             "",
@@ -241,28 +440,64 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "",
             "규칙:",
             f"- 유효한 인텐트 목록: {list(VALID_INTENTS)}",
-            "- intent: 금융 작업 유형이 파악되면 반드시 설정. 슬롯 채우기 진행 중이면 null.",
-            "  예) '이체해줘' → intent='transfer'",
-            "  예) '잔액 얼마야' → intent='asset', extracted_slots={'action': 'balance'}",
-            "  예) '어떤 거에 제일 많이 지출했어', '뭐에 돈 많이 썼어', '카테고리별 지출 순위' → intent='asset', extracted_slots={'action': 'top_category'}",
-            "  예) '이번달 식비 얼마야' → intent='asset', extracted_slots={'action': 'category', 'period': '이번달', 'category': '식비'}",
-            "  예) '이번달 지출 수입 얼마야', '지난달 소비 얼마야' → intent='asset', extracted_slots={'action': 'history', 'period': '이번달'}",
-            "  예) '최근 7일 거래내역 알려줘', '지난달 내역 말해줘' → intent='asset', extracted_slots={'action': 'history', 'period': '최근7일'} (기간+알려줘/말해줘 조합은 반드시 asset)",
-            "  예) '거래내역 보여줘', '내역 보여줘' (기간 없음) → intent='history' (화면 이동만, 음성 응답 없음)",
-            "  ★ '알려줘', '말해줘', '얼마야' + 기간('이번달','지난달','최근7일') → 반드시 intent='asset'",
-            "  예) '홈 화면', '처음으로', '홈으로 가줘' → intent='home'",
-            "- extracted_slots: 발화에서 파악한 슬롯 값.",
-            "  asset 인텐트 슬롯: action('balance'|'history'|'category'|'top_category'), period('이번달'|'지난달'|'최근7일'만 허용), category(카테고리명)",
-            "  action 선택 기준: balance=잔액조회, history=수입지출요약, category=특정카테고리조회, top_category=어떤카테고리에 많이 썼는지",
-            "  '다음달' 등 미래 기간 요청 시 intent를 설정하지 말고 direct_response로 '다음달 데이터는 아직 없습니다. 이번달, 지난달, 최근 7일 중 말씀해 주세요.'라고 안내하시오.",
-            "  transfer 슬롯: recipient(수신자명), amount(원화 정수 문자열), memo(메모 문자열, 선택)",
-            "  auto_transfer 슬롯: recipient, amount, cycle('monthly'|'weekly'), scheduled_day(숫자), memo(선택)",
-            "  transfer_history 인텐트: '이체 내역', '누구한테 보냈어', '자동이체 목록' 등 이체 조회 발화",
-            "  예) '엄마에게 오만 원 이체하고 생일축하라고 메모해줘' → intent='transfer', extracted_slots={'recipient':'엄마','amount':'50000','memo':'생일축하'}",
-            "  예) '최근 이체 내역 알려줘' → intent='transfer_history'",
+            "- intent: 진행 중인 액션이 없을 때만 설정."
+            " 진행 중인 액션이 있으면 반드시 null.",
+            "  transfer    : 일회성 이체 ('이체해줘', '보내줘', '송금해줘',"
+            " '송금하고 싶어', '이체하고 싶어', '돈 보내고 싶어')",
+            "  ★ 이체·송금 의도가 보이면 슬롯 없어도 반드시 intent=transfer.",
+            "  auto_transfer: 정기·반복 이체 ("
+            "'자동이체', '자동 송금', '정기 이체', '정기 송금',"
+            " '매달', '매월', '한달에 한번', '한달에 한번씩', '월 1회', '월마다',"
+            " '매주', '주마다', '일주일에 한번', '일주일마다', '주 1회',"
+            " '정기적으로', '주기적으로', '반복해서', '계속', '꾸준히',"
+            " '자동으로 보내줘', '고정으로 보내줘', 'N일마다',"
+            " '격주', '격월')",
+            "  balance     : 잔액·거래내역 조회 ('잔액 얼마야', '내역 보여줘')",
+            "  event       : 이벤트 조회·이동 ('이벤트 조회해줘', '이벤트 알려줘',"
+            " '이벤트 화면', '이벤트 이동해줘')",
+            "  home        : 홈 화면 이동 ('홈 화면', '처음으로', '홈으로 가줘')",
+            "  (단, '이벤트 화면', '잔액 화면' 등 특정 화면으로의 이동은 home이 아님)",
+            "  ★ '매달', '매주', '자동이체', '한달에', '주마다', '매월', '정기',"
+            " '반복', '주기', '계속', '꾸준히', '고정' 키워드가 있으면 반드시 auto_transfer.",
+            "- extracted_slots: 발화에서 파악한 슬롯 값 (없으면 {})."
+            " 금액 슬롯 키는 'amount', 값은 원화 정수 문자열"
+            " (예: '3만원'→'30000', '오만원'→'50000')."
+            " 수신자 슬롯 키는 'recipient', 값은 발화에서 언급한"
+            " 이름·별명·전화번호 그대로"
+            " (예: '엄마에게'→recipient='엄마', '친구한테'→recipient='친구',"
+            " '010 1234 5678로'→recipient='010 1234 5678').",
+            "- cycle 슬롯: 반드시 'monthly' 또는 'weekly' 영문으로 설정"
+            " ('매월'·'한달에한번'→'monthly',"
+            " '매주'·'일주일에한번'·'7일마다'→'weekly')."
+            " ★ '7일마다', '일주일마다','주마다','매주','일주일마다 한번씩' 등은 cycle=weekly로만 설정하고"
+            " scheduled_day는 설정하지 말 것 (요일 미명시)."
+            " ★ '3일마다','5일마다','10일마다' 등 7일이 아닌 'N일마다'는 cycle=monthly,"
+            " scheduled_day=N으로 설정. '삼일마다'→cycle=monthly,scheduled_day=3.",
+            "- scheduled_day: 사용자가 날짜·요일을 명시한 경우에만 추출할 것."
+            " '한달에 한번', '매월', '매주' 등 주기만 말하고"
+            " 날짜·요일을 언급하지 않으면 scheduled_day를 절대 설정하지 말 것."
+            " monthly일 때 날짜 정수(1-31). '15일'→15, '3일'→3, '말일'→31."
+            " ★ cycle=monthly 상태에서 후속 발화로 날짜만 말한 경우 반드시 scheduled_day로 추출."
+            " 예: (cycle=monthly 진행 중) '3일'→scheduled_day=3, '15일'→scheduled_day=15."
+            " ★ STT 오류 보정: 한국어 '일'(日)이 숫자 '1'로 잘못 인식됨."
+            " monthly 날짜 추출 시 숫자 끝 '1'은 '일'(日) 오인식이므로"
+            " 제거 후 나머지를 날짜로 사용."
+            " 예: '61'→6, '71'→7, '91'→9, '11'→1, '21'→2, '31'→3, '211'→21, '311'→31."
+            " '61'을 '6월 1일'로 해석하거나 '1'을 날짜로 추출하면 절대 안 됨."
+            " ★ 자동이체에서 'N월마다'는 달(月)이 아닌 날짜로 해석:"
+            " '10월마다'→scheduled_day=10, '5월마다'→scheduled_day=5."
+            " weekly일 때도 scheduled_day에 요일 정수(0=월,1=화,2=수,3=목,4=금,5=토,6=일)를 저장."
+            " '월요일'→scheduled_day=0, '수요일'→scheduled_day=2, '금요일'→scheduled_day=4.",
+            "  bank_name: 은행명 (예: '우리은행 1101234567890'→bank_name='우리은행',"
+            " recipient='1101234567890').",
             "- user_confirmed: '네', '맞아요', '그렇게 해줘' 등 확인 발화 시 true",
-            "- user_cancelled: '취소', '아니오', '됐어' 등 취소 발화 시 true",
-            "- direct_response: 비금융 챗봇 답변에만 사용. intent 설정 시 반드시 빈 문자열.",
+            "- user_cancelled: '취소', '아니오', '됐어', '하지 마' 등 취소 발화 시 true",
+            "- direct_response: 비금융 챗봇 답변(영업시간, 상품 안내 등)에만 사용.",
+            "  ★ intent가 설정된 경우 반드시 빈 문자열('')로 설정할 것.",
+            "  ★ 누락 슬롯 질문('누구에게?', '얼마?')을 절대 여기에 쓰지 말 것."
+            " 슬롯 수집은 시스템이 자동으로 처리한다.",
+            "  ★ 전화·계좌만 말하고 이체 의도가 없으면 direct_response는 비우고"
+            " 사용자 발화를 그대로 반복하지 말 것 (송금 여부는 시스템이 질문한다).",
             "- TTS 출력: 마크다운 없이 자연스러운 한국어 구어체만 사용",
         ]
 
@@ -300,11 +535,20 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "awaiting_confirmation": False,
                 "awaiting_asv_audio": False,
                 "asv_retry_count": 0,
-                "navigate_to": None,
+                "navigate_to": "home",
                 "execution_ready": False,
                 "recipient_validated": False,
+                "last_tx_id": None,
+                "last_order_id": None,
+                "awaiting_memo_decision": False,
+                "awaiting_transfer_clarification": False,
+                "draft_recipient": None,
                 "messages": [
-                    AIMessage(content=result.direct_response or "취소되었습니다.")
+                    *clear_conversation_messages(),
+                    AIMessage(
+                        content=result.direct_response
+                        or "취소되었습니다. 홈 화면으로 이동합니다."
+                    ),
                 ],
             }
 
@@ -315,6 +559,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 updates = {
                     "awaiting_confirmation": False,
                     "awaiting_asv_audio": True,
+                    "navigate_to": SCREEN_MAP.get(action),
                     "messages": [AIMessage(content="목소리로 인증해 주세요.")],
                 }
             else:
@@ -324,26 +569,106 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 }
             return updates
 
-        if result.intent and result.intent in VALID_INTENTS and not pending:
-            new_slots = dict(result.extracted_slots)
-            updates["pending_action"] = result.intent
+        # ── 확인 단계에서 슬롯 수정 ────────────────────────────────────────────────
+        # "6만원으로 바꿔줘" 등 슬롯 수정 발화 → awaiting_confirmation 해제 후 재확인
+        if state.get("awaiting_confirmation") and result.extracted_slots:
+            existing = dict(state.get("collected_slots", {}))
+            existing.update(result.extracted_slots)
+            logger.info(
+                "[Graph →intent_node] 확인 단계 슬롯 수정: %s", result.extracted_slots
+            )
+            return {
+                "collected_slots": existing,
+                "awaiting_confirmation": False,
+                "recipient_validated": (
+                    False
+                    if "recipient" in result.extracted_slots
+                    else state.get("recipient_validated", False)
+                ),
+            }
+
+        # ── 확인 단계에서 응답 불명확 ────────────────────────────────────────────
+        # extracted_slots도 비어있고 confirmed/cancelled도 False인 경우
+        # → TTS로 "네 또는 아니오" 재안내
+        if state.get("awaiting_confirmation") and not result.direct_response:
+            return {
+                "messages": [
+                    AIMessage(
+                        content=(
+                            CONFIRM_YES_NO_SUFFIX.strip()
+                            + " 변경하실 내용이 있으면 말씀해 주시면 반영해 드립니다."
+                        )
+                    )
+                ]
+            }
+
+        # ── 홈 이동 처리 ─────────────────────────────────────────────────────────
+        # 진행 중인 모든 액션 상태를 초기화하고 홈으로 이동
+        if result.intent == "home":
+            return {
+                "pending_action": None,
+                "collected_slots": {},
+                "awaiting_confirmation": False,
+                "awaiting_asv_audio": False,
+                "execution_ready": False,
+                "recipient_validated": False,
+                "asv_retry_count": 0,
+                "last_tx_id": None,
+                "awaiting_memo_decision": False,
+                "awaiting_transfer_clarification": False,
+                "draft_recipient": None,
+                "navigate_to": "home",
+                "messages": [
+                    *clear_conversation_messages(),
+                    AIMessage(content="홈 화면으로 이동합니다."),
+                ],
+            }
+
+        user_text = last_user_text(state.get("messages", []))
+        restart_transfer = _should_restart_transfer_flow(
+            result.intent, pending, user_text, state
+        )
+
+        # ── 새 인텐트 감지 ──────────────────────────────────────────────────────
+        # 확인·ASV 대기 중에는 인텐트 감지를 무시 (슬롯 초기화 방지)
+        # 다른 인텐트이거나 transfer 재시작 케이스일 때 슬롯·상태 초기화
+        if (
+            result.intent
+            and result.intent in VALID_INTENTS
+            and not state.get("awaiting_confirmation")
+            and not state.get("awaiting_asv_audio")
+            and (result.intent != pending or restart_transfer)
+        ):
+            updates = {
+                "pending_action": result.intent,
+                "navigate_to": SCREEN_MAP.get(result.intent),
+                "collected_slots": dict(result.extracted_slots),
+                "recipient_validated": False,
+                "awaiting_confirmation": False,
+                "awaiting_asv_audio": False,
+                "execution_ready": False,
+                "asv_retry_count": 0,
+                "awaiting_memo_decision": False,
+                "awaiting_transfer_clarification": False,
+                "draft_recipient": None,
+                "last_tx_id": None
+                if result.intent == "transfer"
+                else state.get("last_tx_id"),
+            }
             # asset 인텐트: 액션별 화면 이동 분기
             if result.intent == "asset":
-                action = new_slots.get("action")
+                action = dict(result.extracted_slots).get("action")
                 if action in ("history", "category", "top_category"):
-                    period_val = new_slots.get("period", "")
+                    period_val = dict(result.extracted_slots).get("period", "")
                     nav = f"asset/history?period={period_val}" if period_val else "asset/history"
                     updates["navigate_to"] = nav
                 else:
-                    # balance → 자산 홈 화면으로 이동
                     updates["navigate_to"] = "asset"
-            else:
-                updates["navigate_to"] = SCREEN_MAP.get(result.intent)
-            updates["collected_slots"] = new_slots
-            updates["recipient_validated"] = False
-
-            # SCREEN_ONLY 인텐트는 execute_node 없이 END → 마지막 메시지가 HumanMessage가 되어
-            # TTS가 유저 발화를 그대로 따라하는 문제 방지
+            if result.intent == "transfer":
+                updates["messages"] = [
+                    *clear_conversation_messages(),
+                    HumanMessage(content=user_text),
+                ]
             if result.intent in SCREEN_ONLY_INTENTS:
                 _nav_msgs: dict[str, str] = {
                     "history": "최근 거래 내역 보여드리겠습니다.",
@@ -355,18 +680,54 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         elif result.extracted_slots and pending:
             existing = dict(state.get("collected_slots", {}))
-            existing.update(result.extracted_slots)
+            missing_now = _missing_slots(pending, existing)
+            for key, val in result.extracted_slots.items():
+                # scheduled_day는 사용자 수정 가능 — 항상 허용
+                # 나머지는 이미 채워진 슬롯 덮어쓰기 방지 (LLM 오파싱 방어)
+                if (
+                    key == "scheduled_day"
+                    or key in missing_now
+                    or existing.get(key) is None
+                ):
+                    if key == "scheduled_day" and val is not None:
+                        try:
+                            day_int = int(val)
+                        except (ValueError, TypeError):
+                            day_int = None
+                        # STT가 '6일'→'61'처럼 '일'(日)을 '1'로 인식하는 오류 보정
+                        if (
+                            day_int is not None
+                            and 32 <= day_int <= 91
+                            and day_int % 10 == 1
+                        ):
+                            val = day_int // 10
+                    existing[key] = val
             updates["collected_slots"] = existing
-            updates["navigate_to"] = None
+            updates["navigate_to"] = None  # 슬롯 채우기 중 화면 이동 없음
+            if pending == "add_note" and existing.get("memo"):
+                updates["execution_ready"] = True
 
-        if result.direct_response:
+        # ── 챗봇 직접 응답 (인텐트 없음) ───────────────────────────────────────
+        pending_after = updates.get("pending_action") or state.get("pending_action")
+        if should_offer_transfer_clarification(
+            user_text,
+            pending_action=pending_after,
+            awaiting_memo_decision=state.get("awaiting_memo_decision", False),
+            awaiting_transfer_clarification=state.get(
+                "awaiting_transfer_clarification", False
+            ),
+            awaiting_confirmation=state.get("awaiting_confirmation", False),
+            awaiting_asv_audio=state.get("awaiting_asv_audio", False),
+        ):
+            updates = {**updates, **build_transfer_clarification_offer(user_text)}
+        elif result.direct_response:
             updates["messages"] = [AIMessage(content=result.direct_response)]
-        elif "messages" not in updates:
-            # intent도 슬롯도 direct_response도 없는 경우 — HumanMessage가 마지막에 남아
-            # "죄송합니다" fallback이 나오지 않도록 안내 메시지 추가
-            updates["messages"] = [
-                AIMessage(content="이체, 잔액 조회, 거래내역 확인 등 필요한 것을 말씀해 주세요.")
-            ]
+        elif (
+            not updates.get("messages")
+            and not pending_after
+            and not is_plain_transfer_start(user_text)
+        ):
+            updates["messages"] = [AIMessage(content=_DEFAULT_TTS_FALLBACK)]
 
         return updates
 
@@ -386,7 +747,10 @@ def build_graph(tools: list) -> CompiledStateGraph:
             question = "며칠 동안의 내역을 보시겠습니까? 이번달, 지난달, 최근 칠일 중 말씀해 주세요."
         elif missing:
             slot_name = missing[0]
-            if slot_name == "scheduled_day" and slots.get("cycle") == "weekly":
+            action_questions = SLOT_QUESTIONS_BY_ACTION.get(pending, {})
+            if slot_name in action_questions:
+                question = action_questions[slot_name]
+            elif slot_name == "scheduled_day" and slots.get("cycle") == "weekly":
                 question = (
                     "매주 무슨 요일에 이체할까요? 월요일부터 일요일 중 말씀해 주세요."
                 )
@@ -408,55 +772,112 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         return {
             "awaiting_confirmation": True,
+            "navigate_to": SCREEN_MAP.get(pending),
             "messages": [AIMessage(content=confirm_msg)],
         }
 
     def resolve_node(state: VoiceState) -> dict:
         """recipient 슬롯이 채워진 즉시 수취인 존재 여부를 검증한다."""
         slots = dict(state.get("collected_slots", {}))
-        recipient_input = slots.get("recipient", "")
+        recipient_input = str(slots.get("recipient", ""))
+        bank_name = slots.get("bank_name")
+        user_id = state.get("user_id", "")
+        kind = classify_recipient_input(recipient_input) if recipient_input else "name"
+
         logger.info(
-            "[Graph →resolve_node] recipient=%s user_id=%s",
+            "[Graph →resolve_node] recipient=%s bank=%s kind=%s user_id=%s",
             recipient_input,
-            state.get("user_id"),
+            bank_name,
+            kind,
+            user_id,
         )
 
-        canonical_name: str | None = find_recipient_by_voice(
-            state.get("user_id", ""), recipient_input
-        )
+        try:
+            resolved = find_recipient_by_voice(
+                user_id,
+                recipient_input,
+                bank_name=str(bank_name) if bank_name else None,
+            )
+        except Exception as e:
+            logger.error("resolve_node 수취인 조회 실패: %s", e)
+            resolved = None
 
-        if canonical_name is None:
-            slots["recipient"] = None
+        if resolved is not None:
+            _enrich_slots_from_resolved(slots, resolved, recipient_input, user_id)
+            return {
+                "collected_slots": slots,
+                "recipient_validated": True,
+            }
+
+        if kind == "account" and not bank_name:
             return {
                 "collected_slots": slots,
                 "recipient_validated": False,
+            }
+
+        # 전화·계좌 힌트는 슬롯을 비우지 않는다 (금액만 추가 수집 또는 재시도).
+        if kind in ("phone", "account"):
+            return {
+                "collected_slots": slots,
+                "recipient_validated": False,
+                "navigate_to": None,
                 "messages": [
                     AIMessage(
                         content=(
-                            f"'{recipient_input}'을(를) 찾을 수 없습니다."
-                            " 다시 알려주세요."
+                            f"'{recipient_input}'은(는) 등록된 수취인이 아닙니다."
+                            " 수신인 이름이나 별명, 계좌번호를 다시 말씀해 주세요."
                         )
                     )
                 ],
             }
 
-        slots["recipient"] = canonical_name
+        pending_action = state.get("pending_action", "transfer")
+        slots["recipient"] = None
         return {
             "collected_slots": slots,
-            "recipient_validated": True,
+            "recipient_validated": False,
+            "navigate_to": SCREEN_MAP.get(pending_action, SCREEN_MAP.get("transfer")),
+            "messages": [
+                AIMessage(
+                    content=(
+                        f"'{recipient_input}'은(는) 등록되지 않은 수취인입니다. "
+                        "누구에게 보낼까요?"
+                    )
+                )
+            ],
         }
 
     def route_after_resolve(state: VoiceState) -> str:
         """resolve_node 결과에 따라 다음 노드를 결정한다."""
         slots = state.get("collected_slots", {})
-        if not slots.get("recipient"):
-            logger.info("[Graph route] resolve_node → slot_fill_node (recipient invalid)")
-            return "slot_fill_node"
         pending = state.get("pending_action", "")
-        if _missing_slots(pending, slots):
+        missing = _missing_slots(pending, slots)
+
+        if not slots.get("recipient"):
+            # 수취인 미등록 → resolve_node의 실패 메시지를 TTS로 전달하고 END
+            # slot_fill_node로 넘기면 "누구에게 보낼까요?"가 실패 메시지를 덮어씀
+            logger.info("[Graph route] resolve_node → END (recipient not found)")
+            return END
+
+        if not state.get("recipient_validated"):
+            # 조회 실패: 금액만 빠진 상태로 slot_fill 가면 안 됨 (미검증 수취인).
+            if missing == ["amount"]:
+                logger.info(
+                    "[Graph route] resolve_node → END (unvalidated, lookup failed)"
+                )
+                return END
+            if missing:
+                logger.info(
+                    "[Graph route] resolve_node → slot_fill_node (missing=%s)",
+                    missing,
+                )
+                return "slot_fill_node"
+            logger.info("[Graph route] resolve_node → END (unvalidated)")
+            return END
+
+        if missing:
             logger.info(
-                "[Graph route] resolve_node → slot_fill_node (missing=%s)",
-                _missing_slots(pending, slots),
+                "[Graph route] resolve_node → slot_fill_node (missing=%s)", missing
             )
             return "slot_fill_node"
         logger.info("[Graph route] resolve_node → confirm_node")
@@ -482,6 +903,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "execution_ready": False,
                 "recipient_validated": False,
                 "asv_retry_count": 0,
+                "awaiting_memo_decision": False,
                 "navigate_to": "home",
                 "messages": [
                     AIMessage(
@@ -490,23 +912,113 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 ],
             }
         else:
+            from app.shared.agent.tools.transfer import run_execute_transfer
+
             invoke_args = {"user_id": state.get("user_id", ""), **slots}
+            new_last_tx_id: str | None = state.get("last_tx_id")
+            new_last_order_id: str | None = state.get("last_order_id")
+            completed_slots: dict = {}
+            note_consumed = False
+            awaiting_memo_next = False
+            response_text = ""
+
             try:
-                response_text = tool_obj.invoke(invoke_args)
+                if pending == "transfer" and tool_obj.name == "execute_transfer":
+                    response_text, tx_id = run_execute_transfer(
+                        user_id=invoke_args["user_id"],
+                        recipient=str(invoke_args.get("recipient", "")),
+                        amount=int(invoke_args.get("amount", 0)),
+                        collected_slots=slots,
+                    )
+                    if tx_id:
+                        new_last_tx_id = tx_id
+                        awaiting_memo_next = True
+                        response_text = response_text + MEMO_OFFER_SUFFIX
+                        # 영수증은 프론트 prevSlots로 처리; 세션 슬롯은 비움
+                        completed_slots = {}
+                elif pending == "transfer":
+                    response_text = tool_obj.invoke(invoke_args)
+                elif pending == "auto_transfer":
+                    result_raw = tool_obj.invoke(invoke_args)
+                    try:
+                        result_data = json.loads(result_raw)
+                    except Exception:
+                        result_data = {}
+                    response_text = result_data.get(
+                        "tts_text", "자동이체 등록 중 오류가 발생했습니다."
+                    )
+                    if result_data.get("success"):
+                        order_id = result_data.get("order_id")
+                        if order_id:
+                            new_last_order_id = order_id
+                            awaiting_memo_next = True
+                            response_text = response_text + MEMO_OFFER_SUFFIX
+                        completed_slots = {}
+                elif pending == "add_note":
+                    tx_id = slots.get("tx_id") or state.get("last_tx_id")
+                    if not tx_id:
+                        response_text = (
+                            "메모를 추가할 이체 내역을 찾을 수 없습니다."
+                            " 이체를 먼저 완료해 주세요."
+                        )
+                    else:
+                        response_text = tool_obj.invoke(
+                            {
+                                "user_id": invoke_args["user_id"],
+                                "memo": str(invoke_args.get("memo", "")),
+                                "tx_id": str(tx_id),
+                            }
+                        )
+                        if "추가되었습니다" in response_text:
+                            note_consumed = True
+                elif pending == "add_auto_transfer_note":
+                    order_id = slots.get("order_id") or state.get("last_order_id")
+                    if not order_id:
+                        response_text = (
+                            "메모를 추가할 자동이체 내역을 찾을 수 없습니다."
+                            " 자동이체 등록을 먼저 완료해 주세요."
+                        )
+                    else:
+                        response_text = tool_obj.invoke(
+                            {
+                                "user_id": invoke_args["user_id"],
+                                "memo": str(invoke_args.get("memo", "")),
+                                "order_id": str(order_id),
+                            }
+                        )
+                        if "추가되었습니다" in response_text:
+                            note_consumed = True
+                else:
+                    response_text = tool_obj.invoke(invoke_args)
             except Exception as e:
                 logger.error("execute_node tool 호출 실패 (%s): %s", pending, e)
                 response_text = (
                     "처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
                 )
+                new_last_tx_id = state.get("last_tx_id")
+                new_last_order_id = state.get("last_order_id")
+                completed_slots = {}
 
         updates: dict = {
             "pending_action": None,
-            "collected_slots": {},
+            "collected_slots": completed_slots,
             "awaiting_confirmation": False,
             "awaiting_asv_audio": False,
+            "awaiting_memo_decision": awaiting_memo_next,
             "execution_ready": False,
+            "recipient_validated": False,
             "messages": [AIMessage(content=response_text)],
+            "last_tx_id": None if note_consumed else new_last_tx_id,
+            "last_order_id": None if note_consumed else new_last_order_id,
         }
+        if note_consumed:
+            updates["awaiting_memo_decision"] = False
+            updates["navigate_to"] = "home"
+            updates["messages"] = [
+                *clear_conversation_messages(),
+                AIMessage(content=response_text),
+            ]
+        # transfer/auto_transfer 등 완료 화면이 있는 액션만 navigate_to 덮어씀.
         if pending in COMPLETE_SCREEN_MAP:
             updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
         return updates
@@ -519,6 +1031,18 @@ def build_graph(tools: list) -> CompiledStateGraph:
             logger.info("[Graph route] intent_node → END (awaiting_asv_audio)")
             return END
 
+        # 메모 제안 응답 대기 → END (다음 발화로 intent_node에서 처리)
+        if state.get("awaiting_memo_decision"):
+            logger.info("[Graph route] intent_node → END (awaiting_memo_decision)")
+            return END
+
+        if state.get("awaiting_transfer_clarification"):
+            logger.info(
+                "[Graph route] intent_node → END (awaiting_transfer_clarification)"
+            )
+            return END
+
+        # 확인 완료 + 즉시 실행 가능 → execute_node
         if state.get("execution_ready"):
             logger.info("[Graph route] intent_node → execute_node (execution_ready)")
             return "execute_node"
@@ -537,6 +1061,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
         ):
             logger.info("[Graph route] intent_node → resolve_node")
             return "resolve_node"
+
+        if pending == "add_note":
+            logger.info(
+                "[Graph route] intent_node → END (add_note — memo_decision only)"
+            )
+            return END
 
         missing = _missing_slots(pending, slots)
 
@@ -600,6 +1130,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             code="AGENT_INIT_FAILED",
             message="AI 에이전트를 초기화하지 못했습니다.",
             status_code=500,
+            user_message="AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         ) from e
 
     return graph

@@ -42,8 +42,8 @@ export default function Index() {
         <Text style={styles.btnText}>🎨 컴포넌트 쇼케이스</Text>
       </Pressable>
 
-      <Pressable style={[styles.btn, styles.btnPrimary]} onPress={() => router.push('/home')}>
-        <Text style={[styles.btnText, styles.btnTextDark]}>🏠 앱 진입</Text>
+      <Pressable style={[styles.btn, styles.btnPrimary]} onPress={() => router.push('/login')}>
+        <Text style={[styles.btnText, styles.btnTextDark]}>🔐 로그인 (앱 시작)</Text>
       </Pressable>
 
       <Pressable

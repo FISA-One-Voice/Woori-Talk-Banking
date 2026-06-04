@@ -35,6 +35,7 @@ def get_asset_summary(db: Session, user_id: str) -> list[Account]:
             code="ACCOUNT_NOT_FOUND",
             message="계좌를 찾을 수 없습니다.",
             status_code=404,
+            user_message="계좌를 찾을 수 없습니다.",
         )
 
     return accounts
@@ -68,6 +69,7 @@ def get_account_balance(db: Session, user_id: str, account_id: str) -> Account:
             code="ACCOUNT_NOT_FOUND",
             message="계좌를 찾을 수 없습니다.",
             status_code=404,
+            user_message="계좌를 찾을 수 없습니다.",
         )
 
     return account
@@ -150,6 +152,7 @@ def get_expense_summary(
             code="TX_NOT_FOUND",
             message="해당 기간에 지출 내역이 없습니다.",
             status_code=404,
+            user_message="해당 기간에 지출 내역이 없습니다.",
         )
 
     total = sum(t.amount for t in transactions)

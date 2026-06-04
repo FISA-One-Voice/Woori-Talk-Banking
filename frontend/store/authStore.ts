@@ -3,33 +3,52 @@
 // =============================================================================
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import * as SecureStore from 'expo-secure-store';
+
+// react-native-encrypted-storage와 동일한 역할을 하는 Expo 호환 안전 저장소입니다.
+const secureStorage = {
+  getItem: async (name: string) => {
+    return (await SecureStore.getItemAsync(name)) || null;
+  },
+  setItem: async (name: string, value: string) => {
+    await SecureStore.setItemAsync(name, value);
+  },
+  removeItem: async (name: string) => {
+    await SecureStore.deleteItemAsync(name);
+  },
+};
 
 interface AuthState {
-  /** JWT accessToken. 없으면 null. */
   token: string | null;
-  /** JWT refreshToken. 없으면 null. */
   refreshToken: string | null;
-  /** 로그인 시 입력한 전화번호 (Face ID 재로그인용) */
-  phone: string | null;
-
-  /** 토큰 쌍 및 전화번호 저장 (로그인 성공 시 호출) */
-  setTokens: (accessToken: string, refreshToken: string, phone?: string) => void;
-
-  /** 모든 토큰 삭제 (로그아웃 시 호출) */
+  hasVoiceRegistered: boolean;
+  ttsSpeed: number;
+  setTokens: (accessToken: string, refreshToken: string, hasVoiceRegistered?: boolean, ttsSpeed?: number) => void;
+  setHasVoiceRegistered: (status: boolean) => void;
   clearTokens: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
-  refreshToken: null,
-  phone: null,
-
-  setTokens: (token, refreshToken, phone) =>
-    set((state) => ({
-      token,
-      refreshToken,
-      phone: phone !== undefined ? phone : state.phone,
-    })),
-
-  clearTokens: () => set({ token: null, refreshToken: null, phone: null }),
-}));
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      token: null,
+      refreshToken: null,
+      hasVoiceRegistered: false,
+      ttsSpeed: 1.7,
+      setTokens: (token, refreshToken, hasVoiceRegistered = false, ttsSpeed) =>
+        set((state) => ({
+          token,
+          refreshToken,
+          hasVoiceRegistered: hasVoiceRegistered ?? state.hasVoiceRegistered,
+          ttsSpeed: ttsSpeed ?? state.ttsSpeed,
+        })),
+      setHasVoiceRegistered: (status) => set({ hasVoiceRegistered: status }),
+      clearTokens: () => set({ token: null, refreshToken: null, hasVoiceRegistered: false, ttsSpeed: 1.7 }),
+    }),
+    {
+      name: 'auth-storage',
+      storage: createJSONStorage(() => secureStorage),
+    }
+  )
+);

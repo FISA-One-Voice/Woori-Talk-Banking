@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
+import re
 
 from app.core.database import Base
 
@@ -53,3 +54,12 @@ class Account(Base):
     standing_orders: Mapped[list["StandingOrder"]] = relationship(
         "StandingOrder", back_populates="from_account"
     )
+
+    @validates("account_number")
+    def validate_account_number(self, key, value):
+        if value:
+            # 암호화된 Base64 문자열(영문, 숫자, -, _ 포함)을 훼손하지 않기 위해,
+            # 숫자와 하이픈(-)으로만 구성된 순수 계좌번호 평문일 경우에만 하이픈을 제거합니다.
+            if re.fullmatch(r"[\d\-]+", value):
+                return value.replace("-", "")
+        return value

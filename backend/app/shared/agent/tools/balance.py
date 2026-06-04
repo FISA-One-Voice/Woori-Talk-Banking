@@ -11,8 +11,8 @@ tool이 에이전트에 연결되는 방식:
 from langchain_core.tools import tool
 
 from app.core.database import get_db
+from app.core.exception import AppError
 from app.features.asset.service import get_asset_summary, get_account_balance
-from app.core.exception import BalanceError
 
 
 @tool
@@ -35,6 +35,8 @@ def get_total_balance(user_id: str) -> str:  # noqa: D401
         accounts = get_asset_summary(db, user_id)
         total = sum(a.balance for a in accounts)
         return f"전체 잔액은 {total:,}원입니다."
+    except AppError as e:
+        return e.user_message or e.message
     finally:
         db.close()
 
@@ -59,5 +61,7 @@ def get_account_balance_by_id(user_id: str, account_id: str) -> str:  # noqa: D4
     try:
         account = get_account_balance(db, user_id, account_id)
         return f"{account.bank_name} 계좌 잔액은 {account.balance:,}원입니다."
+    except AppError as e:
+        return e.user_message or e.message
     finally:
         db.close()

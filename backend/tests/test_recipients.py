@@ -16,10 +16,17 @@ import pytest
 from app.core.exception import RecipientError
 from app.features.recipients.schema import ResolvedRecipient
 from app.features.recipients.service import (
+    classify_recipient_input,
     create_recipient,
+    lookup_recipient_by_voice,
+    lookup_recipient_for_transfer,
     match_by_name,
+    match_by_registered_account,
+    normalize_account_digits,
     resolve_by_id,
     resolve_by_phone,
+    resolve_by_registered_account,
+    resolve_direct_account,
 )
 from app.models.account import Account
 from app.models.recipient import RegisteredRecipient
@@ -38,6 +45,7 @@ def _make_user(phone: str) -> User:
 
 
 # ── 픽스처 ─────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def test_user(db):
@@ -95,6 +103,7 @@ def registered_recipient(db, test_user):
 
 # ── resolve_by_id ──────────────────────────────────────────────────────────────
 
+
 def test_resolve_by_id_success(db, test_user, registered_recipient):
     """등록된 수취인 ID로 정상 조회되는지 확인합니다."""
     result = resolve_by_id(db, test_user.user_id, registered_recipient.recipient_id)
@@ -102,7 +111,7 @@ def test_resolve_by_id_success(db, test_user, registered_recipient):
     assert isinstance(result, ResolvedRecipient)
     assert result.recipient_id == registered_recipient.recipient_id
     assert result.bank_name == "국민은행"
-    assert result.account_number == "123-456-789012"
+    assert result.account_number == "123456789012"
     assert result.recipient_name == "홍길동"
 
 
@@ -127,6 +136,7 @@ def test_resolve_by_id_other_user(db, registered_recipient):
 
 # ── resolve_by_phone ───────────────────────────────────────────────────────────
 
+
 def test_resolve_by_phone_success(db, phone_user):
     """전화번호로 수취인 주계좌를 정상 조회합니다."""
     result = resolve_by_phone(db, phone_user.phone)
@@ -134,7 +144,7 @@ def test_resolve_by_phone_success(db, phone_user):
     assert isinstance(result, ResolvedRecipient)
     assert result.recipient_id is None
     assert result.bank_name == "우리은행"
-    assert result.account_number == "1002-111-222333"
+    assert result.account_number == "1002111222333"
     assert result.recipient_name == phone_user.name
 
 
@@ -165,6 +175,7 @@ def test_resolve_by_phone_no_primary_account(db):
 
 # ── create_recipient ───────────────────────────────────────────────────────────
 
+
 def test_create_recipient_success(db, test_user):
     """수취인을 신규 등록하고 반환합니다."""
     alias = f"친구_{uuid.uuid4().hex[:6]}"
@@ -181,7 +192,7 @@ def test_create_recipient_success(db, test_user):
     assert isinstance(result, ResolvedRecipient)
     assert result.recipient_id is not None
     assert result.bank_name == "신한은행"
-    assert result.account_number == "110-222-333444"
+    assert result.account_number == "110222333444"
     assert result.recipient_name == "김철수"
 
     saved = (
@@ -193,6 +204,7 @@ def test_create_recipient_success(db, test_user):
 
 
 # ── match_by_name ──────────────────────────────────────────────────────────────
+
 
 def test_match_by_name_by_alias(db, test_user, registered_recipient):
     """별칭으로 수취인을 검색합니다."""
@@ -230,3 +242,56 @@ def test_match_by_name_other_user_isolated(db, test_user, registered_recipient):
     results = match_by_name(db, other_uuid, "엄마")
 
     assert all(r.recipient_id != registered_recipient.recipient_id for r in results)
+
+
+# ── account digits / registered account lookup ───────────────────────────────
+
+
+def test_normalize_account_digits():
+    assert normalize_account_digits("123-456-789012") == "123456789012"
+    assert normalize_account_digits("12345") is None
+
+
+def test_match_by_registered_account_success(db, test_user, registered_recipient):
+    row = match_by_registered_account(db, test_user.user_id, "123-456-789012")
+    assert row is not None
+    assert row.recipient_id == registered_recipient.recipient_id
+
+
+def test_resolve_by_registered_account(db, test_user, registered_recipient):
+    result = resolve_by_registered_account(db, test_user.user_id, "123456789012")
+    assert result is not None
+    assert result.recipient_id == registered_recipient.recipient_id
+    assert result.bank_name == "국민은행"
+    assert result.recipient_name == "홍길동"
+
+
+def test_lookup_account_registered(db, test_user, registered_recipient):
+    assert classify_recipient_input("123456789012") == "account"
+    result = lookup_recipient_by_voice(db, test_user.user_id, "123456789012")
+    assert result is not None
+    assert result.bank_name == "국민은행"
+
+
+def test_lookup_account_unregistered_without_bank_returns_none(db, test_user):
+    result = lookup_recipient_by_voice(db, test_user.user_id, "99998888777766")
+    assert result is None
+
+
+def test_lookup_recipient_for_transfer_direct_account(db, test_user):
+    result = lookup_recipient_for_transfer(
+        db,
+        test_user.user_id,
+        "99998888777766",
+        bank_name="신한은행",
+    )
+    assert result is not None
+    assert result.recipient_id is None
+    assert result.bank_name == "신한은행"
+    assert result.account_number == "99998888777766"
+
+
+def test_resolve_direct_account():
+    r = resolve_direct_account("1101234567890", "우리은행")
+    assert r is not None
+    assert r.bank_name == "우리은행"

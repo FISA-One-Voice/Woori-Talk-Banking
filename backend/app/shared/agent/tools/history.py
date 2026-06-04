@@ -11,8 +11,8 @@ tool이 에이전트에 연결되는 방식:
 from langchain_core.tools import tool
 
 from app.core.database import get_db
+from app.core.exception import AppError
 from app.features.asset.service import get_expense_summary, get_transaction_history
-from app.core.exception import HistoryError
 
 
 @tool
@@ -38,6 +38,8 @@ def get_recent_history(user_id: str, days: int = 7) -> str:  # noqa: D401
         return (
             f"최근 {days}일간 거래 내역 알려드리겠습니다. 총 {len(transactions)}건, {total:,}원입니다."
         )
+    except AppError as e:
+        return e.user_message or e.message
     finally:
         db.close()
 
@@ -68,6 +70,8 @@ def get_category_history(user_id: str, category: str, days: int = 30) -> str:  #
         return (
             f"{days}일간 {category} 내역 알려드리겠습니다. 총 {len(transactions)}건, {total:,}원입니다."
         )
+    except AppError as e:
+        return e.user_message or e.message
     finally:
         db.close()
 

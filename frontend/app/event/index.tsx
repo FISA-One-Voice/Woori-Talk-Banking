@@ -7,7 +7,6 @@ import { TtsBubble } from '@/components/feedback';
 import { TopBar } from '@/components/layout';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { apiClient, type ApiResponse } from '@/utils/api';
-import { useScreenAnnounce } from '@/hooks/useScreenAnnounce';
 import { useMic } from '@/context/MicContext';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -109,8 +108,6 @@ export default function EventListScreen() {
   const [screen, setScreen] = useState<Screen>('loading');
   const [events, setEvents] = useState<EventItem[]>([]);
 
-  useScreenAnnounce('이벤트 목록 화면입니다.');
-
   useEffect(() => {
     apiClient
       .get<ApiResponse<{ events: EventItem[]; total: number }>>('/api/events')
@@ -132,7 +129,7 @@ export default function EventListScreen() {
     <View style={styles.root}>
       <View style={styles.body}>
         <TopBar variant="back" title="이벤트" onBack={() => router.replace('/home' as never)} />
-        <TtsBubble message={ttsMessage} autoPlay={screen !== 'loading'} />
+        <TtsBubble message={ttsMessage} autoPlay={false} />
 
         {screen === 'loading' && (
           <View style={styles.center}>

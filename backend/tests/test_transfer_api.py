@@ -49,7 +49,9 @@ def api_setup(db: Session):
     """
     # 이전 실행 잔류 데이터 정리
     db.query(Transaction).filter(Transaction.user_id == _USER_UUID).delete()
-    db.query(RegisteredRecipient).filter(RegisteredRecipient.user_id == _USER_UUID).delete()
+    db.query(RegisteredRecipient).filter(
+        RegisteredRecipient.user_id == _USER_UUID
+    ).delete()
     db.query(Account).filter(Account.user_id == _USER_UUID).delete()
     db.query(User).filter(User.user_id == _USER_UUID).delete()
     db.commit()
@@ -76,7 +78,9 @@ def api_setup(db: Session):
 
     # 모듈 종료 시 정리
     db.query(Transaction).filter(Transaction.user_id == _USER_UUID).delete()
-    db.query(RegisteredRecipient).filter(RegisteredRecipient.user_id == _USER_UUID).delete()
+    db.query(RegisteredRecipient).filter(
+        RegisteredRecipient.user_id == _USER_UUID
+    ).delete()
     db.query(Account).filter(Account.user_id == _USER_UUID).delete()
     db.query(User).filter(User.user_id == _USER_UUID).delete()
     db.commit()
@@ -136,7 +140,12 @@ class TestCreateTransferAPI:
         # 첫 번째 요청
         resp1 = authed_client.post(
             "/api/transfer/",
-            json={"recipient": "12345678901", "bankName": "하나은행", "amount": 5_000, "idempotencyKey": key},
+            json={
+                "recipient": "12345678901",
+                "bankName": "하나은행",
+                "amount": 5_000,
+                "idempotencyKey": key,
+            },
         )
         assert resp1.status_code == 200
         tx_id_first = resp1.json()["data"]["txId"]
@@ -144,7 +153,12 @@ class TestCreateTransferAPI:
         # 동일 key로 두 번째 요청 → 기존 영수증 재반환
         resp2 = authed_client.post(
             "/api/transfer/",
-            json={"recipient": "12345678901", "bankName": "하나은행", "amount": 5_000, "idempotencyKey": key},
+            json={
+                "recipient": "12345678901",
+                "bankName": "하나은행",
+                "amount": 5_000,
+                "idempotencyKey": key,
+            },
         )
         assert resp2.status_code == 200
         # 새 트랜잭션이 아닌 기존 txId 반환
@@ -204,7 +218,9 @@ class TestMemoAPI:
         db.add(tx)
         db.commit()
 
-        resp = authed_client.post(f"/api/transfer/{tx.tx_id}/memo", json={"memo": "생일 선물"})
+        resp = authed_client.post(
+            f"/api/transfer/{tx.tx_id}/memo", json={"memo": "생일 선물"}
+        )
 
         assert resp.status_code == 200
         assert resp.json()["data"]["memo"] == "생일 선물"
