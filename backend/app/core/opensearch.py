@@ -112,4 +112,5 @@ def create_indices_if_not_exists() -> None:
         raise OpenSearchIndexError(
             code="INDEX_CREATION_FAILED",
             message="OpenSearch 인덱스 생성에 실패했습니다.",
+            user_message="서버 초기화 중 오류가 발생했습니다.",
         ) from e

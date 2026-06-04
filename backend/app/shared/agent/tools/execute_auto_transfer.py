@@ -15,7 +15,10 @@ from app.core.database import SessionLocal
 from app.core.exception import AutoTransferError, RecipientError
 from app.features.auto_transfer.schema import AutoTransferRequest
 from app.features.auto_transfer.service import register_auto_transfer
-from app.features.recipients.service import classify_recipient_input, lookup_recipient_by_voice
+from app.features.recipients.service import (
+    classify_recipient_input,
+    lookup_recipient_by_voice,
+)
 from app.models.account import Account
 
 _DOW_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
@@ -73,7 +76,11 @@ def execute_auto_transfer(
         # ── 슬롯 값 정규화 ──────────────────────────────────────────────────────────
         # cycle: 한국어 표현 → 영문 코드
         cycle_raw = str(slots.get("cycle", ""))
-        if cycle_raw in ("monthly", "매월", "매달") or "월" in cycle_raw or "달" in cycle_raw:
+        if (
+            cycle_raw in ("monthly", "매월", "매달")
+            or "월" in cycle_raw
+            or "달" in cycle_raw
+        ):
             slots["cycle"] = "monthly"
         elif cycle_raw in ("weekly", "매주") or "주" in cycle_raw:
             slots["cycle"] = "weekly"
@@ -141,8 +148,8 @@ def execute_auto_transfer(
                 "toAccountNumber": slots.get("to_account_number"),
                 "bankName": slots.get("bankName") or slots.get("bank_name"),
                 "toName": slots.get("toName") or slots.get("to_name"),
-                "password": None,       # ASV 통과가 PIN 대체
-                "termsAgreed": True,    # 동의 발화가 약관 동의 대체
+                "password": None,  # ASV 통과가 PIN 대체
+                "termsAgreed": True,  # 동의 발화가 약관 동의 대체
                 "transferNote": slots.get("transfer_note"),
             }
         )

@@ -41,8 +41,7 @@ class AutoTransferRequest(BaseModel):
     def validate_recipient_and_cycle(self) -> "AutoTransferRequest":
         """수취인 지정 방법(XOR)과 cycle 스케줄 필드를 검증합니다."""
         provided = [
-            v for v in [self.recipient_id, self.to_account_number]
-            if v is not None
+            v for v in [self.recipient_id, self.to_account_number] if v is not None
         ]
         if len(provided) != 1:
             raise ValueError(

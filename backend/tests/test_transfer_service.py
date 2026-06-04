@@ -17,7 +17,11 @@ from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 — Base.metadata에 모든 테이블 등록
 from app.core.exception import RecipientError, TransferError
-from app.features.transfer.service import execute_transfer, get_recent_recipients, update_memo
+from app.features.transfer.service import (
+    execute_transfer,
+    get_recent_recipients,
+    update_memo,
+)
 from app.models.account import Account
 from app.models.recipient import RegisteredRecipient
 from app.models.transaction import Transaction
@@ -56,13 +60,19 @@ def transfer_setup(db: Session):
     사전 정리: 이전 실행에서 teardown이 실패한 경우 잔류 데이터를 제거한다.
     """
     # 이전 실행 잔류 데이터 정리 (teardown 실패 등으로 남은 데이터)
-    db.query(Transaction).filter(Transaction.user_id.in_([_USER_UUID, _OTHER_UUID])).delete()
-    db.query(RegisteredRecipient).filter(RegisteredRecipient.user_id == _USER_UUID).delete()
+    db.query(Transaction).filter(
+        Transaction.user_id.in_([_USER_UUID, _OTHER_UUID])
+    ).delete()
+    db.query(RegisteredRecipient).filter(
+        RegisteredRecipient.user_id == _USER_UUID
+    ).delete()
     db.query(Account).filter(Account.user_id.in_([_USER_UUID, _OTHER_UUID])).delete()
     db.query(User).filter(User.user_id.in_([_USER_UUID, _OTHER_UUID])).delete()
     db.commit()
 
-    user = User(user_id=_USER_UUID, name="이체서비스테스터", phone="01077771001", pin_hash="x")
+    user = User(
+        user_id=_USER_UUID, name="이체서비스테스터", phone="01077771001", pin_hash="x"
+    )
     other = User(user_id=_OTHER_UUID, name="타인", phone="01077771002", pin_hash="x")
     account = Account(
         account_id=_ACCOUNT_ID,
@@ -87,8 +97,12 @@ def transfer_setup(db: Session):
     yield
 
     # 모듈 종료 시 테스트 데이터 전체 삭제
-    db.query(Transaction).filter(Transaction.user_id.in_([_USER_UUID, _OTHER_UUID])).delete()
-    db.query(RegisteredRecipient).filter(RegisteredRecipient.user_id == _USER_UUID).delete()
+    db.query(Transaction).filter(
+        Transaction.user_id.in_([_USER_UUID, _OTHER_UUID])
+    ).delete()
+    db.query(RegisteredRecipient).filter(
+        RegisteredRecipient.user_id == _USER_UUID
+    ).delete()
     db.query(Account).filter(Account.user_id.in_([_USER_UUID, _OTHER_UUID])).delete()
     db.query(User).filter(User.user_id.in_([_USER_UUID, _OTHER_UUID])).delete()
     db.commit()
@@ -148,7 +162,9 @@ class TestExecuteTransfer:
         assert exc_info.value.status_code == 400
 
         # 실패 트랜잭션이 DB에 남아있어야 함 (idempotency_key 소진 확인)
-        failed_tx = db.query(Transaction).filter(Transaction.idempotency_key == key).first()
+        failed_tx = (
+            db.query(Transaction).filter(Transaction.idempotency_key == key).first()
+        )
         assert failed_tx is not None
         assert failed_tx.status == "failed"
 
@@ -262,7 +278,7 @@ class TestExecuteTransfer:
         result = execute_transfer(
             db=db,
             user_id=_USER_ID,
-            recipient="",   # recipient_id가 있으면 이 값은 무시됨
+            recipient="",  # recipient_id가 있으면 이 값은 무시됨
             bank_name="",
             amount=2_000,
             idempotency_key=key,

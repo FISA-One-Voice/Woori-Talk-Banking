@@ -92,7 +92,9 @@ def _calc_next_execution(
             year = today.year + (1 if today.month == 12 else 0)
             month = 1 if today.month == 12 else today.month + 1
             last_day = calendar.monthrange(year, month)[1]
-            candidate = today.replace(year=year, month=month, day=min(scheduled_day, last_day))
+            candidate = today.replace(
+                year=year, month=month, day=min(scheduled_day, last_day)
+            )
         return datetime(candidate.year, candidate.month, candidate.day)
 
     # weekly — Python weekday(): 0=월, 6=일
@@ -162,6 +164,7 @@ def _verify_account(db: Session, user_uuid: uuid.UUID, from_account_id: str) -> 
             code="AUTO_ORDER_ACCOUNT_NOT_FOUND",
             message="출금 계좌를 찾을 수 없습니다.",
             status_code=404,
+            user_message="출금 계좌를 찾을 수 없습니다.",
         )
     return account
 
@@ -181,10 +184,12 @@ def _verify_pin(user: User, raw_password: str) -> None:
             code="AUTO_ORDER_WITHDRAWAL_PASSWORD_INVALID",
             message="PIN이 올바르지 않습니다.",
             status_code=403,
+            user_message="PIN이 올바르지 않습니다.",
         )
 
 
 # ── POST /api/auto-transfer ───────────────────────────────────────────────────
+
 
 def register_auto_transfer(
     db: Session,
@@ -233,6 +238,7 @@ def register_auto_transfer(
             code="AUTO_ORDER_TERMS_NOT_AGREED",
             message="자동이체 약관에 동의해 주세요.",
             status_code=400,
+            user_message="자동이체 약관에 동의해 주세요.",
         )
 
     # ── 5관문: 실행일 계산 + StandingOrder 저장 ─────────────────────────────
@@ -264,6 +270,7 @@ def register_auto_transfer(
             code="INTERNAL_ERROR",
             message="자동이체 등록 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
             status_code=500,
+            user_message="자동이체 등록 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         ) from e
 
     return AutoTransferResult(
@@ -282,6 +289,7 @@ def register_auto_transfer(
 
 
 # ── GET /api/auto-transfer ────────────────────────────────────────────────────
+
 
 def list_auto_transfers(
     db: Session,
@@ -307,27 +315,31 @@ def list_auto_transfers(
     result = []
     for order in orders:
         resolved = resolve_by_id(db, user_uuid, order.recipient_id)
-        result.append(AutoTransferListItem(
-            order_id=str(order.order_id),
-            to_name=resolved.recipient_name,
-            bank_name=resolved.bank_name,
-            account_masked=_mask_account(resolved.account_number),
-            amount=order.amount,
-            cycle=order.cycle,
-            scheduled_day=order.scheduled_day,
-            scheduled_dow=order.scheduled_dow,
-            next_execution_at=(
-                order.next_execution_at.strftime("%Y-%m-%d")
-                if order.next_execution_at else None
-            ),
-            status=order.status,
-            transfer_note=order.transfer_note,
-            created_at=order.created_at.isoformat(),
-        ))
+        result.append(
+            AutoTransferListItem(
+                order_id=str(order.order_id),
+                to_name=resolved.recipient_name,
+                bank_name=resolved.bank_name,
+                account_masked=_mask_account(resolved.account_number),
+                amount=order.amount,
+                cycle=order.cycle,
+                scheduled_day=order.scheduled_day,
+                scheduled_dow=order.scheduled_dow,
+                next_execution_at=(
+                    order.next_execution_at.strftime("%Y-%m-%d")
+                    if order.next_execution_at
+                    else None
+                ),
+                status=order.status,
+                transfer_note=order.transfer_note,
+                created_at=order.created_at.isoformat(),
+            )
+        )
     return result
 
 
 # ── PATCH /api/auto-transfer/{order_id}/status ───────────────────────────────
+
 
 def update_status(
     db: Session,
@@ -363,6 +375,7 @@ def update_status(
             code="AUTO_ORDER_NOT_FOUND",
             message="자동이체 건을 찾을 수 없습니다.",
             status_code=404,
+            user_message="자동이체 건을 찾을 수 없습니다.",
         )
 
     if data.status not in _ALLOWED_TRANSITIONS.get(order.status, set()):
@@ -370,6 +383,7 @@ def update_status(
             code="AUTO_ORDER_STATUS_INVALID",
             message=f"'{order.status}' 상태에서 '{data.status}'로 변경할 수 없습니다.",
             status_code=400,
+            user_message="자동이체 상태를 변경할 수 없습니다.",
         )
 
     order.status = data.status
@@ -386,6 +400,7 @@ def update_status(
 
 
 # ── POST /api/auto-transfer/{order_id}/label ─────────────────────────────────
+
 
 def update_memo(
     db: Session,
@@ -422,14 +437,18 @@ def update_memo(
             code="AUTO_ORDER_NOT_FOUND",
             message="자동이체 건을 찾을 수 없습니다.",
             status_code=404,
+            user_message="자동이체 건을 찾을 수 없습니다.",
         )
 
     order.transfer_note = data.transfer_note
     db.commit()
-    return AutoTransferMemoResult(order_id=str(order.order_id), transfer_note=order.transfer_note)
+    return AutoTransferMemoResult(
+        order_id=str(order.order_id), transfer_note=order.transfer_note
+    )
 
 
 # ── POST /api/auto-transfer/execute ──────────────────────────────────────────
+
 
 def _execute_single_order(db: Session, order: StandingOrder) -> None:
     """단일 자동이체 건을 실행합니다.

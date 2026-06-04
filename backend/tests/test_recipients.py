@@ -46,6 +46,7 @@ def _make_user(phone: str) -> User:
 
 # ── 픽스처 ─────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="module")
 def test_user(db):
     """수취인 테스트용 사용자."""
@@ -102,6 +103,7 @@ def registered_recipient(db, test_user):
 
 # ── resolve_by_id ──────────────────────────────────────────────────────────────
 
+
 def test_resolve_by_id_success(db, test_user, registered_recipient):
     """등록된 수취인 ID로 정상 조회되는지 확인합니다."""
     result = resolve_by_id(db, test_user.user_id, registered_recipient.recipient_id)
@@ -109,7 +111,7 @@ def test_resolve_by_id_success(db, test_user, registered_recipient):
     assert isinstance(result, ResolvedRecipient)
     assert result.recipient_id == registered_recipient.recipient_id
     assert result.bank_name == "국민은행"
-    assert result.account_number == "123-456-789012"
+    assert result.account_number == "123456789012"
     assert result.recipient_name == "홍길동"
 
 
@@ -134,6 +136,7 @@ def test_resolve_by_id_other_user(db, registered_recipient):
 
 # ── resolve_by_phone ───────────────────────────────────────────────────────────
 
+
 def test_resolve_by_phone_success(db, phone_user):
     """전화번호로 수취인 주계좌를 정상 조회합니다."""
     result = resolve_by_phone(db, phone_user.phone)
@@ -141,7 +144,7 @@ def test_resolve_by_phone_success(db, phone_user):
     assert isinstance(result, ResolvedRecipient)
     assert result.recipient_id is None
     assert result.bank_name == "우리은행"
-    assert result.account_number == "1002-111-222333"
+    assert result.account_number == "1002111222333"
     assert result.recipient_name == phone_user.name
 
 
@@ -172,6 +175,7 @@ def test_resolve_by_phone_no_primary_account(db):
 
 # ── create_recipient ───────────────────────────────────────────────────────────
 
+
 def test_create_recipient_success(db, test_user):
     """수취인을 신규 등록하고 반환합니다."""
     alias = f"친구_{uuid.uuid4().hex[:6]}"
@@ -188,7 +192,7 @@ def test_create_recipient_success(db, test_user):
     assert isinstance(result, ResolvedRecipient)
     assert result.recipient_id is not None
     assert result.bank_name == "신한은행"
-    assert result.account_number == "110-222-333444"
+    assert result.account_number == "110222333444"
     assert result.recipient_name == "김철수"
 
     saved = (
@@ -200,6 +204,7 @@ def test_create_recipient_success(db, test_user):
 
 
 # ── match_by_name ──────────────────────────────────────────────────────────────
+
 
 def test_match_by_name_by_alias(db, test_user, registered_recipient):
     """별칭으로 수취인을 검색합니다."""

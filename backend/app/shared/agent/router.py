@@ -59,11 +59,7 @@ async def chat(
     # config의 thread_id는 LangGraph 메모리 체크포인팅 전용이며 tool 파라미터로 주입되지 않습니다.
     # parse_transfer_slots의 user_id 파라미터는 LLM이 [사용자ID:...] 태그에서
     # 직접 읽어 tool 호출 인자로 채워야 합니다.
-    message = (
-        f"[사용자ID:{user_id}]\n"
-        f"{body.transcript}\n"
-        f"[슬롯:{body.current_slots}]"
-    )
+    message = f"[사용자ID:{user_id}]\n{body.transcript}\n[슬롯:{body.current_slots}]"
 
     result = await _graph.ainvoke(
         {"messages": [HumanMessage(content=message)]},

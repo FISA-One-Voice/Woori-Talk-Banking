@@ -1,21 +1,29 @@
-import { useState, useEffect, useRef } from 'react';
-import { SafeAreaView, StyleSheet, Text, View, Pressable, ActivityIndicator, Alert } from 'react-native';
-import { router } from 'expo-router';
-import { TopBar } from '@/components/layout';
 import VoiceWaveAnimation from '@/components/feedback/VoiceWaveAnimation';
+import { TopBar } from '@/components/layout';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
-import { Ionicons } from '@expo/vector-icons';
-import { apiClient, ApiResponse } from '@/utils/api';
+import { fetchTtsAudio } from '@/services/voiceService';
 import { useAuthStore } from '@/store/authStore';
+import { playBase64Audio } from '@/utils/audioPlayer';
+import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import * as Speech from 'expo-speech';
+import { router } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 type Step = 'TUTORIAL' | 'READY' | 'RECORDING' | 'SUCCESS' | 'FAIL';
 
 const SENTENCES = [
-  "내 목소리가 나의 비밀번호입니다",
-  "우리 톡 뱅킹으로 안전하게 이체해요",
-  "오늘도 기분 좋은 하루 보내세요"
+  '내 목소리가 나의 비밀번호입니다',
+  '우리 톡 뱅킹으로 안전하게 이체해요',
+  '오늘도 기분 좋은 하루 보내세요',
 ];
 
 export default function DevVoiceRegisterScreen() {
@@ -23,20 +31,12 @@ export default function DevVoiceRegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [audioLevel, setAudioLevel] = useState(-160);
   const [recordingIndex, setRecordingIndex] = useState(0);
-  const [recordingStatus, setRecordingStatus] = useState<'WAITING' | 'RECORDING' | 'UPLOADING'>('WAITING');
-  
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const [recordingStatus, setRecordingStatus] = useState<'WAITING' | 'RECORDING' | 'UPLOADING'>(
+    'WAITING',
+  );
 
-  const speakWithSpeaker = async (text: string, options: any = {}) => {
-    try {
-      const { sound: dummySound } = await Audio.Sound.createAsync(require('@/assets/sounds/beep.wav'));
-      await dummySound.setVolumeAsync(0);
-      await dummySound.playAsync();
-      await dummySound.unloadAsync();
-    } catch (e) {}
-    await new Promise(resolve => setTimeout(resolve, 200));
-    Speech.speak(text, options);
-  };
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const ttsRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     Audio.setAudioModeAsync({
@@ -45,31 +45,34 @@ export default function DevVoiceRegisterScreen() {
       playThroughEarpieceAndroid: false,
       staysActiveInBackground: false,
     });
-    
-    Speech.stop();
 
     if (step === 'TUTORIAL') {
-      speakWithSpeaker("고객님의 목소리 등록을 시작합니다. 준비사항. 1. 조용한 환경에서 진행해 주세요. 2. 음성 안내가 끝나고 삐 소리가 나면 화면에 뜨는 문장을 천천히 읽어주세요. 3. 총 세 개의 문장을 녹음합니다. 준비가 되셨다면 화면 하단의 시작하기 버튼을 눌러주세요.", { language: 'ko-KR', rate: 0.9 });
+      fetchTtsAudio(
+        '고객님의 목소리 등록을 시작합니다. 준비사항. 1. 조용한 환경에서 진행해 주세요. 2. 음성 안내가 끝나고 삐 소리가 나면 화면에 뜨는 문장을 천천히 읽어주세요. 3. 총 세 개의 문장을 녹음합니다. 준비가 되셨다면 화면 하단의 시작하기 버튼을 눌러주세요.',
+      )
+        .then((base64) => playBase64Audio(base64, ttsRef))
+        .catch(() => undefined);
     } else if (step === 'READY') {
-      const message = "잠시 후 첫 번째 문장 녹음을 시작합니다.";
-      speakWithSpeaker(message, {
-        language: 'ko-KR',
-        rate: 0.9,
-        volume: 1.0,
-        onDone: () => {
-          setTimeout(() => {
-            setStep('RECORDING');
-          }, 500);
-        }
-      });
+      fetchTtsAudio('잠시 후 첫 번째 문장 녹음을 시작합니다.')
+        .then((base64) => playBase64Audio(base64, ttsRef))
+        .then(() => setTimeout(() => setStep('RECORDING'), 500))
+        .catch(() => undefined);
     } else if (step === 'SUCCESS') {
-      speakWithSpeaker("목소리 등록이 완료되었습니다. 이제부터 화면을 길게 누르면 어시스턴트를 호출할 수 있으며, 안내 도중 화면에 알파벳 브이 자를 그리면 음성을 즉시 중단할 수 있습니다. 이제 목소리로 간편하게 이용하세요 화면 하단의 버튼을 눌러 홈 화면으로 이동하세요", { language: 'ko-KR', rate: 0.9 });
+      fetchTtsAudio(
+        '목소리 등록이 완료되었습니다. 이제부터 화면을 길게 누르면 어시스턴트를 호출할 수 있으며, 안내 도중 화면에 알파벳 브이 자를 그리면 음성을 즉시 중단할 수 있습니다. 이제 목소리로 간편하게 이용하세요',
+      )
+        .then((base64) => playBase64Audio(base64, ttsRef))
+        .catch(() => undefined);
     } else if (step === 'FAIL') {
-      speakWithSpeaker("목소리 인식에 실패했습니다. 조용한 곳에서 다시 시도해 주세요.", { language: 'ko-KR', rate: 0.9 });
+      fetchTtsAudio('목소리 인식에 실패했습니다. 조용한 곳에서 다시 시도해 주세요.')
+        .then((base64) => playBase64Audio(base64, ttsRef))
+        .catch(() => undefined);
     }
 
     return () => {
-      Speech.stop();
+      ttsRef.current?.stopAsync().catch(() => undefined);
+      ttsRef.current?.unloadAsync().catch(() => undefined);
+      ttsRef.current = null;
     };
   }, [step]);
 
@@ -83,11 +86,11 @@ export default function DevVoiceRegisterScreen() {
     const uris: string[] = [];
     try {
       await Audio.requestPermissionsAsync();
-      
+
       for (let i = 0; i < 3; i++) {
         setRecordingIndex(i);
         setRecordingStatus('WAITING');
-        
+
         // TTS 스피커 모드로 확실하게 전환하기 위해 잠시 대기
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
@@ -95,44 +98,38 @@ export default function DevVoiceRegisterScreen() {
           playThroughEarpieceAndroid: false,
           staysActiveInBackground: false,
         });
-        
+
         // [iOS 버그 해결 핵] expo-av는 실제로 소리를 재생해야 오디오 세션을 iOS 시스템에 적용(Commit)합니다.
         // 마이크 사용 후 수화기에 갇힌 소리를 스피커로 빼기 위해 TTS 직전에 묵음으로 오디오 세션을 강제 갱신합니다.
         try {
-          const { sound: dummySound } = await Audio.Sound.createAsync(require('@/assets/sounds/beep.wav'));
+          const { sound: dummySound } = await Audio.Sound.createAsync(
+            require('@/assets/sounds/beep.wav'),
+          );
           await dummySound.setVolumeAsync(0); // 소리 끄기
           await dummySound.playAsync();
           await dummySound.unloadAsync();
         } catch (e) {
           // ignore
         }
-        
-        await new Promise(resolve => setTimeout(resolve, 200));
+
+        await new Promise((resolve) => setTimeout(resolve, 200));
 
         // TTS 안내: "삐 소리가 나면 ~라고 말해주세요."
         const sentence = SENTENCES[i];
         const prompt = `삐 소리가 나면, ${sentence} 라고 말해주세요.`;
-        
-        await new Promise<void>((resolve) => {
-          Speech.speak(prompt, {
-            language: 'ko-KR',
-            rate: 0.9,
-            volume: 1.0,
-            onDone: () => resolve()
-          });
-        });
+
+        const base64 = await fetchTtsAudio(prompt);
+        await playBase64Audio(base64);
 
         // TTS 끝나면 실제 삐 소리 재생
         try {
-          const { sound } = await Audio.Sound.createAsync(
-            require('@/assets/sounds/beep.wav')
-          );
+          const { sound } = await Audio.Sound.createAsync(require('@/assets/sounds/beep.wav'));
           await sound.playAsync();
           // 삐 소리 재생 길이만큼 약간 대기 (0.4초)
-          await new Promise(resolve => setTimeout(resolve, 400));
+          await new Promise((resolve) => setTimeout(resolve, 400));
           await sound.unloadAsync();
         } catch (e) {
-          console.error("삐 소리 재생 실패:", e);
+          console.error('삐 소리 재생 실패:', e);
         }
 
         // 삐 소리가 끝난 직후 마이크 켜기
@@ -172,7 +169,7 @@ export default function DevVoiceRegisterScreen() {
         };
 
         const { recording } = await Audio.Recording.createAsync(WAV_RECORDING_OPTIONS);
-        
+
         recording.setOnRecordingStatusUpdate((status) => {
           if (status.isRecording && status.metering !== undefined) {
             setAudioLevel(status.metering);
@@ -180,30 +177,29 @@ export default function DevVoiceRegisterScreen() {
         });
         recording.setProgressUpdateInterval(100);
         recordingRef.current = recording;
-        
+
         // 3.3초 녹음 대기
-        await new Promise(resolve => setTimeout(resolve, 3300));
-        
+        await new Promise((resolve) => setTimeout(resolve, 3300));
+
         await recording.stopAndUnloadAsync();
         const uri = recording.getURI();
         if (uri) uris.push(uri);
         recordingRef.current = null;
-        
+
         setRecordingStatus('WAITING');
         // 다음 문장 넘어가기 전 잠깐 대기 (iOS 오디오 세션 강제 초기화 포함)
         if (i < 2) {
           // iOS에서 마이크 사용 후 수화기로 소리가 갇히는 버그를 강제로 풀기 위해 오디오 시스템 껐다 켜기
           await Audio.setIsEnabledAsync(false);
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 100));
           await Audio.setIsEnabledAsync(true);
-          
-          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
-      
+
       setRecordingStatus('UPLOADING');
       await handleRegisterMultiVoice(uris);
-
     } catch (err) {
       console.error(err);
       setStep('FAIL');
@@ -219,21 +215,21 @@ export default function DevVoiceRegisterScreen() {
         formData.append('files', {
           uri: uri,
           name: isWav ? `voice_${index}.wav` : `voice_${index}.m4a`,
-          type: isWav ? 'audio/wav' : 'audio/m4a'
+          type: isWav ? 'audio/wav' : 'audio/m4a',
         } as any);
       });
-      
+
       const token = useAuthStore.getState().token;
       const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
-      
+
       const response = await fetch(`${baseUrl}/api/voice/register`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: formData,
       });
-      
+
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -263,18 +259,20 @@ export default function DevVoiceRegisterScreen() {
     <SafeAreaView style={styles.root}>
       <View style={styles.pad}>
         <TopBar variant="back" title="" onBack={() => router.back()} />
-        
+
         <View style={styles.content}>
-          
           {step === 'TUTORIAL' && (
             <View style={styles.stepContainer}>
-              {renderInfoBox('음성 등록', '내 목소리가 나의 \n비밀번호입니다.\n안전한 뱅킹을 위해 등록해 주세요')}
-              
+              {renderInfoBox(
+                '음성 등록',
+                '내 목소리가 나의 \n비밀번호입니다.\n안전한 뱅킹을 위해 등록해 주세요',
+              )}
+
               <View style={styles.listContainer}>
                 {[
                   '조용한 환경에서 진행해 주세요',
                   '안내 후 삐 소리가 나면 화면의 문장을 \n읽어주세요',
-                  '총 세 개의 문장을 녹음합니다'
+                  '총 세 개의 문장을 녹음합니다',
                 ].map((text, idx) => (
                   <View key={idx} style={styles.listItem}>
                     <View style={styles.listNumber}>
@@ -307,39 +305,74 @@ export default function DevVoiceRegisterScreen() {
           {step === 'RECORDING' && (
             <View style={styles.stepContainer}>
               {renderInfoBox(
-                `문장 녹음 중 [${recordingIndex + 1}/3]`, 
-                recordingStatus === 'RECORDING' ? '지금 말씀해 주세요!' : '음성 안내를 듣고 대기하세요.'
+                `문장 녹음 중 [${recordingIndex + 1}/3]`,
+                recordingStatus === 'RECORDING'
+                  ? '지금 말씀해 주세요!'
+                  : '음성 안내를 듣고 대기하세요.',
               )}
               <View style={styles.centerAction}>
                 {recordingStatus === 'RECORDING' ? (
-                  <View style={[styles.recordingBadge, { backgroundColor: 'rgba(239, 68, 68, 0.2)' }]}>
+                  <View
+                    style={[styles.recordingBadge, { backgroundColor: 'rgba(239, 68, 68, 0.2)' }]}
+                  >
                     <View style={[styles.recordingDot, { backgroundColor: '#EF4444' }]} />
-                    <Text style={[styles.recordingBadgeText, { color: '#EF4444' }]}>마이크 켜짐</Text>
+                    <Text style={[styles.recordingBadgeText, { color: '#EF4444' }]}>
+                      마이크 켜짐
+                    </Text>
                   </View>
                 ) : recordingStatus === 'WAITING' ? (
-                  <View style={[styles.recordingBadge, { backgroundColor: 'rgba(107, 114, 128, 0.2)' }]}>
-                    <Ionicons name="volume-high" size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
-                    <Text style={[styles.recordingBadgeText, { color: '#9CA3AF' }]}>음성 안내 듣는 중...</Text>
+                  <View
+                    style={[styles.recordingBadge, { backgroundColor: 'rgba(107, 114, 128, 0.2)' }]}
+                  >
+                    <Ionicons
+                      name="volume-high"
+                      size={14}
+                      color="#9CA3AF"
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={[styles.recordingBadgeText, { color: '#9CA3AF' }]}>
+                      음성 안내 듣는 중...
+                    </Text>
                   </View>
                 ) : (
-                  <View style={[styles.recordingBadge, { backgroundColor: 'rgba(250, 204, 21, 0.2)' }]}>
-                    <ActivityIndicator size="small" color={COLORS.highlightYellow} style={{ marginRight: 6 }} />
-                    <Text style={[styles.recordingBadgeText, { color: COLORS.highlightYellow }]}>서버 병합 업로드 중...</Text>
+                  <View
+                    style={[styles.recordingBadge, { backgroundColor: 'rgba(250, 204, 21, 0.2)' }]}
+                  >
+                    <ActivityIndicator
+                      size="small"
+                      color={COLORS.highlightYellow}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text style={[styles.recordingBadgeText, { color: COLORS.highlightYellow }]}>
+                      서버 병합 업로드 중...
+                    </Text>
                   </View>
                 )}
-                
-                <Text style={[
-                  styles.actionText, 
-                  { fontSize: 24, fontWeight: 'bold', marginBottom: 40, textAlign: 'center', lineHeight: 34 },
-                  recordingStatus === 'RECORDING' ? { color: COLORS.highlightYellow } : { color: COLORS.grayMedium }
-                ]}>
+
+                <Text
+                  style={[
+                    styles.actionText,
+                    {
+                      fontSize: 24,
+                      fontWeight: 'bold',
+                      marginBottom: 40,
+                      textAlign: 'center',
+                      lineHeight: 34,
+                    },
+                    recordingStatus === 'RECORDING'
+                      ? { color: COLORS.highlightYellow }
+                      : { color: COLORS.grayMedium },
+                  ]}
+                >
                   "{SENTENCES[recordingIndex]}"
                 </Text>
 
                 {recordingStatus === 'RECORDING' ? (
                   <VoiceWaveAnimation isActive={true} audioLevel={audioLevel} />
                 ) : (
-                  <View style={[styles.micCircle, { borderColor: COLORS.grayMedium, marginTop: 20 }]}>
+                  <View
+                    style={[styles.micCircle, { borderColor: COLORS.grayMedium, marginTop: 20 }]}
+                  >
                     <Ionicons name="mic-off" size={48} color={COLORS.grayMedium} />
                   </View>
                 )}
@@ -355,9 +388,12 @@ export default function DevVoiceRegisterScreen() {
                 </View>
                 <Text style={styles.successTitleText}>등록 완료</Text>
               </View>
-              
-              {renderInfoBox('등록 완료', '성공적으로 등록되었습니다!\n이제 목소리로 간편하게 \n인증하세요.')}
-              
+
+              {renderInfoBox(
+                '등록 완료',
+                '성공적으로 등록되었습니다!\n이제 목소리로 간편하게 \n인증하세요.',
+              )}
+
               <View style={{ flex: 1, justifyContent: 'flex-end' }}>
                 <Pressable style={styles.button} onPress={() => router.replace('/home')}>
                   <Text style={styles.buttonText}>홈 화면으로 이동</Text>
@@ -374,20 +410,37 @@ export default function DevVoiceRegisterScreen() {
                 </View>
                 <Text style={styles.failTitleText}>등록 실패</Text>
               </View>
-              
-              <View style={[styles.infoBox, { backgroundColor: '#3f1a1a', borderColor: '#5c2222' }]}>
+
+              <View
+                style={[styles.infoBox, { backgroundColor: '#3f1a1a', borderColor: '#5c2222' }]}
+              >
                 <Text style={[styles.infoLabel, { color: '#F87171' }]}>인증 오류</Text>
-                <Text style={styles.infoDesc}>{"서버 업로드 중 오류가\n발생했습니다. 조용한 곳에서 다시 \n시도해 주세요."}</Text>
+                <Text style={styles.infoDesc}>
+                  {'서버 업로드 중 오류가\n발생했습니다. 조용한 곳에서 다시 \n시도해 주세요.'}
+                </Text>
               </View>
-              
+
               <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-                <Pressable style={[styles.button, { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.grayMedium }]} onPress={() => { setStep('TUTORIAL'); }}>
-                  <Text style={[styles.buttonText, { color: COLORS.textMain }]}>처음부터 다시 시도하기</Text>
+                <Pressable
+                  style={[
+                    styles.button,
+                    {
+                      backgroundColor: 'transparent',
+                      borderWidth: 1,
+                      borderColor: COLORS.grayMedium,
+                    },
+                  ]}
+                  onPress={() => {
+                    setStep('TUTORIAL');
+                  }}
+                >
+                  <Text style={[styles.buttonText, { color: COLORS.textMain }]}>
+                    처음부터 다시 시도하기
+                  </Text>
                 </Pressable>
               </View>
             </View>
           )}
-          
         </View>
       </View>
     </SafeAreaView>

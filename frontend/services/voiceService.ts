@@ -62,10 +62,10 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
  * @throws Error('TTS_SERVICE_UNAVAILABLE') — Azure TTS 장애 시
  */
 export async function fetchTtsAudio(text: string, speed = 1.0): Promise<string> {
-  const { data } = await apiClient.post<ApiResponse<{ audio_base64: string }>>(
-    '/api/voice/tts',
-    { text, speed },
-  );
+  const { data } = await apiClient.post<ApiResponse<{ audio_base64: string }>>('/api/voice/tts', {
+    text,
+    speed,
+  });
   if (!data.success || !data.data?.audio_base64) {
     throw new Error('TTS_SERVICE_UNAVAILABLE');
   }

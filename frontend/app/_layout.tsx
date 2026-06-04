@@ -1,27 +1,19 @@
 import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay';
+import { needsYesNoVoicePrompt, YES_NO_CONFIRM_INSTRUCTION } from '@/constants/voicePrompts';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
-import { useVoiceResponseStore } from '@/store/voiceResponseStore';
-import { useTransferStore as transferStore } from '@/store/transferStore';
-import { useAutoTransferFlowStore } from './auto-transfer/store';
 import { useAuthStore } from '@/store/authStore';
+import { useTransferStore as transferStore } from '@/store/transferStore';
+import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { playBase64Audio } from '@/utils/audioPlayer';
-import { apiClient, ApiResponse } from '@/utils/api';
-import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { getTtsMessage } from '@/utils/errorHandler';
-import {
-  needsYesNoVoicePrompt,
-  YES_NO_CONFIRM_INSTRUCTION,
-} from '@/constants/voicePrompts';
+import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { speakText, stopAllTts } from '@/utils/ttsManager';
-import {
-  agentPathFromNavigateTo,
-  shouldNavigateToRoute,
-} from '@/utils/voiceNavigation';
+import { agentPathFromNavigateTo, shouldNavigateToRoute } from '@/utils/voiceNavigation';
 import { Href, Stack, useRouter, useSegments } from 'expo-router';
-import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
+import { useAutoTransferFlowStore } from './auto-transfer/store';
 
 // ── V 제스처 감지 ─────────────────────────────────────────────────────────────
 
@@ -80,8 +72,7 @@ function buildTxReceiptFromSlots(
   const merged = { ...prevSlots, ...(newSlots ?? {}) };
   const recipientName = (merged.recipient as string) ?? '';
   const amount = merged.amount ? Number(merged.amount) : 0;
-  const txId =
-    (merged.txId as string) ?? (merged.tx_id as string) ?? '';
+  const txId = (merged.txId as string) ?? (merged.tx_id as string) ?? '';
   if (!recipientName || !amount) return;
   transferStore.getState().setTxReceipt({
     txId,
@@ -91,9 +82,7 @@ function buildTxReceiptFromSlots(
   });
 }
 
-function buildAutoTransferReceiptFromSlots(
-  prevSlots: Record<string, unknown>,
-) {
+function buildAutoTransferReceiptFromSlots(prevSlots: Record<string, unknown>) {
   const s = prevSlots;
   useAutoTransferFlowStore.getState().setReceipt({
     orderId: (s.orderId as string) ?? '',
@@ -185,8 +174,8 @@ export default function RootLayout() {
       }
 
       if (data.audio) {
-        Speech.stop();
-        await playBase64Audio(data.audio).catch(() => undefined);
+        await stopAllTts();
+        playBase64Audio(data.audio).catch(() => undefined);
       }
 
       if (needsYesNoVoicePrompt(data) && !data.audio) {

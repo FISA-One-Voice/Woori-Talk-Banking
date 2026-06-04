@@ -33,7 +33,8 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   hasVoiceRegistered: boolean;
-  setTokens: (accessToken: string, refreshToken: string, hasVoiceRegistered?: boolean) => void;
+  ttsSpeed: number;
+  setTokens: (accessToken: string, refreshToken: string, hasVoiceRegistered?: boolean, ttsSpeed?: number) => void;
   setHasVoiceRegistered: (status: boolean) => void;
   clearTokens: () => void;
 }
@@ -44,10 +45,16 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       hasVoiceRegistered: false,
-      setTokens: (token, refreshToken, hasVoiceRegistered = false) =>
-        set((state) => ({ token, refreshToken, hasVoiceRegistered: hasVoiceRegistered ?? state.hasVoiceRegistered })),
+      ttsSpeed: 1.7,
+      setTokens: (token, refreshToken, hasVoiceRegistered = false, ttsSpeed) =>
+        set((state) => ({
+          token,
+          refreshToken,
+          hasVoiceRegistered: hasVoiceRegistered ?? state.hasVoiceRegistered,
+          ttsSpeed: ttsSpeed ?? state.ttsSpeed,
+        })),
       setHasVoiceRegistered: (status) => set({ hasVoiceRegistered: status }),
-      clearTokens: () => set({ token: null, refreshToken: null, hasVoiceRegistered: false }),
+      clearTokens: () => set({ token: null, refreshToken: null, hasVoiceRegistered: false, ttsSpeed: 1.7 }),
     }),
     {
       name: 'auth-storage',

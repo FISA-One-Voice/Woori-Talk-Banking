@@ -484,7 +484,7 @@ class TestIntegrationMultiTurn:
 
     @pytest.mark.xfail(
         reason="invoke() 반환 dict에 pending_action 누락 — MemorySaver에는 저장되나 "
-               "반환값에서 확인 불가. 실제 이체 흐름(test_asv_success_then_llm_executes_transfer)은 정상.",
+        "반환값에서 확인 불가. 실제 이체 흐름(test_asv_success_then_llm_executes_transfer)은 정상.",
         strict=False,
     )
     def test_state_persisted_across_turns(self, graph_with_mocks):

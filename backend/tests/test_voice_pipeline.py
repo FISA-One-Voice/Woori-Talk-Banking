@@ -291,20 +291,26 @@ class TestResolveNavigateTo:
         assert _resolve_navigate_to({"pending_action": "transfer"}) is None
 
     def test_awaiting_asv_fallback_transfer(self) -> None:
-        assert _resolve_navigate_to(
-            {
-                "pending_action": "transfer",
-                "awaiting_asv_audio": True,
-            }
-        ) == "transfer"
+        assert (
+            _resolve_navigate_to(
+                {
+                    "pending_action": "transfer",
+                    "awaiting_asv_audio": True,
+                }
+            )
+            == "transfer"
+        )
 
     def test_awaiting_confirmation_fallback_transfer(self) -> None:
-        assert _resolve_navigate_to(
-            {
-                "pending_action": "transfer",
-                "awaiting_confirmation": True,
-            }
-        ) == "transfer"
+        assert (
+            _resolve_navigate_to(
+                {
+                    "pending_action": "transfer",
+                    "awaiting_confirmation": True,
+                }
+            )
+            == "transfer"
+        )
 
     def test_explicit_home(self) -> None:
         assert _resolve_navigate_to({"navigate_to": "home"}) == "home"

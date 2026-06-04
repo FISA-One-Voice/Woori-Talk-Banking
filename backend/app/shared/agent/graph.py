@@ -31,33 +31,25 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exception import AgentError
+from app.features.recipients.schema import ResolvedRecipient
 from app.features.recipients.service import (
     classify_recipient_input,
     find_recipient_by_voice,
     match_by_registered_account,
 )
-from app.features.recipients.schema import ResolvedRecipient
 from app.features.transfer.service import _mask_account
-from app.shared.agent.prompts import SYSTEM_PROMPT
 from app.shared.agent.memo_decision import (
     build_memo_decision_update,
     last_user_text,
 )
+from app.shared.agent.prompts import SYSTEM_PROMPT
 from app.shared.agent.session_reset import clear_conversation_messages
-from app.shared.agent.transfer_intent import is_plain_transfer_start
-from app.shared.agent.transfer_clarification import (
-    _recipient_hint_from_state,
-    build_transfer_clarification_offer,
-    build_transfer_clarification_response,
-    should_offer_transfer_clarification,
-)
-from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
     ACTIONS_WITH_YES_NO_CONFIRM,
     ASV_REQUIRED_ACTIONS,
-    CONFIRM_YES_NO_SUFFIX,
     COMPLETE_SCREEN_MAP,
+    CONFIRM_YES_NO_SUFFIX,
     MEMO_OFFER_SUFFIX,
     RECIPIENT_REQUIRED_ACTIONS,
     SCREEN_MAP,
@@ -69,6 +61,14 @@ from app.shared.agent.slot_schema import (
     transfer_missing_slots,
 )
 from app.shared.agent.state import VoiceState
+from app.shared.agent.transfer_clarification import (
+    _recipient_hint_from_state,
+    build_transfer_clarification_offer,
+    build_transfer_clarification_response,
+    should_offer_transfer_clarification,
+)
+from app.shared.agent.transfer_intent import is_plain_transfer_start
+from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,7 @@ class IntentResult(BaseModel):
 
 
 # ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
+
 
 def _is_transfer_restart_utterance(text: str) -> bool:
     """홈 등에서 새 송금을 시작하는 발화인지."""
@@ -166,9 +167,7 @@ def _enrich_slots_from_resolved(
     if resolved.recipient_id and classify_recipient_input(recipient_input) == "account":
         db = next(get_db())
         try:
-            row = match_by_registered_account(
-                db, uuid.UUID(user_id), recipient_input
-            )
+            row = match_by_registered_account(db, uuid.UUID(user_id), recipient_input)
             if row and row.alias:
                 display = row.alias
         finally:
@@ -308,6 +307,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             code="AGENT_CONFIG_ERROR",
             message="AI 에이전트 설정 오류가 발생했습니다.",
             status_code=500,
+            user_message="AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         ) from e
 
     # ── tool registry: 액션 이름 → tool 함수 매핑 ───────────────────────────────
@@ -363,9 +363,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
         if state.get("awaiting_memo_decision"):
             user_text = last_user_text(state.get("messages", []))
             note_action = (
-                "add_auto_transfer_note"
-                if state.get("last_order_id")
-                else "add_note"
+                "add_auto_transfer_note" if state.get("last_order_id") else "add_note"
             )
             logger.info(
                 "[Graph →intent_node] awaiting_memo_decision"
@@ -459,7 +457,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 " 예: '아니 6만원으로'→{\"amount\":60000},"
                 " '아니 화요일로'→{\"scheduled_day\":1},"
                 " '아니 10일로'→{\"scheduled_day\":10},"
-                " '아니 월요일마다'→{\"cycle\":\"weekly\",\"scheduled_day\":0}."
+                ' \'아니 월요일마다\'→{"cycle":"weekly","scheduled_day":0}.'
                 " 수정할 슬롯이 불명확하면 direct_response에 무엇을 바꿀지 질문할 것."
             )
 
@@ -623,7 +621,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
         # "6만원으로 바꿔줘" 등 슬롯 수정 발화 → awaiting_confirmation 해제 후 재확인
         if state.get("awaiting_confirmation") and result.extracted_slots:
             existing = dict(state.get("collected_slots", {}))
-            existing.update(result.extracted_slots)  # 기존 슬롯 포함 전체 교체 허용
+            existing.update(result.extracted_slots)
             logger.info(
                 "[Graph →intent_node] 확인 단계 슬롯 수정: %s", result.extracted_slots
             )
@@ -701,7 +699,9 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "awaiting_memo_decision": False,
                 "awaiting_transfer_clarification": False,
                 "draft_recipient": None,
-                "last_tx_id": None if result.intent == "transfer" else state.get("last_tx_id"),
+                "last_tx_id": None
+                if result.intent == "transfer"
+                else state.get("last_tx_id"),
             }
             if result.intent == "transfer":
                 updates["messages"] = [
@@ -782,9 +782,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
             if slot_name in action_questions:
                 question = action_questions[slot_name]
             elif slot_name == "scheduled_day" and slots.get("cycle") == "weekly":
-                question = "매주 무슨 요일에 이체할까요? 월요일부터 일요일 중 말씀해 주세요."
+                question = (
+                    "매주 무슨 요일에 이체할까요? 월요일부터 일요일 중 말씀해 주세요."
+                )
             else:
-                question = SLOT_QUESTIONS.get(slot_name, f"{slot_name}을 말씀해 주세요.")
+                question = SLOT_QUESTIONS.get(
+                    slot_name, f"{slot_name}을 말씀해 주세요."
+                )
         else:
             question = "정보가 모두 수집되었습니다."
 
@@ -891,9 +895,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
         if not slots.get("recipient"):
             # 수취인 미등록 → resolve_node의 실패 메시지를 TTS로 전달하고 END
             # slot_fill_node로 넘기면 "누구에게 보낼까요?"가 실패 메시지를 덮어씀
-            logger.info(
-                "[Graph route] resolve_node → END (recipient not found)"
-            )
+            logger.info("[Graph route] resolve_node → END (recipient not found)")
             return END
 
         if not state.get("recipient_validated"):
@@ -1174,6 +1176,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             code="AGENT_INIT_FAILED",
             message="AI 에이전트를 초기화하지 못했습니다.",
             status_code=500,
+            user_message="AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         ) from e
 
     return graph

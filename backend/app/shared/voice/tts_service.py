@@ -9,14 +9,14 @@ TTS_SPEED_MAX = 4.0
 
 async def synthesize_speech(
     text: str,
-    speed: float = 1.7,
+    speed: float = 1.0,
     voice_name: str = "ko-KR-SunHiNeural",
 ) -> bytes:
     """Azure Cognitive Services TTS API로 텍스트를 음성(MP3)으로 변환합니다.
 
     Args:
         text: 음성으로 변환할 텍스트.
-        speed: 재생 속도. 0.25 ~ 4.0 범위. 기본값 1.0.
+        speed: 재생 속도. 0.25 ~ 4.0 범위. 기본값 1.0. 재생 배속은 프론트엔드 TTS_RATE로 제어.
         voice_name: 사용할 Azure 음성 이름. 기본값 'ko-KR-SunHiNeural'.
 
     Returns:
@@ -29,12 +29,14 @@ async def synthesize_speech(
         raise TTSError(
             code="INVALID_REQUEST",
             message="텍스트가 비어 있습니다.",
+            user_message="음성 변환할 내용이 없습니다.",
         )
 
     if not (TTS_SPEED_MIN <= speed <= TTS_SPEED_MAX):
         raise TTSError(
             code="TTS_SPEED_OUT_OF_RANGE",
             message="TTS 속도는 0.25 ~ 4.0 범위여야 합니다.",
+            user_message="음성 속도 설정이 올바르지 않습니다.",
         )
 
     url = (
@@ -58,17 +60,20 @@ async def synthesize_speech(
         raise TTSError(
             code="SERVICE_UNAVAILABLE",
             message="Azure TTS API 요청 시간이 초과됐습니다.",
+            user_message="음성 합성 서비스가 응답하지 않습니다. 잠시 후 다시 시도해 주세요.",
         ) from exc
     except httpx.RequestError as exc:
         raise TTSError(
             code="SERVICE_UNAVAILABLE",
             message="Azure TTS API에 연결할 수 없습니다.",
+            user_message="음성 합성 서비스에 연결할 수 없습니다.",
         ) from exc
 
     if response.status_code != 200:
         raise TTSError(
             code="SERVICE_UNAVAILABLE",
             message=f"Azure TTS API 오류: status={response.status_code}",
+            user_message="음성 합성 중 오류가 발생했습니다.",
         )
 
     return response.content

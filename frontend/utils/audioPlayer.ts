@@ -1,4 +1,4 @@
-import { registerSound } from '@/utils/ttsManager';
+import { getTtsRate, registerSound } from '@/utils/ttsManager';
 import { Audio } from 'expo-av';
 import React from 'react';
 
@@ -16,6 +16,8 @@ export async function playBase64Audio(
   const { sound } = await Audio.Sound.createAsync({
     uri: `data:audio/mpeg;base64,${base64}`,
   });
+
+  await sound.setRateAsync(getTtsRate(), true);
 
   if (soundRef) {
     soundRef.current = sound;

@@ -47,17 +47,20 @@ async def transcribe_audio(
         raise STTError(
             code="STT_FAILED",
             message="Clova Speech API 요청 시간이 초과됐습니다.",
+            user_message="음성 인식 서비스가 응답하지 않습니다. 잠시 후 다시 시도해 주세요.",
         ) from exc
     except httpx.RequestError as exc:
         raise STTError(
             code="SERVICE_UNAVAILABLE",
             message="Clova Speech API에 연결할 수 없습니다.",
+            user_message="음성 인식 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.",
         ) from exc
 
     if response.status_code != 200:
         raise STTError(
             code="STT_FAILED",
             message=f"Clova Speech API 오류: status={response.status_code}, body={response.text}",
+            user_message="음성을 인식하지 못했습니다. 다시 말씀해 주세요.",
         )
 
     payload = response.json()

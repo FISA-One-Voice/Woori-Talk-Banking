@@ -27,6 +27,7 @@ def _get_primary_account(db: Session, user_uuid: uuid.UUID) -> Account:
             code="TRANSFER_ACCOUNT_NOT_FOUND",
             message="출금 계좌를 찾을 수 없습니다.",
             status_code=404,
+            user_message="출금 계좌를 찾을 수 없습니다.",
         )
     return account
 
@@ -50,6 +51,7 @@ def _build_receipt(tx: Transaction) -> dict:
 
 
 # ── API 1: 이체 실행 ────────────────────────────────────────────────────────
+
 
 def execute_transfer(
     db: Session,
@@ -78,6 +80,7 @@ def execute_transfer(
                 code="INVALID_ACCOUNT_FORMAT",
                 message="계좌번호는 10~14자리 숫자여야 합니다.",
                 status_code=400,
+                user_message="계좌번호 형식이 올바르지 않습니다.",
             )
         recipient = cleaned
 
@@ -96,6 +99,7 @@ def execute_transfer(
             code="IDEMPOTENCY_KEY_USED",
             message="이 idempotency_key는 실패한 이체에 사용되었습니다. 새 key를 발급하세요.",
             status_code=409,
+            user_message="이미 처리된 이체 요청입니다.",
         )
 
     # 수취인 정보 해석
@@ -135,6 +139,7 @@ def execute_transfer(
             code="TRANSFER_PENDING",
             message="동일한 이체 요청이 처리 중입니다.",
             status_code=409,
+            user_message="동일한 이체 요청이 처리 중입니다.",
         )
 
     # SELECT FOR UPDATE — 출금 계좌 비관적 락 (잔액 이중 차감 방지)
@@ -152,6 +157,7 @@ def execute_transfer(
             code="INSUFFICIENT_BALANCE",
             message="잔액이 부족합니다.",
             status_code=400,
+            user_message="잔액이 부족합니다.",
         )
 
     locked_account.balance -= amount
@@ -161,6 +167,7 @@ def execute_transfer(
 
 
 # ── API 2: 메모 업데이트 ────────────────────────────────────────────────────
+
 
 def update_memo(db: Session, user_id: str, tx_id: str, memo: str) -> dict:
     """본인 소유 트랜잭션의 메모를 업데이트합니다."""
@@ -175,6 +182,7 @@ def update_memo(db: Session, user_id: str, tx_id: str, memo: str) -> dict:
             code="TRANSACTION_NOT_FOUND",
             message="트랜잭션을 찾을 수 없습니다.",
             status_code=404,
+            user_message="해당 거래를 찾을 수 없습니다.",
         )
     tx.memo = memo
     db.commit()
@@ -182,6 +190,7 @@ def update_memo(db: Session, user_id: str, tx_id: str, memo: str) -> dict:
 
 
 # ── API 3: 최근 수취인 조회 ─────────────────────────────────────────────────
+
 
 def get_recent_recipients(db: Session, user_id: str, limit: int = 5) -> list[dict]:
     """최근 이체 완료 트랜잭션에서 recipient_id 기준 중복 제거 후 최신 수취인을 반환합니다.
@@ -214,9 +223,7 @@ def get_recent_recipients(db: Session, user_id: str, limit: int = 5) -> list[dic
 
     # Subquery를 IN()에 직접 전달하면 SQLAlchemy가 경고와 함께 잘못된 SQL을 생성할 수 있으므로
     # tx_id를 Python 리스트로 먼저 조회한 뒤 IN()에 전달한다.
-    top_tx_id_rows = (
-        db.query(rn_subq.c.tx_id).filter(rn_subq.c.rn == 1).all()
-    )
+    top_tx_id_rows = db.query(rn_subq.c.tx_id).filter(rn_subq.c.rn == 1).all()
     tx_ids = [r[0] for r in top_tx_id_rows]
     if not tx_ids:
         return []
