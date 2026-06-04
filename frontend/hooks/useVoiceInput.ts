@@ -98,4 +98,4 @@ export function useVoiceInput(
   }, [onError, onResponse, setVoiceState]);
 
   return { isRecording, handleLongPress, handlePressOut };
-}
+} 

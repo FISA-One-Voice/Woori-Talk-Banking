@@ -111,7 +111,7 @@ def test_resolve_by_id_success(db, test_user, registered_recipient):
     assert isinstance(result, ResolvedRecipient)
     assert result.recipient_id == registered_recipient.recipient_id
     assert result.bank_name == "국민은행"
-    assert result.account_number == "123-456-789012"
+    assert result.account_number == "123456789012"
     assert result.recipient_name == "홍길동"
 
 
@@ -144,7 +144,7 @@ def test_resolve_by_phone_success(db, phone_user):
     assert isinstance(result, ResolvedRecipient)
     assert result.recipient_id is None
     assert result.bank_name == "우리은행"
-    assert result.account_number == "1002-111-222333"
+    assert result.account_number == "1002111222333"
     assert result.recipient_name == phone_user.name
 
 
@@ -192,7 +192,7 @@ def test_create_recipient_success(db, test_user):
     assert isinstance(result, ResolvedRecipient)
     assert result.recipient_id is not None
     assert result.bank_name == "신한은행"
-    assert result.account_number == "110-222-333444"
+    assert result.account_number == "110222333444"
     assert result.recipient_name == "김철수"
 
     saved = (
