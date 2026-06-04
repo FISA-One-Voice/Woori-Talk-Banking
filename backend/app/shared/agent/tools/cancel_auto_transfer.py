@@ -5,13 +5,17 @@
 해당 수취인의 active/paused 상태 자동이체를 cancelled로 변경한다.
 """
 
+import logging
 import uuid
 
 from langchain_core.tools import tool
 from sqlalchemy import and_
 
 from app.core.database import SessionLocal
+from app.core.exception import AppError
 from app.features.recipients.service import lookup_recipient_by_voice
+
+logger = logging.getLogger(__name__)
 from app.models.standing_order import StandingOrder
 
 
@@ -59,8 +63,15 @@ def cancel_auto_transfer(user_id: str, recipient: str) -> str:
             return f"{name}에게 설정된 자동이체가 해지되었습니다."
         return f"{name}에게 설정된 자동이체 {count}건이 모두 해지되었습니다."
 
+    except AppError as e:
+        db.rollback()
+        return e.user_message or e.message
     except Exception as e:
         db.rollback()
-        return f"자동이체 해지 중 오류가 발생했습니다: {e}"
+        logger.error(
+            "cancel_auto_transfer 실패: user=%s recipient=%s error=%s",
+            user_id, recipient, e,
+        )
+        return "자동이체 해지 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
     finally:
         db.close()

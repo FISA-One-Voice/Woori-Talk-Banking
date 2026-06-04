@@ -13,9 +13,9 @@ import { agentPathFromNavigateTo, shouldNavigateToRoute } from '@/utils/voiceNav
 import { Href, Stack, useRouter, useSegments } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
+import { useAutoTransferFlowStore } from './auto-transfer/store';
 
 // ── V 제스처 감지 ─────────────────────────────────────────────────────────────
-// 터치 경로가 V 모양(↘ → ↗)을 그리면 true.
 
 function isVGesture(pts: Array<{ x: number; y: number }>): boolean {
   if (pts.length < 8) return false;
@@ -82,6 +82,19 @@ function buildTxReceiptFromSlots(
   });
 }
 
+function buildAutoTransferReceiptFromSlots(prevSlots: Record<string, unknown>) {
+  const s = prevSlots;
+  useAutoTransferFlowStore.getState().setReceipt({
+    orderId: (s.orderId as string) ?? '',
+    recipient: (s.recipient as string) ?? '',
+    amount: s.amount ? Number(s.amount) : 0,
+    cycle: (s.cycle as string) ?? '',
+    scheduledDay: s.scheduled_day != null ? Number(s.scheduled_day) : null,
+    scheduledDow: s.scheduled_dow != null ? Number(s.scheduled_dow) : null,
+    bankName: (s.bank_name as string) ?? (s.bankName as string) ?? '',
+  });
+}
+
 // ── 루트 레이아웃 ─────────────────────────────────────────────────────────────
 
 export default function RootLayout() {
@@ -133,6 +146,7 @@ export default function RootLayout() {
           | undefined) ?? {};
 
       const isCompleteNav = data.navigate_to === 'transfer/complete';
+      const isAutoCompleteNav = data.navigate_to === 'auto-transfer/complete';
 
       if (isCompleteNav) {
         buildTxReceiptFromSlots(prevSlots, data.collected_slots);
@@ -141,6 +155,10 @@ export default function RootLayout() {
           ...data,
           collected_slots: { ...prevSlots, ...(data.collected_slots ?? {}) },
         });
+      } else if (isAutoCompleteNav) {
+        buildAutoTransferReceiptFromSlots(prevSlots);
+        navigateFromAgent(router, 'auto-transfer/complete', currentPathRef);
+        useVoiceResponseStore.getState().setLastResponse(data);
       } else {
         useVoiceResponseStore.getState().setLastResponse(data);
       }
@@ -164,7 +182,7 @@ export default function RootLayout() {
         speakText(YES_NO_CONFIRM_INSTRUCTION);
       }
 
-      if (data.navigate_to && !isCompleteNav) {
+      if (data.navigate_to && !isCompleteNav && !isAutoCompleteNav) {
         navigateFromAgent(router, data.navigate_to, currentPathRef);
       }
     },

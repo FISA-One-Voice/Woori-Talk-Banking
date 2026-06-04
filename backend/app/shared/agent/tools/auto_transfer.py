@@ -10,8 +10,14 @@ v2 (현재): 슬롯 추출만. 분기 판단 → 에이전트. DB 조회 → sea
 """
 
 import json
+import logging
 
 from langchain_core.tools import tool
+
+from app.core.database import get_db
+from app.core.exception import AppError
+
+logger = logging.getLogger(__name__)
 
 
 @tool
@@ -69,3 +75,45 @@ def parse_auto_transfer_slots(
         },
         ensure_ascii=False,
     )
+
+
+@tool
+def add_auto_transfer_note(user_id: str, memo: str, order_id: str) -> str:
+    """자동이체 건(order_id)에 메모를 추가합니다.
+
+    자동이체 등록 직후 메모 제안에 사용합니다.
+    order_id는 자동이체 완료 후 세션(last_order_id)에서 전달받습니다.
+
+    Args:
+        user_id: 현재 로그인한 사용자 ID.
+        memo: 추가할 메모 내용.
+        order_id: 메모를 붙일 자동이체 ID (UUID 문자열).
+
+    Returns:
+        TTS 친화적 메모 완료 안내 문자열.
+    """
+    from app.features.auto_transfer import service as auto_transfer_service
+    from app.features.auto_transfer.schema import AutoTransferMemoRequest
+
+    db = next(get_db())
+    try:
+        auto_transfer_service.update_memo(
+            db=db,
+            user_id=user_id,
+            order_id=order_id,
+            data=AutoTransferMemoRequest(transfer_note=memo),
+        )
+        return f"'{memo}' 메모가 추가되었습니다."
+    except AppError as e:
+        logger.warning("add_auto_transfer_note AppError: user=%s code=%s", user_id, e.code)  # noqa: E501
+        return e.user_message or e.message
+    except Exception as e:
+        logger.error(
+            "add_auto_transfer_note 실패: user=%s order_id=%s error=%s",
+            user_id,
+            order_id,
+            e,
+        )
+        return "메모 추가 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+    finally:
+        db.close()

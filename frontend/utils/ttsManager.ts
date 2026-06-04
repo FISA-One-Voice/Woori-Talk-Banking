@@ -12,9 +12,9 @@
 //   stopAllTts()          — 재생 중인 모든 TTS(expo-speech + expo-av)를 중단한다.
 // =============================================================================
 
+import { useAuthStore } from '@/store/authStore';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
-import { useAuthStore } from '@/store/authStore';
 
 // ── TTS 속도 ──────────────────────────────────────────────────────────────────
 
@@ -44,12 +44,10 @@ export function speakText(
 
 let _sound: Audio.Sound | null = null;
 
-/** expo-av Sound 인스턴스를 등록합니다. 재생 시작 직전에 호출하세요. */
 export function registerSound(sound: Audio.Sound | null): void {
   _sound = sound;
 }
 
-/** 재생 중인 모든 TTS(expo-speech + expo-av)를 중단합니다. */
 export async function stopAllTts(): Promise<void> {
   Speech.stop();
   if (_sound) {

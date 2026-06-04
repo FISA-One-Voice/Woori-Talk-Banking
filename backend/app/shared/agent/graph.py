@@ -31,37 +31,25 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exception import AgentError
+from app.features.recipients.schema import ResolvedRecipient
 from app.features.recipients.service import (
     classify_recipient_input,
     find_recipient_by_voice,
     match_by_registered_account,
 )
-from app.features.recipients.schema import ResolvedRecipient
 from app.features.transfer.service import _mask_account
-from app.shared.agent.prompts import SYSTEM_PROMPT
 from app.shared.agent.memo_decision import (
     build_memo_decision_update,
     last_user_text,
 )
+from app.shared.agent.prompts import SYSTEM_PROMPT
 from app.shared.agent.session_reset import clear_conversation_messages
-from app.shared.agent.transfer_intent import (
-    build_bare_transfer_start_update,
-    is_plain_transfer_start,
-    should_use_bare_transfer_fast_start,
-)
-from app.shared.agent.transfer_clarification import (
-    _recipient_hint_from_state,
-    build_transfer_clarification_offer,
-    build_transfer_clarification_response,
-    should_offer_transfer_clarification,
-)
-from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
     ACTIONS_WITH_YES_NO_CONFIRM,
     ASV_REQUIRED_ACTIONS,
-    CONFIRM_YES_NO_SUFFIX,
     COMPLETE_SCREEN_MAP,
+    CONFIRM_YES_NO_SUFFIX,
     MEMO_OFFER_SUFFIX,
     RECIPIENT_REQUIRED_ACTIONS,
     SCREEN_MAP,
@@ -73,6 +61,14 @@ from app.shared.agent.slot_schema import (
     transfer_missing_slots,
 )
 from app.shared.agent.state import VoiceState
+from app.shared.agent.transfer_clarification import (
+    _recipient_hint_from_state,
+    build_transfer_clarification_offer,
+    build_transfer_clarification_response,
+    should_offer_transfer_clarification,
+)
+from app.shared.agent.transfer_intent import is_plain_transfer_start
+from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +133,20 @@ def _missing_slots(pending_action: str, collected_slots: dict) -> list[str]:
     for s in required:
         val = collected_slots.get(s)
         if s == "scheduled_day":
-            if val is None:
+            cycle = collected_slots.get("cycle")
+            valid = False
+            if val is not None:
+                try:
+                    n = int(val)
+                    if cycle == "monthly":
+                        valid = 1 <= n <= 31
+                    elif cycle == "weekly":
+                        valid = 0 <= n <= 6
+                    else:
+                        valid = True
+                except (TypeError, ValueError):
+                    pass
+            if not valid:
                 missing.append(s)
         else:
             if not val:
@@ -198,11 +207,18 @@ def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
         parts.append(f"{target}{bank_name} 계좌 {masked}로")
     elif recipient:
         parts.append(f"{recipient}에게")
-    if cycle:
-        freq_label = "매월" if cycle == "monthly" else "매주"
-        parts.append(freq_label)
-    if scheduled_day:
-        parts.append(f"{scheduled_day}일")
+    _DOW_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
+    if cycle == "monthly":
+        parts.append("매월")
+        if scheduled_day is not None:
+            parts.append(f"{scheduled_day}일")
+    elif cycle == "weekly":
+        parts.append("매주")
+        if scheduled_day is not None:
+            try:
+                parts.append(f"{_DOW_LABELS[int(scheduled_day)]}요일")
+            except (IndexError, ValueError):
+                parts.append(f"{scheduled_day}요일")
     if amount:
         try:
             parts.append(_amount_to_korean(int(amount)))
@@ -346,11 +362,16 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         if state.get("awaiting_memo_decision"):
             user_text = last_user_text(state.get("messages", []))
-            logger.info(
-                "[Graph →intent_node] awaiting_memo_decision user_text=%s",
-                user_text,
+            note_action = (
+                "add_auto_transfer_note" if state.get("last_order_id") else "add_note"
             )
-            return build_memo_decision_update(user_text)
+            logger.info(
+                "[Graph →intent_node] awaiting_memo_decision"
+                " user_text=%s note_action=%s",
+                user_text,
+                note_action,
+            )
+            return build_memo_decision_update(user_text, note_action=note_action)
 
         if state.get("pending_action") == "add_note":
             user_text = last_user_text(state.get("messages", []))
@@ -402,15 +423,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
             )
             return build_transfer_clarification_offer(user_text)
 
-        if not state.get("pending_action") and should_use_bare_transfer_fast_start(
-            user_text
-        ):
-            logger.info(
-                "[Graph →intent_node] bare transfer fast start (pre-LLM) text=%s",
-                user_text,
-            )
-            return build_bare_transfer_start_update(user_text)
-
         # 현재 상태 컨텍스트를 시스템 프롬프트에 추가
         context_lines = [
             SYSTEM_PROMPT,
@@ -430,7 +442,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
             if missing:
                 context_lines.append(
                     f"★ 슬롯 채우기 진행 중 — intent는 반드시 null로 설정하고,"
-                    f" 누락 슬롯 {missing}의 값을 extracted_slots에서만 채울 것."
+                    f" 누락 슬롯 {missing}의 값만 extracted_slots에 포함할 것."
+                    " 이미 수집된 슬롯은 extracted_slots에 절대 포함하지 말 것."
                     " 사용자 발화가 새 인텐트처럼 보여도 절대 intent를 설정하지 말 것."
                 )
 
@@ -438,9 +451,14 @@ def build_graph(tools: list) -> CompiledStateGraph:
             context_lines.append(
                 "★ 대기 상태: 사용자 확인('네'/'아니오') 대기 중."
                 " '네', '응', '맞아', '그렇게 해줘' → user_confirmed=true 반드시 설정."
-                " '아니오', '취소', '됐어' → user_cancelled=true 반드시 설정."
-                " '6만원으로 바꿔줘', '수취인 변경' 등 슬롯 수정 발화 →"
-                " extracted_slots에 바꿀 값만 설정 (user_confirmed/cancelled는 false)."
+                " '취소', '됐어', '하지 마' → user_cancelled=true 반드시 설정."
+                " '아니' 단독 또는 '아니 + [새 값]' 패턴은 슬롯 수정으로 처리:"
+                " user_cancelled=false 유지하고 extracted_slots에 바꿀 슬롯만 설정."
+                " 예: '아니 6만원으로'→{\"amount\":60000},"
+                " '아니 화요일로'→{\"scheduled_day\":1},"
+                " '아니 10일로'→{\"scheduled_day\":10},"
+                ' \'아니 월요일마다\'→{"cycle":"weekly","scheduled_day":0}.'
+                " 수정할 슬롯이 불명확하면 direct_response에 무엇을 바꿀지 질문할 것."
             )
 
         if state.get("awaiting_memo_decision"):
@@ -490,8 +508,23 @@ def build_graph(tools: list) -> CompiledStateGraph:
             " (예: '엄마에게'→recipient='엄마', '친구한테'→recipient='친구',"
             " '010 1234 5678로'→recipient='010 1234 5678').",
             "- cycle 슬롯: 반드시 'monthly' 또는 'weekly' 영문으로 설정"
-            " ('매월'·'한달에한번'→'monthly', '매주'·'일주일에한번'→'weekly').",
-            "- scheduled_day: monthly일 때 날짜 정수(1-31). '15일'→15, '말일'→31."
+            " ('매월'·'한달에한번'→'monthly',"
+            " '매주'·'일주일에한번'·'7일마다'→'weekly')."
+            " ★ '7일마다', '일주일마다','주마다','매주','일주일마다 한번씩' 등은 cycle=weekly로만 설정하고"
+            " scheduled_day는 설정하지 말 것 (요일 미명시)."
+            " ★ '3일마다','5일마다','10일마다' 등 7일이 아닌 'N일마다'는 cycle=monthly,"
+            " scheduled_day=N으로 설정. '삼일마다'→cycle=monthly,scheduled_day=3.",
+            "- scheduled_day: 사용자가 날짜·요일을 명시한 경우에만 추출할 것."
+            " '한달에 한번', '매월', '매주' 등 주기만 말하고"
+            " 날짜·요일을 언급하지 않으면 scheduled_day를 절대 설정하지 말 것."
+            " monthly일 때 날짜 정수(1-31). '15일'→15, '3일'→3, '말일'→31."
+            " ★ cycle=monthly 상태에서 후속 발화로 날짜만 말한 경우 반드시 scheduled_day로 추출."
+            " 예: (cycle=monthly 진행 중) '3일'→scheduled_day=3, '15일'→scheduled_day=15."
+            " ★ STT 오류 보정: 한국어 '일'(日)이 숫자 '1'로 잘못 인식됨."
+            " monthly 날짜 추출 시 숫자 끝 '1'은 '일'(日) 오인식이므로"
+            " 제거 후 나머지를 날짜로 사용."
+            " 예: '61'→6, '71'→7, '91'→9, '11'→1, '21'→2, '31'→3, '211'→21, '311'→31."
+            " '61'을 '6월 1일'로 해석하거나 '1'을 날짜로 추출하면 절대 안 됨."
             " ★ 자동이체에서 'N월마다'는 달(月)이 아닌 날짜로 해석:"
             " '10월마다'→scheduled_day=10, '5월마다'→scheduled_day=5."
             " weekly일 때도 scheduled_day에 요일 정수(0=월,1=화,2=수,3=목,4=금,5=토,6=일)를 저장."
@@ -552,6 +585,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "execution_ready": False,
                 "recipient_validated": False,
                 "last_tx_id": None,
+                "last_order_id": None,
                 "awaiting_memo_decision": False,
                 "awaiting_transfer_clarification": False,
                 "draft_recipient": None,
@@ -594,9 +628,26 @@ def build_graph(tools: list) -> CompiledStateGraph:
             return {
                 "collected_slots": existing,
                 "awaiting_confirmation": False,
-                "recipient_validated": False
-                if "recipient" in result.extracted_slots
-                else state.get("recipient_validated", False),
+                "recipient_validated": (
+                    False
+                    if "recipient" in result.extracted_slots
+                    else state.get("recipient_validated", False)
+                ),
+            }
+
+        # ── 확인 단계에서 응답 불명확 ────────────────────────────────────────────
+        # extracted_slots도 비어있고 confirmed/cancelled도 False인 경우
+        # → TTS로 "네 또는 아니오" 재안내
+        if state.get("awaiting_confirmation") and not result.direct_response:
+            return {
+                "messages": [
+                    AIMessage(
+                        content=(
+                            CONFIRM_YES_NO_SUFFIX.strip()
+                            + " 변경하실 내용이 있으면 말씀해 주시면 반영해 드립니다."
+                        )
+                    )
+                ]
             }
 
         # ── 홈 이동 처리 ─────────────────────────────────────────────────────────
@@ -627,10 +678,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
         )
 
         # ── 새 인텐트 감지 ──────────────────────────────────────────────────────
-        # pending과 다른 인텐트, 또는 홈에서 '송금' 등으로 transfer 재시작
+        # 확인·ASV 대기 중에는 인텐트 감지를 무시 (슬롯 초기화 방지)
+        # 다른 인텐트이거나 transfer 재시작 케이스일 때 슬롯·상태 초기화
         if (
             result.intent
             and result.intent in VALID_INTENTS
+            and not state.get("awaiting_confirmation")
+            and not state.get("awaiting_asv_audio")
             and (result.intent != pending or restart_transfer)
         ):
             updates = {
@@ -664,9 +718,30 @@ def build_graph(tools: list) -> CompiledStateGraph:
         # ── 슬롯 보충 ──────────────────────────────────────────────────────────
         elif result.extracted_slots and pending:
             existing = dict(state.get("collected_slots", {}))
-            existing.update(result.extracted_slots)
+            missing_now = _missing_slots(pending, existing)
+            for key, val in result.extracted_slots.items():
+                # scheduled_day는 사용자 수정 가능 — 항상 허용
+                # 나머지는 이미 채워진 슬롯 덮어쓰기 방지 (LLM 오파싱 방어)
+                if (
+                    key == "scheduled_day"
+                    or key in missing_now
+                    or existing.get(key) is None
+                ):
+                    if key == "scheduled_day" and val is not None:
+                        try:
+                            day_int = int(val)
+                        except (ValueError, TypeError):
+                            day_int = None
+                        # STT가 '6일'→'61'처럼 '일'(日)을 '1'로 인식하는 오류 보정
+                        if (
+                            day_int is not None
+                            and 32 <= day_int <= 91
+                            and day_int % 10 == 1
+                        ):
+                            val = day_int // 10
+                    existing[key] = val
             updates["collected_slots"] = existing
-            # 슬롯만 채운 턴: navigate_to 생략 (프론트가 슬롯으로 step 전환, replace 중복 방지)
+            updates["navigate_to"] = None  # 슬롯 채우기 중 화면 이동 없음
             if pending == "add_note" and existing.get("memo"):
                 updates["execution_ready"] = True
 
@@ -795,11 +870,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 ],
             }
 
+        pending_action = state.get("pending_action", "transfer")
         slots["recipient"] = None
         return {
             "collected_slots": slots,
             "recipient_validated": False,
-            "navigate_to": SCREEN_MAP.get("transfer"),
+            "navigate_to": SCREEN_MAP.get(pending_action, SCREEN_MAP.get("transfer")),
             "messages": [
                 AIMessage(
                     content=(
@@ -887,6 +963,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
             invoke_args = {"user_id": state.get("user_id", ""), **slots}
             new_last_tx_id: str | None = state.get("last_tx_id")
+            new_last_order_id: str | None = state.get("last_order_id")
             completed_slots: dict = {}
             note_consumed = False
             awaiting_memo_next = False
@@ -904,10 +981,26 @@ def build_graph(tools: list) -> CompiledStateGraph:
                         new_last_tx_id = tx_id
                         awaiting_memo_next = True
                         response_text = response_text + MEMO_OFFER_SUFFIX
-                        # 영수증은 프론트 prevSlots·txReceipt로 처리; 세션 슬롯은 비움
+                        # 영수증은 프론트 prevSlots로 처리; 세션 슬롯은 비움
                         completed_slots = {}
                 elif pending == "transfer":
                     response_text = tool_obj.invoke(invoke_args)
+                elif pending == "auto_transfer":
+                    result_raw = tool_obj.invoke(invoke_args)
+                    try:
+                        result_data = json.loads(result_raw)
+                    except Exception:
+                        result_data = {}
+                    response_text = result_data.get(
+                        "tts_text", "자동이체 등록 중 오류가 발생했습니다."
+                    )
+                    if result_data.get("success"):
+                        order_id = result_data.get("order_id")
+                        if order_id:
+                            new_last_order_id = order_id
+                            awaiting_memo_next = True
+                            response_text = response_text + MEMO_OFFER_SUFFIX
+                        completed_slots = {}
                 elif pending == "add_note":
                     tx_id = slots.get("tx_id") or state.get("last_tx_id")
                     if not tx_id:
@@ -925,6 +1018,23 @@ def build_graph(tools: list) -> CompiledStateGraph:
                         )
                         if "추가되었습니다" in response_text:
                             note_consumed = True
+                elif pending == "add_auto_transfer_note":
+                    order_id = slots.get("order_id") or state.get("last_order_id")
+                    if not order_id:
+                        response_text = (
+                            "메모를 추가할 자동이체 내역을 찾을 수 없습니다."
+                            " 자동이체 등록을 먼저 완료해 주세요."
+                        )
+                    else:
+                        response_text = tool_obj.invoke(
+                            {
+                                "user_id": invoke_args["user_id"],
+                                "memo": str(invoke_args.get("memo", "")),
+                                "order_id": str(order_id),
+                            }
+                        )
+                        if "추가되었습니다" in response_text:
+                            note_consumed = True
                 else:
                     response_text = tool_obj.invoke(invoke_args)
             except Exception as e:
@@ -933,6 +1043,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                     "처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
                 )
                 new_last_tx_id = state.get("last_tx_id")
+                new_last_order_id = state.get("last_order_id")
                 completed_slots = {}
 
         updates: dict = {
@@ -945,6 +1056,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "recipient_validated": False,
             "messages": [AIMessage(content=response_text)],
             "last_tx_id": None if note_consumed else new_last_tx_id,
+            "last_order_id": None if note_consumed else new_last_order_id,
         }
         if note_consumed:
             updates["awaiting_memo_decision"] = False

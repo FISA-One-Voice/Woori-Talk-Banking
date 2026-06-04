@@ -24,8 +24,10 @@ export function resolveAutoTransferStep(
   if (!slots.amount)    return 'input-amount';
   if (!slots.cycle)     return 'input-cycle';
   const cycle = slots.cycle as string;
-  if (cycle === 'monthly' && !slots.scheduled_day)       return 'input-day';
-  if (cycle === 'weekly'  && slots.scheduled_dow == null) return 'input-day';
+  const isMonthly = cycle === 'monthly' || cycle === '매월' || cycle === '매달';
+  const isWeekly  = cycle === 'weekly'  || cycle === '매주';
+  if (isMonthly && !slots.scheduled_day)       return 'input-day';
+  if (isWeekly  && slots.scheduled_dow == null) return 'input-day';
   return 'confirm';
 }
 
@@ -53,7 +55,7 @@ export function formatAmount(amount: unknown): string {
 
 export function formatSchedule(slots: Record<string, unknown>): string {
   const cycle = slots.cycle as string;
-  const isMonthly = cycle === 'monthly' || cycle === '매월';
+  const isMonthly = cycle === 'monthly' || cycle === '매월' || cycle === '매달';
   const isWeekly = cycle === 'weekly' || cycle === '매주';
   if (isMonthly) return `매월 ${slots.scheduled_day}일`;
   if (isWeekly) {
