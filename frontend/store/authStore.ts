@@ -44,8 +44,12 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       hasVoiceRegistered: false,
-      setTokens: (token, refreshToken, hasVoiceRegistered = false) =>
-        set((state) => ({ token, refreshToken, hasVoiceRegistered: hasVoiceRegistered ?? state.hasVoiceRegistered })),
+      setTokens: (token, refreshToken, newHasVoiceRegistered) =>
+        set((state) => ({ 
+          token, 
+          refreshToken, 
+          hasVoiceRegistered: newHasVoiceRegistered ?? state.hasVoiceRegistered 
+        })),
       setHasVoiceRegistered: (status) => set({ hasVoiceRegistered: status }),
       clearTokens: () => set({ token: null, refreshToken: null, hasVoiceRegistered: false }),
     }),
