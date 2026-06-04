@@ -9,14 +9,14 @@ TTS_SPEED_MAX = 4.0
 
 async def synthesize_speech(
     text: str,
-    speed: float = 1.7,
+    speed: float = 1.0,
     voice_name: str = "ko-KR-SunHiNeural",
 ) -> bytes:
     """Azure Cognitive Services TTS API로 텍스트를 음성(MP3)으로 변환합니다.
 
     Args:
         text: 음성으로 변환할 텍스트.
-        speed: 재생 속도. 0.25 ~ 4.0 범위. 기본값 1.0.
+        speed: 재생 속도. 0.25 ~ 4.0 범위. 기본값 1.0. 재생 배속은 프론트엔드 TTS_RATE로 제어.
         voice_name: 사용할 Azure 음성 이름. 기본값 'ko-KR-SunHiNeural'.
 
     Returns:

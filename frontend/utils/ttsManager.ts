@@ -17,8 +17,8 @@ import * as Speech from 'expo-speech';
 
 // ── TTS 속도 ──────────────────────────────────────────────────────────────────
 
-/** expo-speech 재생 속도. 1.0 = 기본. 앱 전체 속도는 여기서만 수정한다. */
-export const TTS_RATE = 1.4;
+/** 앱 전체 TTS 재생 속도. 1.0 = 기본. expo-speech 및 Azure TTS 재생 모두 여기서만 수정한다. */
+export const TTS_RATE = 1.7;
 
 // ── expo-speech 래퍼 ──────────────────────────────────────────────────────────
 
