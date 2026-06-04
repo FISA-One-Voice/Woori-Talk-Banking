@@ -9,6 +9,7 @@ from app.models.user import User
 
 router = APIRouter(prefix="/api/voice", tags=["Voice"])
 
+
 @router.post("/register", response_model=dict)
 async def register_voice(
     files: list[UploadFile] = File(...),
@@ -30,11 +31,9 @@ async def register_voice(
         AppError: 사용자를 찾을 수 없을 때 발생.
     """
     files_bytes = [await file.read() for file in files]
-    
+
     # 1. 병합 및 ASV 서버 연동 (service 계층 위임)
     embedding = await service.extract_voice_vector(files_bytes)
 
     # 2. 추출된 벡터를 DB에 저장
     return service.register_voice_vector(db, user_id, embedding)
-
-

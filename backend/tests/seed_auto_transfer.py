@@ -14,6 +14,7 @@
 """
 
 import sys
+
 sys.path.insert(0, ".")
 
 import bcrypt
@@ -29,8 +30,10 @@ from app.models.user import User
 
 PIN = "000001"
 
+
 def _now():
     return (datetime.now(timezone.utc) + timedelta(hours=9)).replace(tzinfo=None)
+
 
 USERS = [
     {"name": "안유민", "phone": "010-1111-0001"},
@@ -44,6 +47,7 @@ USERS = [
 ALIASES = ["바보", "멍청이", "똑똑이", "귀염둥이", "천재"]
 
 BANKS = ["우리은행", "신한은행", "국민은행", "카카오뱅크", "하나은행"]
+
 
 def main():
     Base.metadata.create_all(bind=engine)
@@ -93,7 +97,7 @@ def main():
                 phone=u_data["phone"],
                 birthday="1995-01-01",
                 address=f"서울시 강남구 테헤란로 {idx + 1}길",
-                resident_number=f"9501{idx+1:02d}-1234567",
+                resident_number=f"9501{idx + 1:02d}-1234567",
                 disability_type="전맹",
                 tts_speed=1.0,
                 pin_hash=pin_hash,
@@ -106,7 +110,7 @@ def main():
             account_main = Account(
                 user_id=user.user_id,
                 bank_name="우리은행",
-                account_number=f"1002-{idx+1:03d}-{100001 + idx}",
+                account_number=f"1002-{idx + 1:03d}-{100001 + idx}",
                 account_type="입출금",
                 balance=5_000_000 + idx * 1_000_000,
                 alias="주거래",
@@ -115,7 +119,7 @@ def main():
             account_save = Account(
                 user_id=user.user_id,
                 bank_name="우리은행",
-                account_number=f"1002-{idx+1:03d}-{200001 + idx}",
+                account_number=f"1002-{idx + 1:03d}-{200001 + idx}",
                 account_type="저축",
                 balance=10_000_000 + idx * 500_000,
                 alias="저축",
@@ -133,7 +137,7 @@ def main():
                     user_id=user.user_id,
                     alias=alias,
                     bank_name=BANKS[r_idx % len(BANKS)],
-                    account_number=f"999-{idx+1:03d}-{r_idx+1:06d}",
+                    account_number=f"999-{idx + 1:03d}-{r_idx + 1:06d}",
                     recipient_name=other["name"],
                 )
                 db.add(r)
@@ -221,7 +225,7 @@ def main():
                 recipient_id=None,
                 auto_order_id=None,
                 to_bank_name="카카오뱅크",
-                to_account_number=f"3333-{idx+1:02d}-000000",
+                to_account_number=f"3333-{idx + 1:02d}-000000",
                 to_name="홍직접",
                 amount=200_000,
                 tx_type="transfer",
@@ -235,7 +239,9 @@ def main():
             # ── EventParticipation ─────────────────────────────────────────────
             db.add(EventParticipation(event_id=event1.event_id, user_id=user.user_id))
             if idx % 2 == 0:
-                db.add(EventParticipation(event_id=event2.event_id, user_id=user.user_id))
+                db.add(
+                    EventParticipation(event_id=event2.event_id, user_id=user.user_id)
+                )
             db.flush()
 
             created_users.append(user)
@@ -249,18 +255,22 @@ def main():
         print("  Swagger 테스트 정보  (PIN 전원 공통: 000001)")
         print("=" * 65)
         for user in created_users:
-            account = db.query(Account).filter_by(
-                user_id=user.user_id, is_primary=True
-            ).first()
-            recipients = db.query(RegisteredRecipient).filter_by(
-                user_id=user.user_id
-            ).all()
+            account = (
+                db.query(Account)
+                .filter_by(user_id=user.user_id, is_primary=True)
+                .first()
+            )
+            recipients = (
+                db.query(RegisteredRecipient).filter_by(user_id=user.user_id).all()
+            )
             print(f"\n  ▶ {user.name}  |  {user.phone}")
             print(f"    fromAccountId : {account.account_id}")
             print(f"    잔액          : {account.balance:,}원")
             print(f"    수취인:")
             for r in recipients:
-                print(f"      [{r.alias}] {r.recipient_id}  ({r.recipient_name} / {r.bank_name})")
+                print(
+                    f"      [{r.alias}] {r.recipient_id}  ({r.recipient_name} / {r.bank_name})"
+                )
 
         print()
         print("=" * 65)

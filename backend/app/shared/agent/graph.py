@@ -100,6 +100,7 @@ class IntentResult(BaseModel):
 
 # ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
 
+
 def _is_transfer_restart_utterance(text: str) -> bool:
     """홈 등에서 새 송금을 시작하는 발화인지."""
     return is_plain_transfer_start(text)
@@ -157,9 +158,7 @@ def _enrich_slots_from_resolved(
     if resolved.recipient_id and classify_recipient_input(recipient_input) == "account":
         db = next(get_db())
         try:
-            row = match_by_registered_account(
-                db, uuid.UUID(user_id), recipient_input
-            )
+            row = match_by_registered_account(db, uuid.UUID(user_id), recipient_input)
             if row and row.alias:
                 display = row.alias
         finally:
@@ -588,11 +587,15 @@ def build_graph(tools: list) -> CompiledStateGraph:
         if state.get("awaiting_confirmation") and result.extracted_slots:
             existing = dict(state.get("collected_slots", {}))
             existing.update(result.extracted_slots)
-            logger.info("[Graph →intent_node] 확인 단계 슬롯 수정: %s", result.extracted_slots)
+            logger.info(
+                "[Graph →intent_node] 확인 단계 슬롯 수정: %s", result.extracted_slots
+            )
             return {
                 "collected_slots": existing,
                 "awaiting_confirmation": False,
-                "recipient_validated": False if "recipient" in result.extracted_slots else state.get("recipient_validated", False),
+                "recipient_validated": False
+                if "recipient" in result.extracted_slots
+                else state.get("recipient_validated", False),
             }
 
         # ── 홈 이동 처리 ─────────────────────────────────────────────────────────
@@ -641,7 +644,9 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 "awaiting_memo_decision": False,
                 "awaiting_transfer_clarification": False,
                 "draft_recipient": None,
-                "last_tx_id": None if result.intent == "transfer" else state.get("last_tx_id"),
+                "last_tx_id": None
+                if result.intent == "transfer"
+                else state.get("last_tx_id"),
             }
             if result.intent == "transfer":
                 updates["messages"] = [
@@ -701,9 +706,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
             if slot_name in action_questions:
                 question = action_questions[slot_name]
             elif slot_name == "scheduled_day" and slots.get("cycle") == "weekly":
-                question = "매주 무슨 요일에 이체할까요? 월요일부터 일요일 중 말씀해 주세요."
+                question = (
+                    "매주 무슨 요일에 이체할까요? 월요일부터 일요일 중 말씀해 주세요."
+                )
             else:
-                question = SLOT_QUESTIONS.get(slot_name, f"{slot_name}을 말씀해 주세요.")
+                question = SLOT_QUESTIONS.get(
+                    slot_name, f"{slot_name}을 말씀해 주세요."
+                )
         else:
             question = "정보가 모두 수집되었습니다."
 
@@ -809,9 +818,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
         if not slots.get("recipient"):
             # 수취인 미등록 → resolve_node의 실패 메시지를 TTS로 전달하고 END
             # slot_fill_node로 넘기면 "누구에게 보낼까요?"가 실패 메시지를 덮어씀
-            logger.info(
-                "[Graph route] resolve_node → END (recipient not found)"
-            )
+            logger.info("[Graph route] resolve_node → END (recipient not found)")
             return END
 
         if not state.get("recipient_validated"):

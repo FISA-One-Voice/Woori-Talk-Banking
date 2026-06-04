@@ -412,9 +412,7 @@ async def _handle_asv_flow(
             f"본인 확인에 실패했습니다. {remaining}번 더 시도하실 수 있습니다. "
             "다시 한번 말씀해 주세요."
         )
-        navigate_to_next = (
-            SCREEN_MAP.get(pending_action) if pending_action else None
-        )
+        navigate_to_next = SCREEN_MAP.get(pending_action) if pending_action else None
         awaiting_asv_next = True
 
     fail_slots = (

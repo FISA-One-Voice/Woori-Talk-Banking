@@ -23,37 +23,46 @@ def convert_to_wav_with_ffmpeg(audio_bytes: bytes) -> bytes:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as temp_in:
         temp_in.write(audio_bytes)
         temp_in_path = temp_in.name
-    
+
     temp_out_path = temp_in_path + ".wav"
     try:
         cmd = [
-            "ffmpeg", "-y", "-i", temp_in_path,
-            "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
-            temp_out_path
+            "ffmpeg",
+            "-y",
+            "-i",
+            temp_in_path,
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            temp_out_path,
         ]
         subprocess.run(cmd, check=True, capture_output=True, timeout=30)
-        
+
         with open(temp_out_path, "rb") as f:
             wav_bytes = f.read()
         return wav_bytes
     except subprocess.CalledProcessError as e:
-        error_msg = e.stderr.decode('utf-8', errors='ignore')
+        error_msg = e.stderr.decode("utf-8", errors="ignore")
         raise VoiceServiceError(
             code="VOICE_AUDIO_INVALID_FORMAT",
             message=f"오디오 변환 실패(ffmpeg): {error_msg}",
-            status_code=500
+            status_code=500,
         )
     except Exception as e:
         raise VoiceServiceError(
             code="VOICE_AUDIO_INVALID_FORMAT",
             message=f"알 수 없는 오디오 변환 오류: {str(e)}",
-            status_code=500
+            status_code=500,
         )
     finally:
         if os.path.exists(temp_in_path):
             os.remove(temp_in_path)
         if os.path.exists(temp_out_path):
             os.remove(temp_out_path)
+
 
 def merge_and_convert_with_ffmpeg(audio_bytes_list: list[bytes]) -> bytes:
     """여러 개의 오디오 바이트 데이터를 하나로 병합한 뒤 16-bit PCM WAV로 변환합니다.
@@ -76,41 +85,55 @@ def merge_and_convert_with_ffmpeg(audio_bytes_list: list[bytes]) -> bytes:
             tf.write(b)
             tf.close()
             temp_files.append(tf.name)
-            
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode='w') as list_file:
+
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=".txt", mode="w"
+        ) as list_file:
             for tf_name in temp_files:
                 list_file.write(f"file '{tf_name}'\n")
             list_file_path = list_file.name
-        
+
         out_path = list_file_path + "_out.wav"
         cmd = [
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-            "-i", list_file_path,
-            "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
-            out_path
+            "ffmpeg",
+            "-y",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            list_file_path,
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            out_path,
         ]
         subprocess.run(cmd, check=True, capture_output=True, timeout=60)
-        
+
         with open(out_path, "rb") as f:
             wav_bytes = f.read()
         return wav_bytes
     except subprocess.CalledProcessError as e:
-        error_msg = e.stderr.decode('utf-8', errors='ignore')
+        error_msg = e.stderr.decode("utf-8", errors="ignore")
         raise VoiceServiceError(
             code="VOICE_AUDIO_INVALID_FORMAT",
             message=f"오디오 병합 실패(ffmpeg): {error_msg}",
-            status_code=500
+            status_code=500,
         )
     finally:
         for tf_name in temp_files:
-            if os.path.exists(tf_name): os.remove(tf_name)
-        if list_file_path and os.path.exists(list_file_path): os.remove(list_file_path)
-        if out_path and os.path.exists(out_path): os.remove(out_path)
+            if os.path.exists(tf_name):
+                os.remove(tf_name)
+        if list_file_path and os.path.exists(list_file_path):
+            os.remove(list_file_path)
+        if out_path and os.path.exists(out_path):
+            os.remove(out_path)
 
 
-async def extract_voice_vector(
-    files_bytes: list[bytes]
-) -> list[float]:
+async def extract_voice_vector(files_bytes: list[bytes]) -> list[float]:
     """여러 개의 오디오 파일을 병합하여 192차원 음성 임베딩 벡터를 추출합니다.
 
     Args:
@@ -198,4 +221,3 @@ def register_voice_vector(db: Session, user_id: str, vector: list[float]) -> dic
         "data": None,
         "message": "음성 벡터(192차원)가 사용자의 계정에 성공적으로 등록되었습니다.",
     }
-

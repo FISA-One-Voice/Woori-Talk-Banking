@@ -55,7 +55,9 @@ def run_execute_transfer(
         if resolved is None:
             return f"{recipient}님을 찾을 수 없습니다. 다시 확인해 주세요.", None
 
-        display_name = str(slots.get("recipient") or recipient or resolved.recipient_name)
+        display_name = str(
+            slots.get("recipient") or recipient or resolved.recipient_name
+        )
         receipt = transfer_service.execute_transfer(
             db=db,
             user_id=user_id,

@@ -92,7 +92,9 @@ def _calc_next_execution(
             year = today.year + (1 if today.month == 12 else 0)
             month = 1 if today.month == 12 else today.month + 1
             last_day = calendar.monthrange(year, month)[1]
-            candidate = today.replace(year=year, month=month, day=min(scheduled_day, last_day))
+            candidate = today.replace(
+                year=year, month=month, day=min(scheduled_day, last_day)
+            )
         return datetime(candidate.year, candidate.month, candidate.day)
 
     # weekly — Python weekday(): 0=월, 6=일
@@ -185,6 +187,7 @@ def _verify_pin(user: User, raw_password: str) -> None:
 
 
 # ── POST /api/auto-transfer ───────────────────────────────────────────────────
+
 
 def register_auto_transfer(
     db: Session,
@@ -283,6 +286,7 @@ def register_auto_transfer(
 
 # ── GET /api/auto-transfer ────────────────────────────────────────────────────
 
+
 def list_auto_transfers(
     db: Session,
     user_id: str,
@@ -307,27 +311,31 @@ def list_auto_transfers(
     result = []
     for order in orders:
         resolved = resolve_by_id(db, user_uuid, order.recipient_id)
-        result.append(AutoTransferListItem(
-            order_id=str(order.order_id),
-            to_name=resolved.recipient_name,
-            bank_name=resolved.bank_name,
-            account_masked=_mask_account(resolved.account_number),
-            amount=order.amount,
-            cycle=order.cycle,
-            scheduled_day=order.scheduled_day,
-            scheduled_dow=order.scheduled_dow,
-            next_execution_at=(
-                order.next_execution_at.strftime("%Y-%m-%d")
-                if order.next_execution_at else None
-            ),
-            status=order.status,
-            transfer_note=order.transfer_note,
-            created_at=order.created_at.isoformat(),
-        ))
+        result.append(
+            AutoTransferListItem(
+                order_id=str(order.order_id),
+                to_name=resolved.recipient_name,
+                bank_name=resolved.bank_name,
+                account_masked=_mask_account(resolved.account_number),
+                amount=order.amount,
+                cycle=order.cycle,
+                scheduled_day=order.scheduled_day,
+                scheduled_dow=order.scheduled_dow,
+                next_execution_at=(
+                    order.next_execution_at.strftime("%Y-%m-%d")
+                    if order.next_execution_at
+                    else None
+                ),
+                status=order.status,
+                transfer_note=order.transfer_note,
+                created_at=order.created_at.isoformat(),
+            )
+        )
     return result
 
 
 # ── PATCH /api/auto-transfer/{order_id}/status ───────────────────────────────
+
 
 def update_status(
     db: Session,
@@ -387,6 +395,7 @@ def update_status(
 
 # ── POST /api/auto-transfer/{order_id}/label ─────────────────────────────────
 
+
 def update_memo(
     db: Session,
     user_id: str,
@@ -426,10 +435,13 @@ def update_memo(
 
     order.transfer_note = data.transfer_note
     db.commit()
-    return AutoTransferMemoResult(order_id=str(order.order_id), transfer_note=order.transfer_note)
+    return AutoTransferMemoResult(
+        order_id=str(order.order_id), transfer_note=order.transfer_note
+    )
 
 
 # ── POST /api/auto-transfer/execute ──────────────────────────────────────────
+
 
 def _execute_single_order(db: Session, order: StandingOrder) -> None:
     """단일 자동이체 건을 실행합니다.

@@ -42,6 +42,7 @@ TEST_PIN = "123456"
 
 # ── 헬퍼 함수 ─────────────────────────────────────────────────────────────────
 
+
 def _make_event(
     db: Session,
     title: str,
@@ -110,6 +111,7 @@ def _cleanup(db: Session) -> None:
 
 
 # ── 픽스처 ────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(autouse=True)
 def cleanup(db: Session):

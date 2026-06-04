@@ -32,7 +32,18 @@ _AMOUNT_PATTERN = re.compile(
     r"[일이삼사오육칠팔구십백천만억]+원)"
 )
 
-_YES_KEYWORDS = ("네", "예", "응", "맞아", "그래", "좋아", "해줘", "할게", "송금", "이체")
+_YES_KEYWORDS = (
+    "네",
+    "예",
+    "응",
+    "맞아",
+    "그래",
+    "좋아",
+    "해줘",
+    "할게",
+    "송금",
+    "이체",
+)
 
 _NO_KEYWORDS = (
     "아니",
@@ -110,7 +121,9 @@ def clarification_offer_message(kind: str) -> str:
     return f"송금을 도와드릴까요?{CONFIRM_YES_NO_SUFFIX}"
 
 
-def _recipient_hint_from_state(draft_recipient: str, collected_slots: dict | None) -> str:
+def _recipient_hint_from_state(
+    draft_recipient: str, collected_slots: dict | None
+) -> str:
     """확인 대기 중 수취인 힌트 — draft_recipient 우선, 없으면 slots.recipient."""
     hint = (draft_recipient or "").strip()
     if hint:
@@ -205,7 +218,11 @@ def build_transfer_clarification_response(user_text: str, draft_recipient: str) 
             "collected_slots": {"recipient": hint},
             "recipient_validated": False,
             "navigate_to": "transfer",
-            "messages": [AIMessage(content="이체 화면으로 이동합니다. 이어서 안내해 드리겠습니다.")],
+            "messages": [
+                AIMessage(
+                    content="이체 화면으로 이동합니다. 이어서 안내해 드리겠습니다."
+                )
+            ],
         }
 
     return {

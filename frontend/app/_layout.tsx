@@ -1,25 +1,16 @@
 import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay';
+import { needsYesNoVoicePrompt, YES_NO_CONFIRM_INSTRUCTION } from '@/constants/voicePrompts';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
-import { useVoiceResponseStore } from '@/store/voiceResponseStore';
-import { useTransferStore as transferStore } from '@/store/transferStore';
 import { useAuthStore } from '@/store/authStore';
+import { useTransferStore as transferStore } from '@/store/transferStore';
+import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { playBase64Audio } from '@/utils/audioPlayer';
-import { apiClient, ApiResponse } from '@/utils/api';
-import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { getTtsMessage } from '@/utils/errorHandler';
-import {
-  needsYesNoVoicePrompt,
-  YES_NO_CONFIRM_INSTRUCTION,
-} from '@/constants/voicePrompts';
-import { registerSound, speakText, stopAllTts } from '@/utils/ttsManager';
-import {
-  agentPathFromNavigateTo,
-  shouldNavigateToRoute,
-} from '@/utils/voiceNavigation';
-import { Audio } from 'expo-av';
+import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
+import { speakText, stopAllTts } from '@/utils/ttsManager';
+import { agentPathFromNavigateTo, shouldNavigateToRoute } from '@/utils/voiceNavigation';
 import { Href, Stack, useRouter, useSegments } from 'expo-router';
-import * as Speech from 'expo-speech';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
 
@@ -81,8 +72,7 @@ function buildTxReceiptFromSlots(
   const merged = { ...prevSlots, ...(newSlots ?? {}) };
   const recipientName = (merged.recipient as string) ?? '';
   const amount = merged.amount ? Number(merged.amount) : 0;
-  const txId =
-    (merged.txId as string) ?? (merged.tx_id as string) ?? '';
+  const txId = (merged.txId as string) ?? (merged.tx_id as string) ?? '';
   if (!recipientName || !amount) return;
   transferStore.getState().setTxReceipt({
     txId,
@@ -166,7 +156,8 @@ export default function RootLayout() {
       }
 
       if (data.audio) {
-        Speech.stop();
+        // Speech.stop();
+        await stopAllTts();
         await playBase64Audio(data.audio).catch(() => undefined);
       }
 

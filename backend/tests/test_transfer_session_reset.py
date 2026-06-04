@@ -19,9 +19,7 @@ class TestTransferRestartDetection:
 
     def test_no_restart_during_confirm(self):
         state = {"awaiting_confirmation": True, "awaiting_asv_audio": False}
-        assert not _should_restart_transfer_flow(
-            "transfer", "transfer", "송금", state
-        )
+        assert not _should_restart_transfer_flow("transfer", "transfer", "송금", state)
 
     def test_plain_transfer_includes하고싶어(self):
         assert is_plain_transfer_start("송금하고 싶어")

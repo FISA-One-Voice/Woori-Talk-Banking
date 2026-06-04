@@ -385,26 +385,30 @@ def lookup_recipient_by_voice(
         return None
     return resolve_by_id(db, user_uuid, str(matches[0].recipient_id))
 
+
 def sync_device_contacts(
     db: Session,
     user_uuid: uuid.UUID,
     contacts: list[ContactItem],
 ) -> int:
     """디바이스 연락처를 받아 가입된 사용자인 경우 수취인으로 자동 등록합니다.
-    
+
     Args:
         db: 데이터베이스 세션.
         user_uuid: 요청 사용자 UUID.
         contacts: 연락처 목록 (name, phone).
-        
+
     Returns:
         새로 등록된 수취인 수.
     """
     added_count = 0
-    
+
     # 내 수취인 이름(alias) 목록 (중복 방지용)
     existing_aliases = {
-        r.alias for r in db.query(RegisteredRecipient).filter(RegisteredRecipient.user_id == user_uuid).all()
+        r.alias
+        for r in db.query(RegisteredRecipient)
+        .filter(RegisteredRecipient.user_id == user_uuid)
+        .all()
     }
 
     # 1. 모든 연락처의 전화번호 정규화 및 매핑 준비
@@ -412,16 +416,16 @@ def sync_device_contacts(
     for c in contacts:
         if not c.phone or not c.name:
             continue
-            
+
         try:
             phone_digits = re.sub(r"\D", "", c.phone)
             if phone_digits.startswith("82"):
                 phone_digits = "0" + phone_digits[2:]
-            
+
             # 빈 번호 필터링
             if not phone_digits:
                 continue
-                
+
             contact_map[phone_digits] = c.name
         except Exception:
             # 정규표현식 파싱 중 오류 발생 시 해당 연락처 건너뜀
@@ -435,9 +439,9 @@ def sync_device_contacts(
     target_users = db.query(User).filter(User.phone.in_(phone_list)).all()
     if not target_users:
         return 0
-        
+
     user_ids = [u.user_id for u in target_users]
-    
+
     # 3. 해당 가입자들의 주계좌 한번에 검색 (IN 절)
     primary_accounts = (
         db.query(Account)
@@ -451,7 +455,7 @@ def sync_device_contacts(
         primary_account = account_by_user.get(user.user_id)
         if not primary_account:
             continue
-            
+
         contact_name = contact_map.get(user.phone)
         if not contact_name or contact_name in existing_aliases:
             continue
@@ -466,7 +470,7 @@ def sync_device_contacts(
         db.add(recipient)
         existing_aliases.add(contact_name)
         added_count += 1
-        
+
     db.commit()
     return added_count
 

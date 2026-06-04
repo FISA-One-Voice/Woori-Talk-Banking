@@ -51,6 +51,7 @@ def _build_receipt(tx: Transaction) -> dict:
 
 # ── API 1: 이체 실행 ────────────────────────────────────────────────────────
 
+
 def execute_transfer(
     db: Session,
     user_id: str,
@@ -162,6 +163,7 @@ def execute_transfer(
 
 # ── API 2: 메모 업데이트 ────────────────────────────────────────────────────
 
+
 def update_memo(db: Session, user_id: str, tx_id: str, memo: str) -> dict:
     """본인 소유 트랜잭션의 메모를 업데이트합니다."""
     user_uuid = uuid.UUID(user_id)
@@ -182,6 +184,7 @@ def update_memo(db: Session, user_id: str, tx_id: str, memo: str) -> dict:
 
 
 # ── API 3: 최근 수취인 조회 ─────────────────────────────────────────────────
+
 
 def get_recent_recipients(db: Session, user_id: str, limit: int = 5) -> list[dict]:
     """최근 이체 완료 트랜잭션에서 recipient_id 기준 중복 제거 후 최신 수취인을 반환합니다.
@@ -214,9 +217,7 @@ def get_recent_recipients(db: Session, user_id: str, limit: int = 5) -> list[dic
 
     # Subquery를 IN()에 직접 전달하면 SQLAlchemy가 경고와 함께 잘못된 SQL을 생성할 수 있으므로
     # tx_id를 Python 리스트로 먼저 조회한 뒤 IN()에 전달한다.
-    top_tx_id_rows = (
-        db.query(rn_subq.c.tx_id).filter(rn_subq.c.rn == 1).all()
-    )
+    top_tx_id_rows = db.query(rn_subq.c.tx_id).filter(rn_subq.c.rn == 1).all()
     tx_ids = [r[0] for r in top_tx_id_rows]
     if not tx_ids:
         return []

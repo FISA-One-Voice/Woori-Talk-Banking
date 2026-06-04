@@ -26,6 +26,7 @@ from app.features.event.schema import EventListResponse, EventResponse
 
 # ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
 
+
 def _validate_event_id(event_id: str) -> None:
     """event_id 가 유효한 UUID 형식인지 검증합니다.
 
@@ -46,6 +47,7 @@ def _validate_event_id(event_id: str) -> None:
 
 
 # ── 서비스 함수 ───────────────────────────────────────────────────────────────
+
 
 def get_active_events(db: Session) -> EventListResponse:
     """활성화된 이벤트 목록을 반환합니다.
@@ -73,7 +75,9 @@ def get_active_events(db: Session) -> EventListResponse:
     )
 
 
-def get_event_detail(db: Session, event_id: str, user_id: str | None = None) -> EventResponse:
+def get_event_detail(
+    db: Session, event_id: str, user_id: str | None = None
+) -> EventResponse:
     """특정 이벤트의 상세 정보를 반환합니다.
 
     Args:

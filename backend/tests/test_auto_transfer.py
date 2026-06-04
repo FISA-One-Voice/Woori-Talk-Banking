@@ -83,25 +83,23 @@ def _cleanup(user_id: uuid.UUID) -> None:
     db = SessionLocal()
     try:
         # Transaction이 StandingOrder를 FK로 참조하므로 먼저 삭제
-        db.query(Transaction).filter(
-            Transaction.user_id == user_id
-        ).delete(synchronize_session=False)
+        db.query(Transaction).filter(Transaction.user_id == user_id).delete(
+            synchronize_session=False
+        )
 
-        db.query(StandingOrder).filter(
-            StandingOrder.user_id == user_id
-        ).delete(synchronize_session=False)
+        db.query(StandingOrder).filter(StandingOrder.user_id == user_id).delete(
+            synchronize_session=False
+        )
 
         db.query(RegisteredRecipient).filter(
             RegisteredRecipient.user_id == user_id
         ).delete(synchronize_session=False)
 
-        db.query(Account).filter(
-            Account.user_id == user_id
-        ).delete(synchronize_session=False)
+        db.query(Account).filter(Account.user_id == user_id).delete(
+            synchronize_session=False
+        )
 
-        db.query(User).filter(
-            User.user_id == user_id
-        ).delete(synchronize_session=False)
+        db.query(User).filter(User.user_id == user_id).delete(synchronize_session=False)
 
         db.commit()
     except Exception:
@@ -182,8 +180,6 @@ def registered_recipient(db: Session, user_with_account):
     # user_with_account _cleanup()에서 일괄 삭제
 
 
-
-
 @pytest.fixture(scope="module")
 def token(client: TestClient, user_with_account):
     """[픽스처] 등록자 JWT 토큰"""
@@ -209,9 +205,11 @@ class TestRegisteredMode:
         assert res.json()["success"] is True
 
         data = res.json()["data"]
-        order = db.query(StandingOrder).filter(
-            StandingOrder.order_id == data["orderId"]
-        ).first()
+        order = (
+            db.query(StandingOrder)
+            .filter(StandingOrder.order_id == data["orderId"])
+            .first()
+        )
         assert order is not None
         assert order.status == "active"
         assert order.cycle == "monthly"
@@ -249,10 +247,18 @@ class TestRegisteredMode:
         data = res.json()["data"]
 
         for field in (
-            "orderId", "toName", "bankName", "accountMasked",
-            "amount", "cycle", "nextExecutionAt", "status",
+            "orderId",
+            "toName",
+            "bankName",
+            "accountMasked",
+            "amount",
+            "cycle",
+            "nextExecutionAt",
+            "status",
         ):
-            assert field in data, f"{field} 필드 누락 — AutoTransferResult by_alias=True 기준"
+            assert field in data, (
+                f"{field} 필드 누락 — AutoTransferResult by_alias=True 기준"
+            )
 
         assert "*" in data["accountMasked"], (
             f"계좌번호 마스킹 미적용: '{data['accountMasked']}'"
@@ -426,9 +432,9 @@ class TestStatusUpdate:
         assert res.json()["data"]["status"] == "paused"
 
         # paused 상태에서는 next_execution_at이 null이어야 합니다.
-        order = db.query(StandingOrder).filter(
-            StandingOrder.order_id == order_id
-        ).first()
+        order = (
+            db.query(StandingOrder).filter(StandingOrder.order_id == order_id).first()
+        )
         db.refresh(order)
         assert order.next_execution_at is None
 
@@ -497,9 +503,9 @@ class TestMemo:
         assert res.status_code == 200
         assert res.json()["data"]["transferNote"] == "월세"
 
-        order = db.query(StandingOrder).filter(
-            StandingOrder.order_id == order_id
-        ).first()
+        order = (
+            db.query(StandingOrder).filter(StandingOrder.order_id == order_id).first()
+        )
         db.refresh(order)
         assert order.transfer_note == "월세"
 
@@ -533,9 +539,10 @@ class TestExecute:
 
         # next_execution_at을 오늘 자정 이전으로 설정해 실행 대상으로 만듦
         from datetime import datetime
-        order = db.query(StandingOrder).filter(
-            StandingOrder.order_id == order_id
-        ).first()
+
+        order = (
+            db.query(StandingOrder).filter(StandingOrder.order_id == order_id).first()
+        )
         order.next_execution_at = datetime(2000, 1, 1)
         db.commit()
         return order_id
@@ -545,9 +552,12 @@ class TestExecute:
     ):
         """실행일이 된 자동이체 성공 — Transaction(completed) 생성 + 잔액 차감 확인."""
         user, account = user_with_account
-        before_balance = db.query(Account).filter(
-            Account.account_id == account.account_id
-        ).first().balance
+        before_balance = (
+            db.query(Account)
+            .filter(Account.account_id == account.account_id)
+            .first()
+            .balance
+        )
 
         order_id = self._register_and_set_past(
             client, token, account.account_id, registered_recipient.recipient_id, db
@@ -560,10 +570,15 @@ class TestExecute:
 
         # Transaction 생성 확인
         from app.models.transaction import Transaction
-        tx = db.query(Transaction).filter(
-            Transaction.auto_order_id == order_id,
-            Transaction.tx_type == "auto_transfer",
-        ).first()
+
+        tx = (
+            db.query(Transaction)
+            .filter(
+                Transaction.auto_order_id == order_id,
+                Transaction.tx_type == "auto_transfer",
+            )
+            .first()
+        )
         db.refresh(tx)
         assert tx is not None
         assert tx.status == "completed"
@@ -573,9 +588,9 @@ class TestExecute:
         assert account.balance == before_balance - 50_000
 
         # next_execution_at 갱신 확인
-        order = db.query(StandingOrder).filter(
-            StandingOrder.order_id == order_id
-        ).first()
+        order = (
+            db.query(StandingOrder).filter(StandingOrder.order_id == order_id).first()
+        )
         db.refresh(order)
         assert order.next_execution_at > datetime(2000, 1, 1)
 
@@ -604,18 +619,22 @@ class TestExecute:
         # failed 카운터는 예외 발생 건수 — 잔액 부족은 예외 없이 Transaction(failed) 생성
         assert res.json()["data"]["total"] >= 1
 
-        tx = db.query(Transaction).filter(
-            Transaction.auto_order_id == order_id,
-            Transaction.tx_type == "auto_transfer",
-        ).first()
+        tx = (
+            db.query(Transaction)
+            .filter(
+                Transaction.auto_order_id == order_id,
+                Transaction.tx_type == "auto_transfer",
+            )
+            .first()
+        )
         db.refresh(tx)
         assert tx is not None
         assert tx.status == "failed"
 
         # standing_order는 active 유지
-        order = db.query(StandingOrder).filter(
-            StandingOrder.order_id == order_id
-        ).first()
+        order = (
+            db.query(StandingOrder).filter(StandingOrder.order_id == order_id).first()
+        )
         db.refresh(order)
         assert order.status == "active"
 

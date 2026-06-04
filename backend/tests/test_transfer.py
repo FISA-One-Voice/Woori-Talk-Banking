@@ -108,21 +108,19 @@ def _cleanup(user_id: uuid.UUID) -> None:
     """
     db = SessionLocal()
     try:
-        db.query(Transaction).filter(
-            Transaction.user_id == user_id
-        ).delete(synchronize_session=False)
+        db.query(Transaction).filter(Transaction.user_id == user_id).delete(
+            synchronize_session=False
+        )
 
         db.query(RegisteredRecipient).filter(
             RegisteredRecipient.user_id == user_id
         ).delete(synchronize_session=False)
 
-        db.query(Account).filter(
-            Account.user_id == user_id
-        ).delete(synchronize_session=False)
+        db.query(Account).filter(Account.user_id == user_id).delete(
+            synchronize_session=False
+        )
 
-        db.query(User).filter(
-            User.user_id == user_id
-        ).delete(synchronize_session=False)
+        db.query(User).filter(User.user_id == user_id).delete(synchronize_session=False)
 
         db.commit()
     except Exception:

@@ -30,6 +30,7 @@ _TEST_PIN_HASH = bcrypt.hashpw(_TEST_PIN.encode(), bcrypt.gensalt()).decode()
 
 # ── 헬퍼 ──────────────────────────────────────────────────────────────────────
 
+
 def _random_phone() -> str:
     return f"010-{uuid.uuid4().hex[:4]}-{uuid.uuid4().hex[:4]}"
 
@@ -70,6 +71,7 @@ def _cleanup(user_id: uuid.UUID) -> None:
 
 
 # ── 픽스처 ─────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def api_user(db: Session):
@@ -129,10 +131,13 @@ def other_token(client: TestClient, other_user: User) -> str:
 
 # ── GET /api/recipients ────────────────────────────────────────────────────────
 
+
 class TestListRecipients:
     """GET /api/recipients 테스트"""
 
-    def test_success_returns_list(self, client: TestClient, api_token: str, api_user: User):
+    def test_success_returns_list(
+        self, client: TestClient, api_token: str, api_user: User
+    ):
         """등록 수취인 목록을 정상 반환합니다."""
         res = client.get("/api/recipients", headers=_auth(api_token))
 
@@ -210,12 +215,15 @@ class TestListRecipients:
 
 # ── GET /api/contacts/match ────────────────────────────────────────────────────
 
+
 class TestMatchContacts:
     """GET /api/contacts/match 테스트"""
 
     def test_match_by_alias_exact(self, client: TestClient, api_token: str):
         """별칭 정확히 일치하는 수취인을 반환합니다."""
-        res = client.get("/api/contacts/match", params={"name": "엄마"}, headers=_auth(api_token))
+        res = client.get(
+            "/api/contacts/match", params={"name": "엄마"}, headers=_auth(api_token)
+        )
 
         assert res.status_code == 200
         body = res.json()
@@ -226,7 +234,9 @@ class TestMatchContacts:
 
     def test_match_by_recipient_name(self, client: TestClient, api_token: str):
         """수취인 실명으로 검색됩니다."""
-        res = client.get("/api/contacts/match", params={"name": "홍길동"}, headers=_auth(api_token))
+        res = client.get(
+            "/api/contacts/match", params={"name": "홍길동"}, headers=_auth(api_token)
+        )
 
         matched = res.json()["data"]["matched"]
         assert len(matched) >= 1
@@ -234,7 +244,9 @@ class TestMatchContacts:
 
     def test_match_partial_alias(self, client: TestClient, api_token: str):
         """별칭 일부만 입력해도 부분 일치로 검색됩니다."""
-        res = client.get("/api/contacts/match", params={"name": "홍"}, headers=_auth(api_token))
+        res = client.get(
+            "/api/contacts/match", params={"name": "홍"}, headers=_auth(api_token)
+        )
 
         # "동생홍" alias + "홍어머니", "홍아버지", "홍길동" recipient_name 포함
         matched = res.json()["data"]["matched"]

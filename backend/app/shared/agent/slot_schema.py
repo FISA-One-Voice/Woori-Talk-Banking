@@ -34,7 +34,9 @@ SCREEN_MAP: dict[str, str] = {
 # ── 수취인 검증이 필요한 액션 ────────────────────────────────────────────────────
 # recipient 슬롯이 채워지는 즉시 resolve_node를 통해 수취인 존재 여부를 확인한다.
 RECIPIENT_REQUIRED_ACTIONS: set[str] = {
-    "transfer", "auto_transfer", "cancel_auto_transfer"
+    "transfer",
+    "auto_transfer",
+    "cancel_auto_transfer",
 }
 
 # ── ASV 음성 인증이 필요한 액션 ─────────────────────────────────────────────────
@@ -55,9 +57,7 @@ MEMO_OFFER_SUFFIX: str = (
 # slot_fill_node에서 첫 번째 누락 슬롯의 질문을 TTS로 반환한다.
 SLOT_QUESTIONS: dict[str, str] = {
     "recipient": "누구에게 보낼까요? 별명이나 이름을 말씀해 주세요.",
-    "bank_name": (
-        "어느 은행 계좌인가요? 우리은행, 국민은행처럼 말씀해 주세요."
-    ),
+    "bank_name": ("어느 은행 계좌인가요? 우리은행, 국민은행처럼 말씀해 주세요."),
     "amount": "얼마를 보낼까요?",
     "cycle": "매월 또는 매주 중 어떤 주기로 보낼까요?",
     "scheduled_day": "매월 며칠에 이체할까요?",

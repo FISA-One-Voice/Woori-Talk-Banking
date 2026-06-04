@@ -99,6 +99,7 @@ def match_contacts(
         "message": f"{len(matched)}명의 수취인을 찾았습니다.",
     }
 
+
 @router.post("/contacts/sync", response_model=dict)
 def sync_contacts(
     request: SyncContactsRequest,
