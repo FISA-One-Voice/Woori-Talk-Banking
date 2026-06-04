@@ -50,12 +50,14 @@ def convert_to_wav_with_ffmpeg(audio_bytes: bytes) -> bytes:
             code="VOICE_AUDIO_INVALID_FORMAT",
             message=f"오디오 변환 실패(ffmpeg): {error_msg}",
             status_code=500,
+            user_message="음성 파일 처리 중 오류가 발생했습니다.",
         )
     except Exception as e:
         raise VoiceServiceError(
             code="VOICE_AUDIO_INVALID_FORMAT",
             message=f"알 수 없는 오디오 변환 오류: {str(e)}",
             status_code=500,
+            user_message="음성 파일 처리 중 오류가 발생했습니다.",
         )
     finally:
         if os.path.exists(temp_in_path):
@@ -122,6 +124,7 @@ def merge_and_convert_with_ffmpeg(audio_bytes_list: list[bytes]) -> bytes:
             code="VOICE_AUDIO_INVALID_FORMAT",
             message=f"오디오 병합 실패(ffmpeg): {error_msg}",
             status_code=500,
+            user_message="음성 파일 처리 중 오류가 발생했습니다.",
         )
     finally:
         for tf_name in temp_files:
@@ -166,6 +169,7 @@ async def extract_voice_vector(files_bytes: list[bytes]) -> list[float]:
                     code="VOICE_VECTOR_EXTRACT_FAILED",
                     message="ASV 서버에서 유효한 192차원 벡터를 반환하지 않았습니다.",
                     status_code=500,
+                    user_message="화자 인증 중 오류가 발생했습니다.",
                 )
             return embedding
     except httpx.HTTPStatusError as e:
@@ -173,6 +177,7 @@ async def extract_voice_vector(files_bytes: list[bytes]) -> list[float]:
             code="VOICE_VECTOR_EXTRACT_FAILED",
             message=f"ASV 서버 오류 (상태 코드: {e.response.status_code})",
             status_code=502,
+            user_message="화자 인증 중 오류가 발생했습니다.",
         )
     except VoiceServiceError:
         raise
@@ -181,6 +186,7 @@ async def extract_voice_vector(files_bytes: list[bytes]) -> list[float]:
             code="SERVICE_UNAVAILABLE",
             message=f"ASV 서버와 통신할 수 없습니다: {str(e)}",
             status_code=503,
+            user_message="화자 인증 서버에 연결할 수 없습니다.",
         )
 
 

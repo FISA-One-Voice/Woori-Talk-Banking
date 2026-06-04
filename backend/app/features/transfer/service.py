@@ -27,6 +27,7 @@ def _get_primary_account(db: Session, user_uuid: uuid.UUID) -> Account:
             code="TRANSFER_ACCOUNT_NOT_FOUND",
             message="출금 계좌를 찾을 수 없습니다.",
             status_code=404,
+            user_message="출금 계좌를 찾을 수 없습니다.",
         )
     return account
 
@@ -79,6 +80,7 @@ def execute_transfer(
                 code="INVALID_ACCOUNT_FORMAT",
                 message="계좌번호는 10~14자리 숫자여야 합니다.",
                 status_code=400,
+                user_message="계좌번호 형식이 올바르지 않습니다.",
             )
         recipient = cleaned
 
@@ -97,6 +99,7 @@ def execute_transfer(
             code="IDEMPOTENCY_KEY_USED",
             message="이 idempotency_key는 실패한 이체에 사용되었습니다. 새 key를 발급하세요.",
             status_code=409,
+            user_message="이미 처리된 이체 요청입니다.",
         )
 
     # 수취인 정보 해석
@@ -136,6 +139,7 @@ def execute_transfer(
             code="TRANSFER_PENDING",
             message="동일한 이체 요청이 처리 중입니다.",
             status_code=409,
+            user_message="동일한 이체 요청이 처리 중입니다.",
         )
 
     # SELECT FOR UPDATE — 출금 계좌 비관적 락 (잔액 이중 차감 방지)
@@ -153,6 +157,7 @@ def execute_transfer(
             code="INSUFFICIENT_BALANCE",
             message="잔액이 부족합니다.",
             status_code=400,
+            user_message="잔액이 부족합니다.",
         )
 
     locked_account.balance -= amount
@@ -177,6 +182,7 @@ def update_memo(db: Session, user_id: str, tx_id: str, memo: str) -> dict:
             code="TRANSACTION_NOT_FOUND",
             message="트랜잭션을 찾을 수 없습니다.",
             status_code=404,
+            user_message="해당 거래를 찾을 수 없습니다.",
         )
     tx.memo = memo
     db.commit()

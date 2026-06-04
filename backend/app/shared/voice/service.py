@@ -361,6 +361,7 @@ async def _handle_asv_flow(
             code="ASV_SERVER_ERROR",
             message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
             status_code=502,
+            user_message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
         )
 
     auth_success = asv_ok and spoof_ok
