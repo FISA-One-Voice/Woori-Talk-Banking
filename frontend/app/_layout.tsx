@@ -156,9 +156,8 @@ export default function RootLayout() {
       }
 
       if (data.audio) {
-        // Speech.stop();
         await stopAllTts();
-        await playBase64Audio(data.audio).catch(() => undefined);
+        playBase64Audio(data.audio).catch(() => undefined);
       }
 
       if (needsYesNoVoicePrompt(data) && !data.audio) {
