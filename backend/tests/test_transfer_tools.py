@@ -14,6 +14,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.core.exception import AppError
+from app.shared.agent.slot_schema import FAILED_SCREEN_MAP
 from app.shared.agent.tools.transfer import (
     add_note,
     execute_transfer,
@@ -114,6 +116,37 @@ class TestExecuteTransferTool:
 
         assert tx_id == _TX_ID
         mock_svc.execute_transfer.assert_called_once()
+
+    def test_run_execute_transfer_app_error_returns_no_tx_id(self, mock_db: MagicMock):
+        mock_resolved = MagicMock()
+        mock_resolved.account_number = "98765432101234"
+        mock_resolved.bank_name = "국민은행"
+        mock_resolved.recipient_name = "홍길순"
+        mock_resolved.recipient_id = uuid.uuid4()
+
+        with (
+            _patch_get_db(mock_db),
+            patch(
+                "app.shared.agent.tools.transfer.lookup_recipient_for_transfer",
+                return_value=mock_resolved,
+            ),
+            patch("app.shared.agent.tools.transfer.transfer_service") as mock_svc,
+        ):
+            mock_svc.execute_transfer.side_effect = AppError(
+                code="INSUFFICIENT_BALANCE",
+                message="잔액이 부족합니다.",
+                status_code=400,
+                user_message="잔액이 부족합니다.",
+            )
+            message, tx_id = run_execute_transfer(_USER_ID, "엄마", 10_000)
+
+        assert tx_id is None
+        assert "잔액" in message
+
+
+class TestTransferFailedScreenMap:
+    def test_failed_screen_map_transfer(self) -> None:
+        assert FAILED_SCREEN_MAP["transfer"] == "transfer/failed"
 
 
 class TestAddNoteTool:

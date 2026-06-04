@@ -2,9 +2,11 @@ import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'rea
 import { router } from 'expo-router';
 import { TopBar } from '@/components/layout';
 import { DEV_LINKS } from '@/constants/devLinks';
+import { TRANSFER_FAILED_HOME_SUFFIX } from '@/constants/voicePrompts';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 
 import { useAuthStore } from '@/store/authStore';
+import { useTransferStore } from '@/store/transferStore';
 import { syncDeviceContactsToBackend } from '@/utils/contactSync';
 
 export default function DevHubScreen() {
@@ -42,7 +44,20 @@ export default function DevHubScreen() {
           </Pressable>
 
           {DEV_LINKS.map((item) => (
-            <Pressable key={item.path} style={styles.link} onPress={() => router.push(item.path)}>
+            <Pressable
+              key={item.path}
+              style={styles.link}
+              onPress={() => {
+                if (item.path === '/transfer/failed') {
+                  useTransferStore.getState().setTxReceipt(null);
+                  useTransferStore.getState().setTransferFailure({
+                    code: 'INSUFFICIENT_BALANCE',
+                    message: `잔액이 부족합니다.${TRANSFER_FAILED_HOME_SUFFIX}`,
+                  });
+                }
+                router.push(item.path);
+              }}
+            >
               <Text style={styles.linkText}>{item.label}</Text>
             </Pressable>
           ))}

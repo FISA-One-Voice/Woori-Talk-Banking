@@ -4,9 +4,12 @@ import { router } from 'expo-router';
 import { TopBar, StepIndicator } from '@/components/layout';
 import { COLORS, LAYOUT } from '@/constants/theme';
 import { useTransferStore } from '@/store/transferStore';
+import { TRANSFER_FAILED_HOME_SUFFIX } from '@/constants/voicePrompts';
 import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { fetchRecentRecipients, executeTransfer } from '@/services/transferService';
+import axios from 'axios';
+import { getTtsMessage } from '@/utils/errorHandler';
 import type { RecipientItem } from '@/components/display';
 import {
   resolveTransferStep,
@@ -40,8 +43,15 @@ function recipientFromSlots(slots: Record<string, unknown>): RecipientItem | nul
 
 export default function TransferScreen() {
   const lastResponse = useVoiceResponseStore((s) => s.lastResponse);
-  const { setSelectedRecipient, setAmount, setTxReceipt, reset, selectedRecipient, amount } =
-    useTransferStore();
+  const {
+    setSelectedRecipient,
+    setAmount,
+    setTxReceipt,
+    setTransferFailure,
+    reset,
+    selectedRecipient,
+    amount,
+  } = useTransferStore();
 
   const slots = lastResponse?.collected_slots ?? {};
   const awaitingAsv = lastResponse?.awaiting_asv_audio ?? false;
@@ -106,10 +116,29 @@ export default function TransferScreen() {
     setLoading(true);
     try {
       const receipt = await executeTransfer(displayRecipient, displayAmount);
+      setTransferFailure(null);
       setTxReceipt(receipt);
       router.replace('/transfer/complete');
-    } catch {
-      router.replace('/transfer/complete');
+    } catch (err) {
+      setTxReceipt(null);
+      let code: string | undefined;
+      let message = getTtsMessage();
+      if (axios.isAxiosError(err) && err.response?.data) {
+        const body = err.response.data as { code?: string; message?: string };
+        code = body.code;
+        message = body.message ?? getTtsMessage(code);
+        if (__DEV__) {
+          console.error('[transfer] executeTransfer failed', code, message);
+        }
+      } else if (__DEV__) {
+        console.error('[transfer] executeTransfer failed', err);
+      }
+      useVoiceResponseStore.getState().clearLastResponse();
+      setTransferFailure({
+        code,
+        message: `${message}${TRANSFER_FAILED_HOME_SUFFIX}`,
+      });
+      router.replace('/transfer/failed');
     } finally {
       setLoading(false);
     }

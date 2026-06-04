@@ -31,10 +31,10 @@ export default function TransferCompleteScreen() {
   }, []);
 
   useEffect(() => {
-    if (!txId && !recipient) {
+    if (!txId) {
       goHome();
     }
-  }, [txId, recipient, goHome]);
+  }, [txId, goHome]);
 
   useEffect(() => {
     if (lastResponse?.navigate_to === 'home') {

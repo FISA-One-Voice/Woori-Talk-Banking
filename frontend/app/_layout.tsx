@@ -73,7 +73,7 @@ function buildTxReceiptFromSlots(
   const recipientName = (merged.recipient as string) ?? '';
   const amount = merged.amount ? Number(merged.amount) : 0;
   const txId = (merged.txId as string) ?? (merged.tx_id as string) ?? '';
-  if (!recipientName || !amount) return;
+  if (!txId || !recipientName || !amount) return;
   transferStore.getState().setTxReceipt({
     txId,
     toName: recipientName,
@@ -146,10 +146,30 @@ export default function RootLayout() {
           | undefined) ?? {};
 
       const isCompleteNav = data.navigate_to === 'transfer/complete';
+      const isFailedNav = data.navigate_to === 'transfer/failed';
       const isAutoCompleteNav = data.navigate_to === 'auto-transfer/complete';
 
-      if (isCompleteNav) {
+      if (isFailedNav) {
+        const mergedSlots = { ...prevSlots, ...(data.collected_slots ?? {}) };
+        const errorMessage =
+          (mergedSlots.transfer_error_message as string) ?? '';
+        transferStore.getState().setTxReceipt(null);
+        transferStore.getState().setTransferFailure({
+          message: errorMessage || getTtsMessage(),
+        });
+        navigateFromAgent(router, 'transfer/failed', currentPathRef);
+        useVoiceResponseStore.getState().setLastResponse({
+          ...data,
+          collected_slots: mergedSlots,
+        });
+        if (data.audio) {
+          await stopAllTts();
+          await playBase64Audio(data.audio).catch(() => undefined);
+        }
+        navigateFromAgent(router, 'home', currentPathRef);
+      } else if (isCompleteNav) {
         buildTxReceiptFromSlots(prevSlots, data.collected_slots);
+        transferStore.getState().setTransferFailure(null);
         navigateFromAgent(router, 'transfer/complete', currentPathRef);
         useVoiceResponseStore.getState().setLastResponse({
           ...data,
@@ -173,7 +193,7 @@ export default function RootLayout() {
         setVoiceState('idle');
       }
 
-      if (data.audio) {
+      if (data.audio && !isFailedNav) {
         await stopAllTts();
         playBase64Audio(data.audio).catch(() => undefined);
       }
@@ -182,7 +202,7 @@ export default function RootLayout() {
         speakText(YES_NO_CONFIRM_INSTRUCTION);
       }
 
-      if (data.navigate_to && !isCompleteNav && !isAutoCompleteNav) {
+      if (data.navigate_to && !isCompleteNav && !isAutoCompleteNav && !isFailedNav) {
         navigateFromAgent(router, data.navigate_to, currentPathRef);
       }
     },
