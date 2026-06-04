@@ -34,6 +34,7 @@ def login(db: Session, req: JwtLoginRequest) -> JwtTokenResponse:
             code="USER_NOT_FOUND",
             message="가입되지 않은 전화번호입니다.",
             status_code=404,
+            user_message="가입되지 않은 전화번호입니다.",
         )
 
     if not verify_pin(req.pin, user.pin_hash):
@@ -41,6 +42,7 @@ def login(db: Session, req: JwtLoginRequest) -> JwtTokenResponse:
             code="UNAUTHORIZED",
             message="비밀번호가 일치하지 않습니다.",
             status_code=401,
+            user_message="비밀번호가 일치하지 않습니다.",
         )
 
     token_data = {"sub": str(user.user_id)}
@@ -81,6 +83,7 @@ def refresh_tokens(refresh_token_str: str) -> JwtTokenResponse:
             code="TOKEN_INVALID",
             message="토큰 위변조 또는 유효하지 않은 리프레시 토큰입니다.",
             status_code=401,
+            user_message="로그인 정보가 만료되었습니다. 다시 로그인해 주세요.",
         )
 
     user_id = payload["sub"]

@@ -164,6 +164,7 @@ def _verify_account(db: Session, user_uuid: uuid.UUID, from_account_id: str) -> 
             code="AUTO_ORDER_ACCOUNT_NOT_FOUND",
             message="출금 계좌를 찾을 수 없습니다.",
             status_code=404,
+            user_message="출금 계좌를 찾을 수 없습니다.",
         )
     return account
 
@@ -183,6 +184,7 @@ def _verify_pin(user: User, raw_password: str) -> None:
             code="AUTO_ORDER_WITHDRAWAL_PASSWORD_INVALID",
             message="PIN이 올바르지 않습니다.",
             status_code=403,
+            user_message="PIN이 올바르지 않습니다.",
         )
 
 
@@ -236,6 +238,7 @@ def register_auto_transfer(
             code="AUTO_ORDER_TERMS_NOT_AGREED",
             message="자동이체 약관에 동의해 주세요.",
             status_code=400,
+            user_message="자동이체 약관에 동의해 주세요.",
         )
 
     # ── 5관문: 실행일 계산 + StandingOrder 저장 ─────────────────────────────
@@ -267,6 +270,7 @@ def register_auto_transfer(
             code="INTERNAL_ERROR",
             message="자동이체 등록 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
             status_code=500,
+            user_message="자동이체 등록 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         ) from e
 
     return AutoTransferResult(
@@ -371,6 +375,7 @@ def update_status(
             code="AUTO_ORDER_NOT_FOUND",
             message="자동이체 건을 찾을 수 없습니다.",
             status_code=404,
+            user_message="자동이체 건을 찾을 수 없습니다.",
         )
 
     if data.status not in _ALLOWED_TRANSITIONS.get(order.status, set()):
@@ -378,6 +383,7 @@ def update_status(
             code="AUTO_ORDER_STATUS_INVALID",
             message=f"'{order.status}' 상태에서 '{data.status}'로 변경할 수 없습니다.",
             status_code=400,
+            user_message="자동이체 상태를 변경할 수 없습니다.",
         )
 
     order.status = data.status
@@ -431,6 +437,7 @@ def update_memo(
             code="AUTO_ORDER_NOT_FOUND",
             message="자동이체 건을 찾을 수 없습니다.",
             status_code=404,
+            user_message="자동이체 건을 찾을 수 없습니다.",
         )
 
     order.transfer_note = data.transfer_note

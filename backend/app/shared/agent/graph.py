@@ -291,6 +291,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             code="AGENT_CONFIG_ERROR",
             message="AI 에이전트 설정 오류가 발생했습니다.",
             status_code=500,
+            user_message="AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         ) from e
 
     # ── tool registry: 액션 이름 → tool 함수 매핑 ───────────────────────────────
@@ -1063,6 +1064,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             code="AGENT_INIT_FAILED",
             message="AI 에이전트를 초기화하지 못했습니다.",
             status_code=500,
+            user_message="AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         ) from e
 
     return graph

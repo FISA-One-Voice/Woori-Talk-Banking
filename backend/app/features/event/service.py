@@ -43,6 +43,7 @@ def _validate_event_id(event_id: str) -> None:
             code="INVALID_EVENT_ID",
             message="유효하지 않은 이벤트 ID 형식입니다.",
             status_code=404,
+            user_message="유효하지 않은 이벤트 ID입니다.",
         )
 
 
@@ -108,6 +109,7 @@ def get_event_detail(
             code="EVENT_NOT_FOUND",
             message="이벤트를 찾을 수 없습니다.",
             status_code=404,
+            user_message="이벤트를 찾을 수 없습니다.",
         )
 
     # 로그인 사용자의 참여 여부 확인
@@ -158,6 +160,7 @@ def participate_event(db: Session, event_id: str, user_id: str) -> dict:
             code="EVENT_NOT_FOUND",
             message="이벤트를 찾을 수 없습니다.",
             status_code=404,
+            user_message="이벤트를 찾을 수 없습니다.",
         )
 
     # 중복 참여 확인
@@ -174,6 +177,7 @@ def participate_event(db: Session, event_id: str, user_id: str) -> dict:
             code="ALREADY_PARTICIPATED",
             message="이미 참여한 이벤트입니다.",
             status_code=409,
+            user_message="이미 참여한 이벤트입니다.",
         )
 
     # 참여 기록 생성

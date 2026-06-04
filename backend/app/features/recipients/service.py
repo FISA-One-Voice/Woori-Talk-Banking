@@ -137,6 +137,7 @@ def resolve_by_id(
             code="RECIPIENT_NOT_FOUND",
             message="등록된 수취인을 찾을 수 없습니다.",
             status_code=404,
+            user_message="등록된 수취인을 찾을 수 없습니다.",
         )
 
     return ResolvedRecipient(
@@ -177,6 +178,7 @@ def resolve_by_phone(
                 "수취 계좌번호와 은행명을 직접 입력해 주세요."
             ),
             status_code=404,
+            user_message="가입되지 않은 전화번호입니다. 수취 계좌번호와 은행명을 직접 입력해 주세요.",
         )
 
     primary_account = (
@@ -195,6 +197,7 @@ def resolve_by_phone(
                 "계좌번호와 은행명을 직접 입력해 주세요."
             ),
             status_code=404,
+            user_message="수취인의 계좌를 찾을 수 없습니다. 계좌번호와 은행명을 직접 입력해 주세요.",
         )
 
     return ResolvedRecipient(
