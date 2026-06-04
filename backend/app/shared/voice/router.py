@@ -76,7 +76,7 @@ async def voice_pipeline(
     except TTSError:
         raise  # global handler로 폴백 — TTS 자체 불가, 프론트 expo-speech 처리
     except AppError as exc:
-        audio_mp3 = await synthesize_speech(exc.message)
+        audio_mp3 = await synthesize_speech(exc.user_message or exc.message)
         error_data = VoiceResponseData(
             audio=base64.b64encode(audio_mp3).decode(),
             navigate_to=None,

@@ -129,6 +129,7 @@ def get_current_user_id(
             code="TOKEN_INVALID",
             message="토큰 위변조 또는 유효하지 않습니다.",
             status_code=401,
+            user_message="로그인 정보가 만료되었습니다. 다시 로그인해 주세요.",
         )
 
     return payload["sub"]

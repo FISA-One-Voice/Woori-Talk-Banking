@@ -4,7 +4,7 @@
 // 앱 전체 expo-speech TTS를 한 곳에서 관리합니다.
 //
 // [속도 설정]
-//   TTS_RATE — Speech.speak의 rate. 1.0 = 기본 속도. 여기서만 바꾸면 된다.
+//   getTtsRate() — 로그인한 사용자의 tts_speed(DB)를 반환. 미로그인 시 1.7.
 //
 // [함수]
 //   speakText(msg, opts?) — 모든 expo-speech 호출은 이 함수를 경유한다.
@@ -14,11 +14,14 @@
 
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
+import { useAuthStore } from '@/store/authStore';
 
 // ── TTS 속도 ──────────────────────────────────────────────────────────────────
 
-/** 앱 전체 TTS 재생 속도. 1.0 = 기본. expo-speech 및 Azure TTS 재생 모두 여기서만 수정한다. */
-export const TTS_RATE = 1.7;
+/** 현재 로그인한 사용자의 TTS 재생 속도를 반환합니다. 미로그인 시 1.7. */
+export function getTtsRate(): number {
+  return useAuthStore.getState().ttsSpeed ?? 1.7;
+}
 
 // ── expo-speech 래퍼 ──────────────────────────────────────────────────────────
 
@@ -32,7 +35,7 @@ export function speakText(
 ): void {
   Speech.speak(message, {
     language: 'ko-KR',
-    rate: TTS_RATE,
+    rate: getTtsRate(),
     ...opts,
   });
 }
