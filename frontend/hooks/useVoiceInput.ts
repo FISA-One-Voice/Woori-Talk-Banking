@@ -23,9 +23,11 @@ export function useVoiceInput(
   setVoiceState: (state: VoiceState) => void,
 ): UseVoiceInputResult {
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const isPressingRef = useRef<boolean>(false);
   const [isRecording, setIsRecording] = useState(false);
 
   const handleLongPress = useCallback(async () => {
+    isPressingRef.current = true;
     try {
       const { granted } = await Audio.requestPermissionsAsync();
       if (!granted) {
@@ -40,7 +42,19 @@ export function useVoiceInput(
 
       const recording = new Audio.Recording();
       await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+
+      // 🔥 녹음 준비(약 0.5초)가 끝났는데 사용자가 이미 손을 뗐다면 시작하지 않고 즉시 취소!
+      if (!isPressingRef.current) {
+        return;
+      }
+
       await recording.startAsync();
+
+      // 🔥 startAsync 직후에도 확인해서 혹시 그 찰나에 손을 뗐다면 즉시 종료
+      if (!isPressingRef.current) {
+        await recording.stopAndUnloadAsync();
+        return;
+      }
 
       recordingRef.current = recording;
       setIsRecording(true);
@@ -51,7 +65,11 @@ export function useVoiceInput(
   }, [onError, setVoiceState]);
 
   const handlePressOut = useCallback(async () => {
+    isPressingRef.current = false; // 손을 떼었음을 기록
+
     const recording = recordingRef.current;
+    
+    // 🔥 아직 녹음 객체가 생성되기도 전에 손을 뗀 경우 무시
     if (!recording) return;
 
     try {
