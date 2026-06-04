@@ -8,9 +8,10 @@ Design Ref:
 # key: pending_action 값
 # value: 슬롯명 → 기본값(None) 딕셔너리 또는 슬롯명 리스트
 SLOT_SCHEMA: dict[str, dict | list] = {
-    "transfer": ["recipient", "amount"],
-    "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
+    "transfer": ["recipient", "amount", "memo"],      # memo 선택 수집
+    "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day", "memo"],  # memo 선택 수집
     "add_note": ["memo"],
+    "transfer_history": [],  # 슬롯 없음
     # Issue #48: 자산 조회 — 가능한 모든 슬롯 정의
     "asset": {
         "action": None,      # "balance" / "history" / "category"
@@ -23,9 +24,10 @@ SLOT_SCHEMA: dict[str, dict | list] = {
 # ── 액션별 필수 슬롯 ───────────────────────────────────────────────────────────────
 # _missing_slots()가 이 목록을 기준으로 "아직 못 채운 슬롯"을 판단한다.
 REQUIRED_SLOTS: dict[str, list[str]] = {
-    "transfer": ["recipient", "amount"],
+    "transfer": ["recipient", "amount"],              # memo는 선택 → 필수 아님
     "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
     "add_note": ["memo"],
+    "transfer_history": [],
     "asset": ["action"],  # action만 필수, period/date_range/category는 optional
 }
 
@@ -35,10 +37,11 @@ SCREEN_MAP: dict[str, str] = {
     "transfer": "transfer",
     "auto_transfer": "auto-transfer",
     "balance": "asset",
-    "history": "asset/history",
+    "history": "asset/history?type=history",   # 거래내역 목록 화면
     "event": "event",
     "asset": "asset",
     "home": "home",
+    "transfer_history": "asset/history?type=history",
 }
 
 # ── 수취인 검증이 필요한 액션 ────────────────────────────────────────────────────
@@ -78,12 +81,12 @@ ACTION_LABELS: dict[str, str] = {
 }
 
 # ── 확인 메시지 없이 즉시 실행하는 액션 ────────────────────────────────────────────
-NO_CONFIRM_ACTIONS: set[str] = {"asset", "balance", "history", "event"}
+NO_CONFIRM_ACTIONS: set[str] = {"asset", "balance", "history", "event", "transfer_history"}
 
 # ── 화면 전환 전용 인텐트 ─────────────────────────────────────────────────────────
 # 화면이 자체적으로 데이터를 가져오고 TTS를 처리하므로
 # intent_node에서 navigate_to만 설정하고 execute_node 없이 바로 END.
-SCREEN_ONLY_INTENTS: set[str] = {"event"}
+SCREEN_ONLY_INTENTS: set[str] = {"event", "history"}  # history는 화면이 자체 TTS 처리
 
 # ── 유효한 인텐트 목록 ─────────────────────────────────────────────────────────────
 VALID_INTENTS: set[str] = set(SCREEN_MAP.keys())

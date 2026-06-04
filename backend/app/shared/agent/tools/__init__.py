@@ -34,8 +34,9 @@ MOCK_TOOLS: list = [
 ]
 
 # ── 실제 tool 목록 ─────────────────────────────────────────────────────────────
+from app.shared.agent.tools.asset import query_asset
 from app.shared.agent.tools.event import get_event_list
-from app.shared.agent.tools.transfer import execute_transfer
+from app.shared.agent.tools.transfer import add_note, execute_transfer, get_transfer_history
 from app.shared.agent.tools.balance import get_account_balance_by_id, get_total_balance
 from app.shared.agent.tools.history import (
     get_category_history,
@@ -46,13 +47,15 @@ from app.shared.agent.tools.history import (
 _REAL_TOOLS: list = [
     get_event_list,
     execute_transfer,
+    add_note,
+    get_transfer_history,
     get_total_balance,
     get_account_balance_by_id,
     get_recent_history,
     get_category_history,
     get_monthly_expense,
+    query_asset,
     # lookup_recipient,   # 공통 — tools/lookup_recipient.py 완성 후 주석 해제
-    # query_asset,        # asset 담당자 — tools/asset.py 완성 후 주석 해제
     # register_auto_transfer,  # auto_transfer 담당자 완성 후 주석 해제
 ]
 

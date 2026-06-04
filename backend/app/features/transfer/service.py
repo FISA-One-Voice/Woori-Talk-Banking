@@ -60,6 +60,7 @@ def execute_transfer(
     idempotency_key: str,
     recipient_name: str | None,
     recipient_id: str | None,
+    memo: str | None = None,
 ) -> dict:
     """이체를 실행하고 영수증을 반환합니다.
 
@@ -125,6 +126,7 @@ def execute_transfer(
         tx_type="transfer",
         status="pending",
         idempotency_key=idempotency_key,
+        memo=memo,
     )
     db.add(tx)
     try:

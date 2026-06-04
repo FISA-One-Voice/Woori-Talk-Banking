@@ -9,8 +9,13 @@ import uuid
 
 import httpx
 from langchain_core.messages import HumanMessage
-from pydub import AudioSegment
 from sqlalchemy.orm import Session
+
+try:
+    from pydub import AudioSegment as _AudioSegment
+    _PYDUB_AVAILABLE = True
+except ImportError:
+    _PYDUB_AVAILABLE = False
 
 from app.core.config import settings
 from app.core.exception import ASVError
@@ -83,7 +88,12 @@ async def _handle_normal_flow(
         config=config,
     )
 
-    response_text = result["messages"][-1].content
+    last_msg = result["messages"][-1]
+    # HumanMessage가 마지막이면 에이전트 응답 없이 끝난 것 — 유저 발화를 TTS로 읽지 않음
+    if last_msg.type == "human":
+        response_text = "죄송합니다, 다시 한 번 말씀해 주세요."
+    else:
+        response_text = last_msg.content
     audio_mp3 = await synthesize_speech(response_text)
     audio_b64 = base64.b64encode(audio_mp3).decode()
 
@@ -99,7 +109,10 @@ async def _handle_normal_flow(
 
 def _to_wav_bytes(audio_bytes: bytes) -> bytes:
     """m4a/AAC 등 임의 포맷 오디오 바이트를 WAV(PCM)로 변환한다."""
-    audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
+    if not _PYDUB_AVAILABLE:
+        # pydub 미설치(Python 3.13+ 호환성 이슈) 시 원본 그대로 반환
+        return audio_bytes
+    audio = _AudioSegment.from_file(io.BytesIO(audio_bytes))
     buf = io.BytesIO()
     audio.export(buf, format="wav")
     return buf.getvalue()

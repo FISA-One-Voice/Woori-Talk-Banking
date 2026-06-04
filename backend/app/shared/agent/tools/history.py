@@ -36,7 +36,7 @@ def get_recent_history(user_id: str, days: int = 7) -> str:  # noqa: D401
         transactions = get_transaction_history(db, user_id, days=days)
         total = sum(t.amount for t in transactions)
         return (
-            f"최근 {days}일간 거래 내역은 총 {len(transactions)}건, {total:,}원입니다."
+            f"최근 {days}일간 거래 내역 알려드리겠습니다. 총 {len(transactions)}건, {total:,}원입니다."
         )
     finally:
         db.close()
@@ -66,7 +66,7 @@ def get_category_history(user_id: str, category: str, days: int = 30) -> str:  #
         )
         total = sum(t.amount for t in transactions)
         return (
-            f"{days}일간 {category} 지출은 총 {len(transactions)}건, {total:,}원입니다."
+            f"{days}일간 {category} 내역 알려드리겠습니다. 총 {len(transactions)}건, {total:,}원입니다."
         )
     finally:
         db.close()
@@ -94,6 +94,6 @@ def get_monthly_expense(user_id: str, days: int = 30) -> str:  # noqa: D401
         total = summary["total"]
         top = summary["top_categories"]
         cat_text = ", ".join(f"{c['category']} {c['amount']:,}원" for c in top)
-        return f"{days}일간 총 지출은 {total:,}원입니다. {cat_text} 등 지출하였습니다."
+        return f"{days}일간 지출 내역 알려드리겠습니다. 총 지출은 {total:,}원이며, {cat_text} 등 지출하셨습니다."
     finally:
         db.close()

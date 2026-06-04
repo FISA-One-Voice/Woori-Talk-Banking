@@ -15,8 +15,8 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
   // TypeScript 타입 서명은 Blob을 요구하므로 unknown을 경유해 캐스팅합니다.
   formData.append('audio', {
     uri: audioUri,
-    type: 'audio/m4a',
-    name: 'recording.m4a',
+    type: 'audio/wav',
+    name: 'recording.wav',
   } as unknown as Blob);
 
   const { data } = await apiClient.post<ApiResponse<VoiceResponseData>>(

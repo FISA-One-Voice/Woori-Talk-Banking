@@ -109,16 +109,7 @@ def get_transaction_history(
     if category:
         query = query.filter(Transaction.category == category)
 
-    transactions = query.order_by(Transaction.created_at.desc()).all()
-
-    if not transactions:
-        raise HistoryError(
-            code="TX_NOT_FOUND",
-            message="거래 내역을 찾을 수 없습니다.",
-            status_code=404,
-        )
-
-    return transactions
+    return query.order_by(Transaction.created_at.desc()).all()
 
 
 def get_expense_summary(

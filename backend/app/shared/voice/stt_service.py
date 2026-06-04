@@ -9,7 +9,6 @@ from app.core.exception import STTError
 
 logger = logging.getLogger(__name__)
 
-# CLOVA STT가 지원하는 오디오 MIME 타입, 절대 안바뀌는 값 이므로 frozenset으로 정의
 SUPPORTED_CONTENT_TYPES = frozenset(
     {
         "audio/wav",
@@ -35,46 +34,63 @@ async def transcribe_audio(
     audio_bytes: bytes,
     content_type: str = "audio/wav",
 ) -> str:
-    """Clova Speech API로 음성을 텍스트로 변환합니다."""
+    """Azure Speech API로 음성을 텍스트로 변환합니다."""
     _validate_audio(audio_bytes, content_type)
+
+    endpoint = (
+        f"https://{settings.AZURE_SPEECH_REGION}.stt.speech.microsoft.com"
+        "/speech/recognition/conversation/cognitiveservices/v1"
+    )
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                settings.CLOVA_URL,
+                endpoint,
                 content=audio_bytes,
                 headers={
-                    "X-CLOVASPEECH-API-KEY": settings.CLOVA_SECRET_KEY,
-                    "Content-Type": "application/octet-stream",
+                    "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
+                    "Content-Type": "audio/wav",
                 },
-                params={"lang": "Kor"},
+                params={"language": "ko-KR"},
             )
     except httpx.TimeoutException as exc:
         raise STTError(
             code="STT_FAILED",
-            message="Clova Speech API 요청 시간이 초과됐습니다.",
+            message="Azure Speech API 요청 시간이 초과됐습니다.",
         ) from exc
     except httpx.RequestError as exc:
         raise STTError(
             code="SERVICE_UNAVAILABLE",
-            message="Clova Speech API에 연결할 수 없습니다.",
+            message="Azure Speech API에 연결할 수 없습니다.",
         ) from exc
 
     if response.status_code != 200:
-        print(f"[STT ERROR] status={response.status_code} body={response.text[:200]} "
-              f"content_type={content_type} size={len(audio_bytes)} "
-              f"header_hex={audio_bytes[:12].hex()}", flush=True)
+        logger.error(
+            "[STT ERROR] Azure Speech 실패 status=%s body=%s content_type=%s size=%s header_hex=%s",
+            response.status_code,
+            response.text[:300],
+            content_type,
+            len(audio_bytes),
+            audio_bytes[:16].hex(),
+        )
         raise STTError(
             code="STT_FAILED",
-            message=f"Clova Speech API 오류: status={response.status_code}, body={response.text}",
+            message=f"Azure Speech API 오류: status={response.status_code}",
         )
 
     payload = response.json()
-    text: str | None = payload.get("text")
+    recognition_status = payload.get("RecognitionStatus")
+    if recognition_status != "Success":
+        raise STTError(
+            code="STT_FAILED",
+            message=f"음성 인식 실패: {recognition_status}",
+        )
+
+    text: str = payload.get("DisplayText", "")
     if not text:
         raise STTError(
             code="STT_FAILED",
-            message="Clova Speech 응답에 텍스트가 없습니다.",
+            message="Azure Speech 응답에 텍스트가 없습니다.",
         )
 
     return text

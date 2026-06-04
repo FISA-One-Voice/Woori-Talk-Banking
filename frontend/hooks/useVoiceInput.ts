@@ -1,8 +1,36 @@
 import type { VoiceState } from '@/components/VoiceStatusOverlay';
 import { sendVoice } from '@/services/voiceService';
 import type { VoiceResponseData } from '@/types/voice';
+import { stopAllTts } from '@/utils/ttsManager';
 import { Audio } from 'expo-av';
 import { useCallback, useRef, useState } from 'react';
+
+// Azure Speech는 WAV(PCM)만 지원 — 'lpcm' 문자열로 enum 없이 WAV 녹음
+const RECORDING_OPTIONS: Audio.RecordingOptions = {
+  android: {
+    extension: '.wav',
+    outputFormat: 6,  // RAW_AMR → pydub 변환 없이 Azure에 직접 전송 가능한 가장 근접한 포맷
+    audioEncoder: 0,  // DEFAULT
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 256000,
+  },
+  ios: {
+    extension: '.wav',
+    outputFormat: 'lpcm' as any,  // IOSOutputFormat.LINEARPCM 의 실제 string 값
+    audioQuality: 96,
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 256000,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+  web: {
+    mimeType: 'audio/wav',
+    bitsPerSecond: 256000,
+  },
+};
 
 export type UseVoiceInputResult = {
   isRecording: boolean;
@@ -27,6 +55,7 @@ export function useVoiceInput(
 
   const handleLongPress = useCallback(async () => {
     try {
+      await stopAllTts(); // 녹음 시작 전 화면 TTS 즉시 중단
       const { granted } = await Audio.requestPermissionsAsync();
       if (!granted) {
         onError('MICROPHONE_PERMISSION_DENIED');
@@ -39,7 +68,7 @@ export function useVoiceInput(
       });
 
       const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.prepareToRecordAsync(RECORDING_OPTIONS);
       await recording.startAsync();
 
       recordingRef.current = recording;

@@ -109,6 +109,9 @@ def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
             parts.append(str(amount))
 
     summary = " ".join(parts)
+    memo = collected_slots.get("memo")
+    if memo:
+        return f"{summary} {action_label}할까요? 메모 '{memo}'도 함께 저장합니다."
     return f"{summary} {action_label}할까요?"
 
 
@@ -241,12 +244,20 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "- intent: 금융 작업 유형이 파악되면 반드시 설정. 슬롯 채우기 진행 중이면 null.",
             "  예) '이체해줘' → intent='transfer'",
             "  예) '잔액 얼마야' → intent='asset', extracted_slots={'action': 'balance'}",
+            "  예) '어떤 거에 제일 많이 지출했어', '뭐에 돈 많이 썼어', '카테고리별 지출 순위' → intent='asset', extracted_slots={'action': 'top_category'}",
             "  예) '이번달 식비 얼마야' → intent='asset', extracted_slots={'action': 'category', 'period': '이번달', 'category': '식비'}",
-            "  예) '최근 거래 내역' → intent='asset', extracted_slots={'action': 'history', 'period': '최근7일'}",
+            "  예) '이번달 지출 수입 얼마야', '지난달 소비 얼마야' → intent='asset', extracted_slots={'action': 'history', 'period': '이번달'}",
+            "  예) '거래내역 보여줘', '최근 거래 목록', '내역 보여줘' → intent='history' (화면 이동만, 음성 응답 없음)",
             "  예) '홈 화면', '처음으로', '홈으로 가줘' → intent='home'",
             "- extracted_slots: 발화에서 파악한 슬롯 값.",
-            "  asset 인텐트 슬롯: action('balance'|'history'|'category'), period('이번달'|'지난달'|'최근7일'), category(카테고리명)",
-            "  transfer 슬롯: recipient(수신자명), amount(원화 정수 문자열)",
+            "  asset 인텐트 슬롯: action('balance'|'history'|'category'|'top_category'), period('이번달'|'지난달'|'최근7일'만 허용), category(카테고리명)",
+            "  action 선택 기준: balance=잔액조회, history=수입지출요약, category=특정카테고리조회, top_category=어떤카테고리에 많이 썼는지",
+            "  '다음달' 등 미래 기간 요청 시 intent를 설정하지 말고 direct_response로 '다음달 데이터는 아직 없습니다. 이번달, 지난달, 최근 7일 중 말씀해 주세요.'라고 안내하시오.",
+            "  transfer 슬롯: recipient(수신자명), amount(원화 정수 문자열), memo(메모 문자열, 선택)",
+            "  auto_transfer 슬롯: recipient, amount, cycle('monthly'|'weekly'), scheduled_day(숫자), memo(선택)",
+            "  transfer_history 인텐트: '이체 내역', '누구한테 보냈어', '자동이체 목록' 등 이체 조회 발화",
+            "  예) '엄마에게 오만 원 이체하고 생일축하라고 메모해줘' → intent='transfer', extracted_slots={'recipient':'엄마','amount':'50000','memo':'생일축하'}",
+            "  예) '최근 이체 내역 알려줘' → intent='transfer_history'",
             "- user_confirmed: '네', '맞아요', '그렇게 해줘' 등 확인 발화 시 true",
             "- user_cancelled: '취소', '아니오', '됐어' 등 취소 발화 시 true",
             "- direct_response: 비금융 챗봇 답변에만 사용. intent 설정 시 반드시 빈 문자열.",
@@ -314,9 +325,31 @@ def build_graph(tools: list) -> CompiledStateGraph:
         if result.intent and result.intent in VALID_INTENTS and not pending:
             new_slots = dict(result.extracted_slots)
             updates["pending_action"] = result.intent
-            updates["navigate_to"] = SCREEN_MAP.get(result.intent)
+            # asset 인텐트: 액션별 화면 이동 분기
+            if result.intent == "asset":
+                action = new_slots.get("action")
+                if action in ("history", "category"):
+                    period_val = new_slots.get("period", "")
+                    nav = f"asset/history?period={period_val}" if period_val else "asset/history"
+                    updates["navigate_to"] = nav
+                else:
+                    # balance 등 조회만 하는 경우 화면 이동 없음 (현재 화면 유지)
+                    updates["navigate_to"] = None
+            else:
+                updates["navigate_to"] = SCREEN_MAP.get(result.intent)
             updates["collected_slots"] = new_slots
             updates["recipient_validated"] = False
+
+            # SCREEN_ONLY 인텐트는 execute_node 없이 END → 마지막 메시지가 HumanMessage가 되어
+            # TTS가 유저 발화를 그대로 따라하는 문제 방지
+            if result.intent in SCREEN_ONLY_INTENTS:
+                _nav_msgs: dict[str, str] = {
+                    "history": "최근 거래 내역 보여드리겠습니다.",
+                    "event": "진행 중인 이벤트 보여드리겠습니다.",
+                }
+                updates["messages"] = [
+                    AIMessage(content=_nav_msgs.get(result.intent, "화면으로 이동합니다."))
+                ]
 
         elif result.extracted_slots and pending:
             existing = dict(state.get("collected_slots", {}))
@@ -503,11 +536,14 @@ def build_graph(tools: list) -> CompiledStateGraph:
             logger.info("[Graph route] intent_node → slot_fill_node (missing=%s)", missing)
             return "slot_fill_node"
 
-        # asset 인텐트: history/category는 period 슬롯 추가 요구
+        # asset 인텐트: 선택 슬롯 추가 요구
         if pending == "asset":
             action = slots.get("action")
             if action in ("history", "category") and not slots.get("period"):
                 logger.info("[Graph route] intent_node → slot_fill_node (asset period missing)")
+                return "slot_fill_node"
+            if action == "category" and not slots.get("category"):
+                logger.info("[Graph route] intent_node → slot_fill_node (asset category missing)")
                 return "slot_fill_node"
 
         # 화면 전환 전용 인텐트 (event 등) → 화면이 자체 데이터·TTS 처리
