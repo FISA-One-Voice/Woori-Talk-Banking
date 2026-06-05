@@ -30,6 +30,7 @@ ALL_TOOLS: list = [
     get_monthly_expense,
 ]
 
+# ── Dev-B (TransferAgent tools) ───────────────────────────────────────────────
 from app.core.config import settings
 from app.shared.agent.tools.auto_transfer import add_auto_transfer_note
 from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
@@ -44,6 +45,15 @@ from app.shared.agent.tools.mock_tools import (
     mock_register_auto_transfer,
 )
 from app.shared.agent.tools.transfer import add_note, execute_transfer
+
+# ── Dev-C (AssetAgent tools) ──────────────────────────────────────────────────
+# Dev-C: 이 구역에만 추가
+# from app.shared.agent.tools.spending_analysis import get_monthly_spending_report
+
+# ── Dev-D (RAGAgent tools) ────────────────────────────────────────────────────
+# Dev-D: 이 구역에만 추가
+# from app.shared.agent.tools.financial_qa import search_financial_docs
+# from app.shared.agent.tools.market_info import get_exchange_rate, get_base_rate
 
 # ── Mock tool 목록 ─────────────────────────────────────────────────────────────
 # 실제 tool 완성 전까지 사용하는 mock 구현체.
@@ -88,4 +98,4 @@ _REAL_TOOLS: list = [
 # USE_MOCK_TOOLS=false → 실제 tool 사용 (Phase 2 완료 후)
 ALL_TOOLS: list = MOCK_TOOLS if settings.USE_MOCK_TOOLS else _REAL_TOOLS
 
-__all__ = ["ALL_TOOLS", "MOCK_TOOLS"]
+__all__ = ["ALL_TOOLS"]
