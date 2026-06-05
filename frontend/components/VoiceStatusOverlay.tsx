@@ -11,7 +11,6 @@ export type VoiceState =
   | 'awaiting_memo';
 
 const OVERLAY_MESSAGES: Partial<Record<VoiceState, string>> = {
-  processing: '처리 중...',
   awaiting_confirm: YES_NO_CONFIRM_INSTRUCTION,
   awaiting_asv: '음성 인증을 위해 말씀해 주세요',
   awaiting_memo: '메모 카테고리를 말씀하거나 건너뛰기라고 하세요',
@@ -22,7 +21,7 @@ interface Props {
 }
 
 export default function VoiceStatusOverlay({ state }: Props) {
-  if (state === 'idle') return null;
+  if (state === 'idle' || state === 'processing') return null;
 
   return (
     <View pointerEvents="none" style={styles.container}>

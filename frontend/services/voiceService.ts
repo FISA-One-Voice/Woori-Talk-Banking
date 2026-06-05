@@ -6,7 +6,8 @@ import { ApiResponse, apiClient } from '@/utils/api';
  *
  * @param audioUri - expo-av가 반환한 로컬 녹음 파일 URI (file://...)
  * @returns VoiceResponseData — 오디오(base64), navigate_to, 슬롯, 상태 플래그
- * @throws Error — message에 백엔드 에러 코드가 담김. errorHandler.getTtsMessage()로 변환 가능.
+ * @throws axios 에러 — HTTP 실패 시 caller가 extractApiErrorMessage()로 message 추출
+ * AppError는 success:false + data.audio 로 반환되어 throw하지 않음
  */
 export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
   const formData = new FormData();

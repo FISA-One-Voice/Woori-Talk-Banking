@@ -49,8 +49,10 @@ from app.shared.agent.slot_schema import (
     ACTIONS_WITH_YES_NO_CONFIRM,
     ASV_REQUIRED_ACTIONS,
     COMPLETE_SCREEN_MAP,
+    FAILED_SCREEN_MAP,
     CONFIRM_YES_NO_SUFFIX,
     MEMO_OFFER_SUFFIX,
+    TRANSFER_FAILED_HOME_SUFFIX,
     RECIPIENT_REQUIRED_ACTIONS,
     SCREEN_MAP,
     SCREEN_ONLY_INTENTS,
@@ -968,6 +970,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             note_consumed = False
             awaiting_memo_next = False
             response_text = ""
+            post_execute_navigate: str | None = None
 
             try:
                 if pending == "transfer" and tool_obj.name == "execute_transfer":
@@ -981,8 +984,15 @@ def build_graph(tools: list) -> CompiledStateGraph:
                         new_last_tx_id = tx_id
                         awaiting_memo_next = True
                         response_text = response_text + MEMO_OFFER_SUFFIX
-                        # 영수증은 프론트 prevSlots로 처리; 세션 슬롯은 비움
-                        completed_slots = {}
+                        # 영수증: 프론트 prevSlots(recipient/amount) + tx_id
+                        completed_slots = {"tx_id": tx_id}
+                        post_execute_navigate = COMPLETE_SCREEN_MAP["transfer"]
+                    else:
+                        completed_slots = {
+                            **slots,
+                            "transfer_error_message": response_text,
+                        }
+                        post_execute_navigate = FAILED_SCREEN_MAP["transfer"]
                 elif pending == "transfer":
                     response_text = tool_obj.invoke(invoke_args)
                 elif pending == "auto_transfer":
@@ -1045,6 +1055,17 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 new_last_tx_id = state.get("last_tx_id")
                 new_last_order_id = state.get("last_order_id")
                 completed_slots = {}
+                if pending == "transfer":
+                    completed_slots = {
+                        **slots,
+                        "transfer_error_message": response_text,
+                    }
+                    post_execute_navigate = FAILED_SCREEN_MAP["transfer"]
+
+        if post_execute_navigate == FAILED_SCREEN_MAP.get("transfer"):
+            response_text = response_text.rstrip() + TRANSFER_FAILED_HOME_SUFFIX
+            if "transfer_error_message" in completed_slots:
+                completed_slots["transfer_error_message"] = response_text
 
         updates: dict = {
             "pending_action": None,
@@ -1065,8 +1086,10 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 *clear_conversation_messages(),
                 AIMessage(content=response_text),
             ]
-        # transfer/auto_transfer 등 완료 화면이 있는 액션만 navigate_to 덮어씀.
-        if pending in COMPLETE_SCREEN_MAP:
+        # transfer/auto_transfer 등 실행 후 화면 이동
+        if post_execute_navigate is not None:
+            updates["navigate_to"] = post_execute_navigate
+        elif pending in COMPLETE_SCREEN_MAP:
             updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
         return updates
 

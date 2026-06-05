@@ -320,6 +320,11 @@ class TestResolveNavigateTo:
             "transfer/complete"
         )
 
+    def test_explicit_failed(self) -> None:
+        assert _resolve_navigate_to({"navigate_to": "transfer/failed"}) == (
+            "transfer/failed"
+        )
+
 
 # ── Layer A: ASV 흐름 테스트 ─────────────────────────────────────────────────────
 
