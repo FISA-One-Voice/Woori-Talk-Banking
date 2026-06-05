@@ -48,7 +48,6 @@ class Settings(BaseSettings):
     CLOVA_SECRET_KEY: str = ""
     CLOVA_URL: str = "https://clovaspeech-gw.ncloud.com/recog/v1/stt?lang=Kor"
 
-    # Azure Cognitive Services Speech-to-Text (STT)
     AZURE_SPEECH_KEY: str = ""
     AZURE_SPEECH_REGION: str = "koreacentral"
 

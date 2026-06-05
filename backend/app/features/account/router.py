@@ -21,10 +21,6 @@ from app.features.account.schema import (
     AccountSummaryResponse,
 )
 
-# JWT 구현 전 임시 고정 user_id
-# TODO: JWT 토큰 검증으로 교체 예정
-TEMP_USER_ID = "ff49c2a0-9b82-4c4f-9f61-d39930b16dd6"
-
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
 
