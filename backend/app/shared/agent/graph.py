@@ -183,7 +183,15 @@ def _enrich_slots_from_resolved(
 
 
 def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
-    """수집된 슬롯을 기반으로 TTS 친화적 확인 메시지를 생성한다."""
+    """수집된 슬롯을 기반으로 TTS 친화적 확인 메시지를 생성한다.
+
+    Args:
+        pending_action: 진행 중인 액션.
+        collected_slots: 수집된 슬롯 dict.
+
+    Returns:
+        예: "엄마에게 오만 원 이체할까요?"
+    """
     action_label = ACTION_LABELS.get(pending_action, pending_action)
     parts: list[str] = []
 
@@ -271,7 +279,9 @@ def build_graph(tools: list) -> CompiledStateGraph:
             api_key=settings.OPENAI_CHAT_API_KEY,
             temperature=0,  # 뱅킹 도메인: 일관성 > 창의성
         )
-        # extracted_slots는 자유형 dict이므로 strict JSON schema 모드 비활성화
+        # extracted_slots는 자유형 dict이므로 OpenAI strict JSON schema 모드
+        # (기본값)가 additionalProperties:false를 요구해 거부한다.
+        # function_calling 방식은 이 제약이 없으므로 해당 method를 사용한다.
         llm_structured = llm.with_structured_output(
             IntentResult, method="function_calling"
         )
@@ -283,11 +293,18 @@ def build_graph(tools: list) -> CompiledStateGraph:
             user_message="AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
         ) from e
 
-    # ── tool registry ───────────────────────────────────────────────────────────
+    # ── tool registry: 액션 이름 → tool 함수 매핑 ───────────────────────────────
+    # SLOT_SCHEMA에 정의된 액션과 tool 이름(함수명)으로 매핑한다.
+    # 실제 tool 이름은 "mock_execute_transfer" 또는 "execute_transfer" 패턴을 따른다.
     tool_registry: dict[str, object] = {t.name: t for t in tools}
 
     def _find_tool_for_action(action: str) -> object | None:
-        """액션 이름에 해당하는 tool을 registry에서 찾는다."""
+        """액션 이름에 해당하는 tool을 registry에서 찾는다.
+
+        액션 → tool 이름 매핑 (mock과 실제 tool 모두 지원)
+        tool 이름 패턴: "mock_{action}" 또는 "{action}_tool"
+        액션명으로 직접 탐색 (부분 일치)
+        """
         candidates = [
             action,
             f"mock_execute_{action}",
@@ -310,7 +327,17 @@ def build_graph(tools: list) -> CompiledStateGraph:
     # ── 노드 정의 ────────────────────────────────────────────────────────────────
 
     def intent_node(state: VoiceState) -> dict:
-        """LLM으로 인텐트를 파악하고 슬롯을 추출한다."""
+        """LLM으로 인텐트를 파악하고 슬롯을 추출한다.
+
+        처리 시나리오:
+        1. 취소 발화("취소", "아니오") → 상태 초기화
+        2. awaiting_confirmation=True + "네" + ASV 필요 → awaiting_asv_audio=True
+        3. awaiting_confirmation=True + "네" + ASV 불필요 → execution_ready=True
+        4. execution_ready=True → LLM 없이 즉시 통과 (execute_node로 라우팅)
+        5. 새 인텐트 감지 → pending_action, navigate_to, 초기 슬롯 설정
+        6. 슬롯 채우기 → collected_slots 업데이트
+        7. 일반 챗봇 질의 → direct_response를 AIMessage로 추가
+        """
         # ASV 인증 성공 직후: execution_ready=True이면 LLM 호출 없이 즉시 반환
         if state.get("execution_ready"):
             logger.info(
@@ -816,7 +843,11 @@ def build_graph(tools: list) -> CompiledStateGraph:
         }
 
     def resolve_node(state: VoiceState) -> dict:
-        """recipient 슬롯이 채워진 즉시 수취인 존재 여부를 검증한다."""
+        """recipient 슬롯이 채워진 즉시 수취인 존재 여부를 검증한다.
+
+        recipient 슬롯이 채워진 턴에 호출되며, 등록된 수취인이면 슬롯을 보강한다.
+        미등록 수취인이면 슬롯을 초기화하고 재질문 TTS를 추가한다.
+        """
         slots = dict(state.get("collected_slots", {}))
         recipient_input = str(slots.get("recipient", ""))
         bank_name = slots.get("bank_name")
@@ -923,7 +954,10 @@ def build_graph(tools: list) -> CompiledStateGraph:
         return "confirm_node"
 
     def execute_node(state: VoiceState) -> dict:
-        """수집된 슬롯으로 tool을 직접 호출하고 결과를 TTS 응답으로 추가한다."""
+        """수집된 슬롯으로 tool을 직접 호출하고 결과를 TTS 응답으로 추가한다.
+
+        tool 탐색 → 슬롯 전달 → TTS 응답 생성 → 상태 초기화 순으로 처리한다.
+        """
         pending = state.get("pending_action", "")
         slots = dict(state.get("collected_slots", {}))
         logger.info("[Graph →execute_node] pending=%s slots=%s", pending, slots)

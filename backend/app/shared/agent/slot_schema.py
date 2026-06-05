@@ -1,12 +1,8 @@
 """액션별 필요 슬롯 정의, 화면 매핑, ASV 필요 액션 목록 (Issue #21, #48).
 
-Design Ref:
+Design Ref (Issue #21):
     §slot_schema.py — SLOT_SCHEMA / SCREEN_MAP / ASV_REQUIRED_ACTIONS
 """
-
-# ── 액션별 전체 슬롯 템플릿 ───────────────────────────────────────────────────────
-# key: pending_action 값
-# value: 슬롯명 → 기본값(None) 딕셔너리 또는 슬롯명 리스트
 
 from app.features.recipients.service import classify_recipient_input
 
@@ -25,6 +21,7 @@ VOICE_ONLY_INTENTS: set[str] = {"add_note"}
 
 # ── intent → 프론트엔드 화면 이름 매핑 ────────────────────────────────────────────
 # Expo Router 경로명을 기준으로 정의한다.
+# intent_node가 navigate_to에 이 값을 설정하면 _layout.tsx가 화면을 이동시킨다.
 SCREEN_MAP: dict[str, str] = {
     "transfer": "transfer",
     "auto_transfer": "auto-transfer",
@@ -46,9 +43,11 @@ RECIPIENT_REQUIRED_ACTIONS: set[str] = {
 }
 
 # ── ASV 음성 인증이 필요한 액션 ─────────────────────────────────────────────────
+# 금전 이동이 발생하는 액션만 포함한다.
+# 해당 액션의 확인("네") 수신 후 awaiting_asv_audio=True를 설정한다.
 ASV_REQUIRED_ACTIONS: set[str] = {
-    "transfer",
-    "auto_transfer",
+    "transfer",  # 계좌 이체
+    "auto_transfer",  # 자동이체 등록
 }
 
 # ── 이체 완료 후 메모 제안 (에이전트 TTS) ─────────────────────────────────────────
@@ -58,6 +57,7 @@ MEMO_OFFER_SUFFIX: str = (
 )
 
 # ── 슬롯별 TTS 질문 템플릿 ────────────────────────────────────────────────────────
+# slot_fill_node에서 첫 번째 누락 슬롯의 질문을 TTS로 반환한다.
 SLOT_QUESTIONS: dict[str, str] = {
     "recipient": "누구에게 보낼까요? 별명이나 이름을 말씀해 주세요.",
     "bank_name": ("어느 은행 계좌인가요? 우리은행, 국민은행처럼 말씀해 주세요."),
@@ -79,6 +79,7 @@ SLOT_QUESTIONS_BY_ACTION: dict[str, dict[str, str]] = {
 }
 
 # ── 실행 완료 화면 경로 ────────────────────────────────────────────────────────────
+# execute_node 실행 후 navigate_to에 설정되어 프론트엔드 완료 화면으로 이동한다.
 COMPLETE_SCREEN_MAP: dict[str, str] = {
     "transfer": "transfer/complete",
     "auto_transfer": "auto-transfer/complete",
@@ -98,6 +99,7 @@ ACTIONS_WITH_YES_NO_CONFIRM: set[str] = {
 }
 
 # ── 액션 한국어 레이블 ────────────────────────────────────────────────────────────
+# confirm_node의 확인 메시지 생성에 사용한다.
 ACTION_LABELS: dict[str, str] = {
     "transfer": "이체",
     "auto_transfer": "자동이체 등록",
