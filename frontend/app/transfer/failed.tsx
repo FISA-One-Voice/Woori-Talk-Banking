@@ -8,7 +8,7 @@ import { fetchTtsAudio } from '@/services/voiceService';
 import { useTransferStore } from '@/store/transferStore';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { playBase64Audio } from '@/utils/audioPlayer';
-import { getTtsMessage } from '@/utils/errorHandler';
+import { FALLBACK_MESSAGE } from '@/utils/errorHandler';
 import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { speakText, stopAllTts } from '@/utils/ttsManager';
 import { TransferFailedView } from './views/TransferFailedView';
@@ -37,7 +37,7 @@ export default function TransferFailedScreen() {
   }, [transferFailure, goHome]);
 
   const errorMessage = withHomeNavSuffix(
-    transferFailure?.message ?? getTtsMessage(transferFailure?.code),
+    transferFailure?.message ?? FALLBACK_MESSAGE,
   );
 
   // 터치 송금 실패: TTS 안내 후 홈 이동 (음성 실패는 _layout에서 audio 재생 후 홈 처리)

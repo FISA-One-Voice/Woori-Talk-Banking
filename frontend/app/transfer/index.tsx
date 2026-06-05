@@ -9,7 +9,7 @@ import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { fetchRecentRecipients, executeTransfer } from '@/services/transferService';
 import axios from 'axios';
-import { getTtsMessage } from '@/utils/errorHandler';
+import { extractApiErrorMessage } from '@/utils/errorHandler';
 import type { RecipientItem } from '@/components/display';
 import {
   resolveTransferStep,
@@ -122,11 +122,10 @@ export default function TransferScreen() {
     } catch (err) {
       setTxReceipt(null);
       let code: string | undefined;
-      let message = getTtsMessage();
+      const message = extractApiErrorMessage(err);
       if (axios.isAxiosError(err) && err.response?.data) {
         const body = err.response.data as { code?: string; message?: string };
         code = body.code;
-        message = body.message ?? getTtsMessage(code);
         if (__DEV__) {
           console.error('[transfer] executeTransfer failed', code, message);
         }

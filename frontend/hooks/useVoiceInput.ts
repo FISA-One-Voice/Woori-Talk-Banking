@@ -1,6 +1,7 @@
 import type { VoiceState } from '@/components/VoiceStatusOverlay';
 import { sendVoice } from '@/services/voiceService';
 import type { VoiceResponseData } from '@/types/voice';
+import { extractApiErrorMessage, getClientErrorMessage } from '@/utils/errorHandler';
 import { Audio } from 'expo-av';
 import { useCallback, useRef, useState } from 'react';
 
@@ -15,7 +16,7 @@ export type UseVoiceInputResult = {
  */
 export function useVoiceInput(
   onResponse: (data: VoiceResponseData) => void,
-  onError: (code: string) => void,
+  onError: (message: string) => void,
   setVoiceState: (state: VoiceState) => void,
 ): UseVoiceInputResult {
   const recordingRef = useRef<Audio.Recording | null>(null);
@@ -27,7 +28,7 @@ export function useVoiceInput(
     try {
       const { granted } = await Audio.requestPermissionsAsync();
       if (!granted) {
-        onError('MICROPHONE_PERMISSION_DENIED');
+        onError(getClientErrorMessage('MICROPHONE_PERMISSION_DENIED'));
         return;
       }
 
@@ -56,7 +57,7 @@ export function useVoiceInput(
       setIsRecording(true);
       setVoiceState('recording');
     } catch {
-      onError('VOICE_PROCESSING_ERROR');
+      onError(getClientErrorMessage('VOICE_PROCESSING_ERROR'));
     }
   }, [onError, setVoiceState]);
 
@@ -84,7 +85,7 @@ export function useVoiceInput(
 
       const uri = recording.getURI();
       if (!uri) {
-        onError('VOICE_PROCESSING_ERROR');
+        onError(getClientErrorMessage('VOICE_PROCESSING_ERROR'));
         return;
       }
 
@@ -92,8 +93,7 @@ export function useVoiceInput(
       onResponse(data);
     } catch (err) {
       recordingRef.current = null;
-      const code = err instanceof Error ? err.message : 'VOICE_PROCESSING_ERROR';
-      onError(code);
+      onError(extractApiErrorMessage(err));
     }
   }, [onError, onResponse, setVoiceState]);
 

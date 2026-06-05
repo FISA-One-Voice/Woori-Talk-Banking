@@ -6,7 +6,7 @@ import { useTransferStore as transferStore } from '@/store/transferStore';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import type { VoiceResponseData } from '@/types/voice';
 import { playBase64Audio } from '@/utils/audioPlayer';
-import { getTtsMessage } from '@/utils/errorHandler';
+import { FALLBACK_MESSAGE } from '@/utils/errorHandler';
 import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { speakText, stopAllTts } from '@/utils/ttsManager';
 import { agentPathFromNavigateTo, shouldNavigateToRoute } from '@/utils/voiceNavigation';
@@ -155,7 +155,7 @@ export default function RootLayout() {
           (mergedSlots.transfer_error_message as string) ?? '';
         transferStore.getState().setTxReceipt(null);
         transferStore.getState().setTransferFailure({
-          message: errorMessage || getTtsMessage(),
+          message: errorMessage || FALLBACK_MESSAGE,
         });
         navigateFromAgent(router, 'transfer/failed', currentPathRef);
         useVoiceResponseStore.getState().setLastResponse({
@@ -209,10 +209,9 @@ export default function RootLayout() {
     [router],
   );
 
-  const handleError = useCallback((code: string) => {
+  const handleError = useCallback((message: string) => {
     setVoiceState('idle');
-    const errorMessage = getTtsMessage(code);
-    speakText(errorMessage);
+    speakText(message);
   }, []);
 
   const { handleLongPress, handlePressOut } = useVoiceInput(
