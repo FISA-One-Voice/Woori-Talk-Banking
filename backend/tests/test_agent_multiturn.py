@@ -8,7 +8,7 @@
     Layer B — 통합 테스트 (실제 OpenAI API 호출)
         - @pytest.mark.integration 마킹
         - .env의 OPENAI_CHAT_API_KEY 필요
-        - build_graph(MOCK_TOOLS)로 end-to-end 흐름 검증
+        - build_graph(ALL_TOOLS)로 end-to-end 흐름 검증
 
 실행 방법:
     cd backend
@@ -36,22 +36,15 @@ from app.shared.agent.slot_schema import (
     SLOT_QUESTIONS,
     SLOT_SCHEMA,
 )
-from app.shared.agent.tools import MOCK_TOOLS
-from app.shared.agent.tools.mock_tools import (
-    mock_execute_transfer,
-    mock_get_balance,
-    mock_get_events,
-    mock_get_history,
-    mock_register_auto_transfer,
-)
+from app.shared.agent.tools import ALL_TOOLS
 
 # ── 공통 픽스처 ────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture(scope="module")
 def graph_with_mocks():
-    """MOCK_TOOLS로 빌드된 StateGraph. 모듈 내에서 공유한다."""
-    return build_graph(MOCK_TOOLS)
+    """ALL_TOOLS로 빌드된 StateGraph. 모듈 내에서 공유한다."""
+    return build_graph(ALL_TOOLS)
 
 
 def _new_thread_id() -> str:
@@ -107,78 +100,23 @@ class TestSlotSchema:
             assert slot in SLOT_QUESTIONS, f"SLOT_QUESTIONS에 '{slot}'가 없습니다."
 
 
-class TestMockTools:
-    """mock tool 시그니처 및 반환값 검증."""
 
-    def test_mock_get_balance_returns_string(self):
-        """mock_get_balance는 TTS 친화적 문자열을 반환해야 한다."""
-        result = mock_get_balance.invoke({"user_id": "u001"})
-        assert isinstance(result, str)
-        assert len(result) > 0
+class TestBuildGraphWithTools:
+    """build_graph(ALL_TOOLS) 초기화 검증 (LLM mock 없이)."""
 
-    def test_mock_get_history_returns_string(self):
-        """mock_get_history는 TTS 친화적 문자열을 반환해야 한다."""
-        result = mock_get_history.invoke({"user_id": "u001", "days": 7})
-        assert isinstance(result, str)
-        assert "7일" in result or "칠 일" in result
-
-    def test_mock_execute_transfer_contains_recipient_and_amount(self):
-        """mock_execute_transfer는 recipient와 금액을 포함한 응답을 반환해야 한다."""
-        result = mock_execute_transfer.invoke({"recipient": "엄마", "amount": 50000})
-        assert isinstance(result, str)
-        assert "엄마" in result
-
-    def test_mock_register_auto_transfer_contains_info(self):
-        """mock_register_auto_transfer는 등록 완료 정보를 반환해야 한다."""
-        result = mock_register_auto_transfer.invoke(
-            {
-                "recipient": "엄마",
-                "amount": 100000,
-                "cycle": "monthly",
-                "scheduled_day": 15,
-            }
-        )
-        assert isinstance(result, str)
-        assert "엄마" in result
-        assert "15일" in result
-
-    def test_mock_get_events_returns_string(self):
-        """mock_get_events는 TTS 친화적 이벤트 안내를 반환해야 한다."""
-        result = mock_get_events.invoke({"user_id": "u001"})
-        assert isinstance(result, str)
-        assert len(result) > 0
-
-    def test_all_mock_tools_no_markdown(self):
-        """모든 mock tool 반환값에 마크다운 기호가 없어야 한다."""
-        responses = [
-            mock_get_balance.invoke({"user_id": "u001"}),
-            mock_get_history.invoke({"user_id": "u001"}),
-            mock_execute_transfer.invoke({"recipient": "회사", "amount": 200000}),
-            mock_get_events.invoke({"user_id": "u001"}),
-        ]
-        for resp in responses:
-            for symbol in ["*", "#", "```", "- ", "| "]:
-                assert symbol not in resp, (
-                    f"mock tool 응답에 마크다운 기호 '{symbol}'가 포함되어 있습니다."
-                )
-
-
-class TestBuildGraphWithMocks:
-    """build_graph(MOCK_TOOLS) 초기화 검증 (LLM mock 없이)."""
-
-    def test_build_graph_with_mock_tools_no_error(self):
-        """build_graph(MOCK_TOOLS)가 오류 없이 초기화되어야 한다."""
-        graph = build_graph(MOCK_TOOLS)
+    def test_build_graph_with_all_tools_no_error(self):
+        """build_graph(ALL_TOOLS)가 오류 없이 초기화되어야 한다."""
+        graph = build_graph(ALL_TOOLS)
         assert graph is not None
 
     def test_build_graph_has_invoke(self):
         """반환 그래프는 .invoke 메서드를 보유해야 한다."""
-        graph = build_graph(MOCK_TOOLS)
+        graph = build_graph(ALL_TOOLS)
         assert hasattr(graph, "invoke")
 
     def test_build_graph_has_ainvoke(self):
         """반환 그래프는 .ainvoke 메서드를 보유해야 한다."""
-        graph = build_graph(MOCK_TOOLS)
+        graph = build_graph(ALL_TOOLS)
         assert hasattr(graph, "ainvoke")
 
     def test_build_graph_empty_tools_still_works(self):
@@ -211,7 +149,7 @@ class TestStateTransitionLogic:
             mock_llm.invoke.return_value = cancel_result
             mock_struct.return_value = mock_llm
 
-            g = build_graph(MOCK_TOOLS)
+            g = build_graph(ALL_TOOLS)
             # pending_action이 있는 상태로 시작
             state_with_pending = {
                 "messages": [HumanMessage(content="이체 취소해줘")],
@@ -250,7 +188,7 @@ class TestStateTransitionLogic:
             mock_llm.invoke.return_value = confirm_result
             mock_struct.return_value = mock_llm
 
-            g = build_graph(MOCK_TOOLS)
+            g = build_graph(ALL_TOOLS)
             state_awaiting = {
                 "messages": [HumanMessage(content="네")],
                 "user_id": uid,
@@ -286,7 +224,7 @@ class TestStateTransitionLogic:
             mock_llm.invoke.return_value = intent_result
             mock_struct.return_value = mock_llm
 
-            g = build_graph(MOCK_TOOLS)
+            g = build_graph(ALL_TOOLS)
             result = _invoke(g, "잔액 얼마야", uid, config)
 
         assert result.get("navigate_to") == SCREEN_MAP["balance"]
@@ -304,12 +242,24 @@ class TestStateTransitionLogic:
             direct_response="",
         )
 
-        with patch("langchain_openai.ChatOpenAI.with_structured_output") as mock_struct:
+        from app.features.recipients.schema import ResolvedRecipient
+
+        mock_resolved = ResolvedRecipient(
+            recipient_id=None,
+            bank_name="우리은행",
+            account_number="1001234567890",
+            recipient_name="엄마",
+        )
+
+        with (
+            patch("langchain_openai.ChatOpenAI.with_structured_output") as mock_struct,
+            patch("app.shared.agent.graph.find_recipient_by_voice", return_value=mock_resolved),
+        ):
             mock_llm = MagicMock()
             mock_llm.invoke.return_value = intent_result
             mock_struct.return_value = mock_llm
 
-            g = build_graph(MOCK_TOOLS)
+            g = build_graph(ALL_TOOLS)
             result = _invoke(g, "엄마에게 이체해줘", uid, config)
 
         # amount 슬롯 질문이 메시지에 있어야 함
@@ -340,7 +290,7 @@ class TestStateTransitionLogic:
             mock_llm.invoke.return_value = intent_result
             mock_struct.return_value = mock_llm
 
-            g = build_graph(MOCK_TOOLS)
+            g = build_graph(ALL_TOOLS)
             state_with_alias = {
                 "messages": [HumanMessage(content="십만원")],
                 "user_id": uid,
@@ -378,7 +328,7 @@ class TestIntegrationSingleTurn:
     """단일 턴 시나리오 — 실제 LLM 응답 검증."""
 
     def test_balance_query_direct_response(self, graph_with_mocks):
-        """'잔액 얼마야' → mock_get_balance 호출 or 직접 응답, navigate_to='balance'.
+        """'잔액 얼마야' → get_account_balance 호출 or 직접 응답, navigate_to='balance'.
 
         LLM이 'balance' intent를 감지하면 navigate_to='balance'로 설정되어야 한다.
         """
@@ -396,7 +346,7 @@ class TestIntegrationSingleTurn:
         )
 
     def test_event_query_response(self, graph_with_mocks):
-        """'이벤트 뭐 있어' → mock_get_events 호출 or 이벤트 관련 응답."""
+        """'이벤트 뭐 있어' → get_event_list 호출 or 이벤트 관련 응답."""
         uid = f"integ-{uuid.uuid4().hex[:6]}"
         config = {"configurable": {"thread_id": _new_thread_id()}}
         result = _invoke(graph_with_mocks, "이벤트 뭐 있어", uid, config)
