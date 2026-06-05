@@ -28,13 +28,19 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
     },
   );
 
+  if (__DEV__) {
+    console.log('[Voice] 응답 success:', data.success, '| code:', data.code ?? '-');
+  }
+
   // success: false + data present → AppError with TTS audio; forward to handleResponse
   if (!data.success) {
+    if (__DEV__) console.log('[Voice] 에러 응답:', data.code, data.message);
     if (data.data) return data.data;
     throw new Error(data.code ?? 'VOICE_PROCESSING_ERROR');
   }
 
   if (!data.data) {
+    if (__DEV__) console.log('[Voice] data 없음');
     throw new Error('VOICE_PROCESSING_ERROR');
   }
 

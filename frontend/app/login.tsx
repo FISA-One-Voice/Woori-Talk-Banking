@@ -28,48 +28,6 @@ export default function DevLoginScreen() {
     }
   }, [step]);
 
-  const triggerBiometric = async () => {
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      if (hasHardware && isEnrolled) {
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: Platform.OS === 'ios' ? 'Face ID로 앱을 잠금 해제합니다' : '지문/얼굴 등 생체 인증으로 잠금 해제합니다',
-          cancelLabel: '취소',
-          disableDeviceFallback: true,
-        });
-        if (result.success) {
-          router.replace('/home'); 
-        } else {
-          // TS의 엄격한 타입 검사를 피하기 위해 any로 캐스팅하여 에러 코드를 확인합니다.
-          const errorCode = (result as any).error;
-          if (errorCode === 'missing_usage_description' || errorCode === 'not_available') {
-            Alert.alert(
-              Platform.OS === 'ios' ? 'Face ID 시뮬레이션 (Expo Go)' : '생체 인증 시뮬레이션 (Expo Go)',
-              '현재 사용 중인 Expo Go 앱은 애플 정책상 Face ID 테스트를 제한하고 있습니다.\n테스트를 위해 Face ID 인증을 통과한 것으로 처리합니다!',
-              [
-                { text: '확인', onPress: () => router.replace('/home') }
-              ]
-            );
-          } else {
-            setStep('PHONE'); 
-          }
-        }
-      } else {
-        // 하드웨어가 없거나 에뮬레이터인 경우 바로 패스 (테스트용)
-        Alert.alert(
-          'Face ID 시뮬레이션',
-          '생체 인증 기기가 아닙니다. 테스트를 위해 통과 처리합니다.',
-          [
-            { text: '확인', onPress: () => router.replace('/home') }
-          ]
-        );
-      }
-    } catch (e: any) {
-      setStep('PHONE');
-    }
-  };
-
   const handlePhoneComplete = (completedPhone: string) => {
     let formatted = completedPhone;
     if (completedPhone.length === 11) {

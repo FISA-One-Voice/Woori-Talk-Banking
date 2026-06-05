@@ -35,10 +35,7 @@ export function shouldNavigateToRoute(
     return false;
   }
 
-  if (
-    navigateTo === 'asset' &&
-    (current === '/asset' || current.startsWith('/asset/'))
-  ) {
+  if (navigateTo === 'asset' && current === '/asset') {
     return false;
   }
 

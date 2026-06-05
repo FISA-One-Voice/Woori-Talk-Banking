@@ -53,7 +53,6 @@ from app.shared.agent.slot_schema import (
     CONFIRM_YES_NO_SUFFIX,
     MEMO_OFFER_SUFFIX,
     RECIPIENT_REQUIRED_ACTIONS,
-    REQUIRED_SLOTS,
     SCREEN_MAP,
     SCREEN_ONLY_INTENTS,
     SLOT_QUESTIONS,
@@ -453,6 +452,23 @@ def build_graph(tools: list) -> CompiledStateGraph:
             " '자동으로 보내줘', '고정으로 보내줘', 'N일마다',"
             " '격주', '격월')",
             "  balance     : 잔액·거래내역 조회 ('잔액 얼마야', '내역 보여줘')",
+            "  예) '잔액 얼마야', '내 통장 잔액 알려줘', '통장에 돈 얼마 있어', '내 잔액 얼마야', '총자산 알려줘' → intent='asset', extracted_slots={'action': 'balance'}",
+            "  예) '어떤 거에 제일 많이 지출했어', '뭐에 돈 많이 썼어' → intent='asset', extracted_slots={'action': 'top_category'}",
+            "  예) '이번달 식비 얼마야' → intent='asset', extracted_slots={'action': 'category', 'period': '이번달', 'category': '식비'}",
+            "  예) '지난달 생활비 얼마 썼어', '지난달 생활비 알려줘' → intent='asset', extracted_slots={'action': 'category', 'period': '지난달', 'category': '생활비'}",
+            "  예) '이번달 교통비 얼마야', '최근 7일 쇼핑 얼마 썼어' → intent='asset', extracted_slots={'action': 'category', 'period': '이번달', 'category': '교통비'}",
+            "  ★ '식비', '교통비', '생활비', '쇼핑', '의료비', '문화생활' 등 특정 카테고리 이름 + '얼마'/'썼는지'/'알려줘' → 반드시 action='category', category=카테고리명",
+            "  예) '이번달 지출 수입 얼마야', '지난달 소비 얼마야' → intent='asset', extracted_slots={'action': 'history', 'period': '이번달', 'filter_type': 'both'}",
+            "  예) '이번달 수입 얼마야', '지난달 수입 알려줘' → intent='asset', extracted_slots={'action': 'history', 'period': '이번달', 'filter_type': 'income'}",
+            "  예) '이번달 지출 얼마야', '지난달 지출 알려줘' → intent='asset', extracted_slots={'action': 'history', 'period': '이번달', 'filter_type': 'expense'}",
+            "  예) '최근 7일 거래내역 알려줘', '지난달 내역 말해줘' → intent='asset', extracted_slots={'action': 'history', 'period': '최근7일'}",
+            "  예) '거래내역 보여줘', '거래내역 알려줘', '내역 알려줘' → intent='asset', extracted_slots={'action': 'transaction_list'} (기간 없으면 시스템이 물어봄)",
+            "  예) '이번달 지출 수입 얼마야', '이번달 얼마 썼어' → intent='asset', extracted_slots={'action': 'history', 'period': '이번달', 'filter_type': 'both'}",
+            "  ★ '거래내역', '내역 목록', '내역 보여줘' → action='transaction_list' (거래내역 목록)",
+            "  ★ '지출', '수입', '얼마 썼어', '소비' → action='history' (지출수입 요약)",
+            "  ★ '알려줘', '말해줘', '얼마야', '보여줘' + 거래내역/지출/수입 → 반드시 intent='asset'",
+            "  transfer_history 인텐트: '이체 내역', '누구한테 보냈어', '자동이체 목록' 등 이체 조회 발화",
+            "  예) '최근 이체 내역 알려줘' → intent='transfer_history'",
             "  event       : 이벤트 조회·이동 ('이벤트 조회해줘', '이벤트 알려줘',"
             " '이벤트 화면', '이벤트 이동해줘')",
             "  home        : 홈 화면 이동 ('홈 화면', '처음으로', '홈으로 가줘')",
@@ -460,6 +476,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
             "  ★ '매달', '매주', '자동이체', '한달에', '주마다', '매월', '정기',"
             " '반복', '주기', '계속', '꾸준히', '고정' 키워드가 있으면 반드시 auto_transfer.",
             "- extracted_slots: 발화에서 파악한 슬롯 값 (없으면 {})."
+            " asset 인텐트 슬롯: action('balance'|'history'|'category'|'top_category'),"
+            " period('이번달'|'지난달'|'최근7일'만 허용), category(카테고리명),"
+            " filter_type('income'=수입만|'expense'=지출만|'both'=둘다, action=history일 때만)."
+            " action 선택 기준: balance=잔액조회, history=수입지출요약,"
+            " transaction_list=거래내역목록, category=특정카테고리조회, top_category=어떤카테고리에 많이 썼는지."
+            " '다음달' 등 미래 기간 요청 시 intent 설정하지 말고"
+            " direct_response로 '다음달 데이터는 아직 없습니다. 이번달, 지난달, 최근 7일 중 말씀해 주세요.'라고 안내."
             " 금액 슬롯 키는 'amount', 값은 원화 정수 문자열"
             " (예: '3만원'→'30000', '오만원'→'50000')."
             " 수신자 슬롯 키는 'recipient', 값은 발화에서 언급한"
@@ -658,7 +681,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
             # asset 인텐트: 액션별 화면 이동 분기
             if result.intent == "asset":
                 action = dict(result.extracted_slots).get("action")
-                if action in ("history", "category", "top_category"):
+                if action == "transaction_list":
+                    # 거래내역 목록 화면 (type=history)
+                    period_val = dict(result.extracted_slots).get("period", "")
+                    nav = f"asset/history?type=history&period={period_val}" if period_val else "asset/history?type=history"
+                    updates["navigate_to"] = nav
+                elif action in ("history", "category", "top_category"):
+                    # 지출수입 요약 화면
                     period_val = dict(result.extracted_slots).get("period", "")
                     nav = f"asset/history?period={period_val}" if period_val else "asset/history"
                     updates["navigate_to"] = nav
@@ -671,7 +700,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 ]
             if result.intent in SCREEN_ONLY_INTENTS:
                 _nav_msgs: dict[str, str] = {
-                    "history": "최근 거래 내역 보여드리겠습니다.",
+                    "history": "거래 내역 화면으로 이동합니다.",
+                    "transfer_history": "이체 내역 화면으로 이동합니다.",
                     "event": "진행 중인 이벤트 보여드리겠습니다.",
                 }
                 updates["messages"] = [
@@ -681,6 +711,15 @@ def build_graph(tools: list) -> CompiledStateGraph:
         elif result.extracted_slots and pending:
             existing = dict(state.get("collected_slots", {}))
             missing_now = _missing_slots(pending, existing)
+            # asset 인텐트에서 action이 바뀌면 기존 슬롯 초기화 후 새 action 적용
+            new_action = result.extracted_slots.get("action")
+            if pending == "asset" and new_action and new_action != existing.get("action"):
+                existing = {"action": new_action}
+                updates["navigate_to"] = (
+                    "asset" if new_action == "balance"
+                    else f"asset/history?type=history" if new_action == "transaction_list"
+                    else "asset/history"
+                )
             for key, val in result.extracted_slots.items():
                 # scheduled_day는 사용자 수정 가능 — 항상 허용
                 # 나머지는 이미 채워진 슬롯 덮어쓰기 방지 (LLM 오파싱 방어)
@@ -744,7 +783,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
             and slots.get("action") in ("history", "category")
             and not slots.get("period")
         ):
-            question = "며칠 동안의 내역을 보시겠습니까? 이번달, 지난달, 최근 칠일 중 말씀해 주세요."
+            question = "어느 기간의 내역을 알려드릴까요? 이번달, 지난달, 최근 칠일 중 말씀해 주세요."
         elif missing:
             slot_name = missing[0]
             action_questions = SLOT_QUESTIONS_BY_ACTION.get(pending, {})
@@ -1021,6 +1060,16 @@ def build_graph(tools: list) -> CompiledStateGraph:
         # transfer/auto_transfer 등 완료 화면이 있는 액션만 navigate_to 덮어씀.
         if pending in COMPLETE_SCREEN_MAP:
             updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
+        # asset 인텐트: 실행 후 period 포함한 정확한 화면으로 이동
+        if pending == "asset":
+            action = slots.get("action", "")
+            period = slots.get("period", "")
+            if action == "transaction_list":
+                updates["navigate_to"] = f"asset/history?type=history&period={period}" if period else "asset/history?type=history"
+            elif action in ("history", "category", "top_category"):
+                updates["navigate_to"] = f"asset/history?period={period}" if period else "asset/history"
+            elif action == "balance":
+                updates["navigate_to"] = "asset"
         return updates
 
     # ── 조건부 라우팅 ─────────────────────────────────────────────────────────────

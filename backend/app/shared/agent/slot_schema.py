@@ -17,14 +17,7 @@ SLOT_SCHEMA: dict[str, list[str]] = {
     "transfer": ["recipient", "amount"],
     "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
     "add_note": ["memo"],
-    "asset": {
-        "action": None,      # "balance" / "history" / "category"
-        "period": None,      # "이번달" / "지난달" / "최근7일"
-        "date_range": None,  # 시작일 ISO "YYYY-MM-DD"
-        "category": None,    # "식비" / "문화생활" / "교통" (action=category 시 사용)
-    },
-
-
+    "asset": ["action"],  # action만 필수, period/category는 선택
 }
 
 # SCREEN_MAP에 없는 음성 전용 인텐트 (화면 이동 없음)
@@ -119,7 +112,8 @@ NO_CONFIRM_ACTIONS: set[str] = {"asset", "balance", "history", "event", "transfe
 # 화면이 자체적으로 데이터를 가져오고 TTS를 처리하므로
 # intent_node에서 navigate_to만 설정하고 execute_node 없이 바로 END.
 # balance/history는 에이전트가 잔액·내역을 TTS로 읽어주므로 여기에 포함하지 않음.
-SCREEN_ONLY_INTENTS: set[str] = set()
+# transfer_history/event는 화면이 자체 데이터를 가져오므로 tool 없이 화면 이동만 함.
+SCREEN_ONLY_INTENTS: set[str] = {"transfer_history", "event"}
 
 # ── 유효한 인텐트 목록 ─────────────────────────────────────────────────────────────
 VALID_INTENTS: set[str] = set(SCREEN_MAP.keys()) | VOICE_ONLY_INTENTS

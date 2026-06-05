@@ -13,6 +13,7 @@ import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { getTtsMessage } from '@/utils/errorHandler';
 import { fetchAssetSummary, AccountItem } from '@/services/assetService';
 import { speakText, stopAllTts } from '@/utils/ttsManager';
+import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 
 function formatAmount(amount: number): string {
   if (amount >= 100000000) {
@@ -60,11 +61,17 @@ export default function AssetScreen() {
         const accountVoice = accounts
           .map((a) => `${a.alias ?? a.account_type} ${formatAmount(a.balance)}`)
           .join(', ');
-        speakText(
-          `총 자산은 ${formatAmount(total_asset)}입니다. ` +
-          `${accountVoice}. ` +
-          `지출 수입 내역이나 거래내역은 화면을 꾹 눌러 음성으로 말씀하시면 알 수 있습니다.`
-        );
+        // 음성 명령으로 이동 시 에이전트 TTS가 이미 재생 중 — 화면 자동 TTS 생략
+        const lastResp = useVoiceResponseStore.getState().lastResponse;
+        const navigatedViaVoice = !!lastResp?.audio &&
+          (lastResp?.navigate_to === 'asset' || lastResp?.navigate_to?.startsWith('asset'));
+        if (!navigatedViaVoice) {
+          speakText(
+            `총 자산은 ${formatAmount(total_asset)}입니다. ` +
+            `${accountVoice}. ` +
+            `지출 수입 내역이나 거래내역은 화면을 꾹 눌러 음성으로 말씀하시면 알 수 있습니다.`
+          );
+        }
       })
       .catch((err: Error) => Alert.alert('안내', getTtsMessage(err.message)))
       .finally(() => setLoading(false));

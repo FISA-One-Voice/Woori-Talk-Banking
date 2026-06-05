@@ -48,9 +48,12 @@ export function useVoiceInput(
 ): UseVoiceInputResult {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const isPressingRef = useRef(false); // 🔥 사용자가 손을 떼었는지 추적하는 변수
+  const isStartingRef = useRef(false); // 🔥 녹음 준비 중 중복 호출 방지 (동기 플래그)
   const [isRecording, setIsRecording] = useState(false);
 
   const handleLongPress = useCallback(async () => {
+    if (recordingRef.current || isStartingRef.current) return; // 이미 녹음 중이거나 준비 중이면 무시
+    isStartingRef.current = true;
     isPressingRef.current = true;
     try {
       await stopAllTts(); // 녹음 시작 전 화면 TTS 즉시 중단
@@ -66,7 +69,7 @@ export function useVoiceInput(
       });
 
       const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.prepareToRecordAsync(RECORDING_OPTIONS);
       
       // 🔥 녹음 준비(약 0.5초)가 끝났는데 사용자가 이미 손을 뗐다면 시작하지 않고 즉시 취소!
       if (!isPressingRef.current) {
@@ -82,9 +85,11 @@ export function useVoiceInput(
       }
 
       recordingRef.current = recording;
+      isStartingRef.current = false;
       setIsRecording(true);
       setVoiceState('recording');
     } catch {
+      isStartingRef.current = false;
       onError('VOICE_PROCESSING_ERROR');
     }
   }, [onError, setVoiceState]);
@@ -93,17 +98,17 @@ export function useVoiceInput(
     isPressingRef.current = false; // 손을 떼었음을 기록
     
     const recording = recordingRef.current;
-    
-    // 🔥 아직 녹음 객체가 생성되기도 전에 손을 뗀 경우, 
+
+    // 🔥 아직 녹음 객체가 생성되기도 전에 손을 뗀 경우,
     // handleLongPress 안의 if (!isPressingRef.current)에서 알아서 취소하므로 무시하고 넘김.
     if (!recording) return;
+    recordingRef.current = null; // 🔥 즉시 null로 설정 — onPressOut + handleTouchEnd 중복 호출 방지
 
     try {
       setIsRecording(false);
       setVoiceState('processing');
 
       await recording.stopAndUnloadAsync();
-      recordingRef.current = null;
 
       // 녹음 모드 해제 후 재생 모드로 전환
       await Audio.setAudioModeAsync({

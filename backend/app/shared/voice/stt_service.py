@@ -34,24 +34,18 @@ async def transcribe_audio(
     audio_bytes: bytes,
     content_type: str = "audio/wav",
 ) -> str:
-    """Azure Speech API로 음성을 텍스트로 변환합니다."""
+    """Clova Speech API로 음성을 텍스트로 변환합니다."""
     _validate_audio(audio_bytes, content_type)
-
-    endpoint = (
-        f"https://{settings.AZURE_SPEECH_REGION}.stt.speech.microsoft.com"
-        "/speech/recognition/conversation/cognitiveservices/v1"
-    )
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                endpoint,
+                settings.CLOVA_URL,
                 content=audio_bytes,
                 headers={
-                    "Ocp-Apim-Subscription-Key": settings.AZURE_SPEECH_KEY,
-                    "Content-Type": "audio/wav",
+                    "X-CLOVASPEECH-API-KEY": settings.CLOVA_SECRET_KEY,
+                    "Content-Type": "application/octet-stream",
                 },
-                params={"language": "ko-KR"},
             )
     except httpx.TimeoutException as exc:
         raise STTError(
@@ -68,12 +62,11 @@ async def transcribe_audio(
 
     if response.status_code != 200:
         logger.error(
-            "[STT ERROR] Azure Speech 실패 status=%s body=%s content_type=%s size=%s header_hex=%s",
+            "[STT ERROR] Clova Speech 실패 status=%s body=%s content_type=%s size=%s",
             response.status_code,
             response.text[:300],
             content_type,
             len(audio_bytes),
-            audio_bytes[:16].hex(),
         )
         raise STTError(
             code="STT_FAILED",
@@ -82,18 +75,11 @@ async def transcribe_audio(
         )
 
     payload = response.json()
-    recognition_status = payload.get("RecognitionStatus")
-    if recognition_status != "Success":
-        raise STTError(
-            code="STT_FAILED",
-            message=f"음성 인식 실패: {recognition_status}",
-        )
-
-    text: str = payload.get("DisplayText", "")
+    text: str = payload.get("text", "")
     if not text:
         raise STTError(
             code="STT_FAILED",
-            message="Azure Speech 응답에 텍스트가 없습니다.",
+            message="Clova Speech 응답에 텍스트가 없습니다.",
         )
 
     return text
