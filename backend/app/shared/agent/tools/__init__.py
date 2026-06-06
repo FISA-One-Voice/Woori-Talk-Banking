@@ -58,7 +58,7 @@ MOCK_TOOLS: list = [
     mock_get_history,
     mock_execute_transfer,
     mock_register_auto_transfer,
-    get_event_list,
+    mock_get_events, # get_event_list -> mock_get_event 로 수정했음. 확인하고 이상없으면 주석 지워줘
 ]
 
 TRANSFER_MOCK_TOOLS: list = [
@@ -77,20 +77,24 @@ TRANSFER_MOCK_TOOLS: list = [
 #   transfer (C):  from app.shared.agent.tools.transfer import execute_transfer
 #   auto_transfer (D): from app.shared.agent.tools.auto_transfer import (
 #                          register_auto_transfer)
+#
+# get_event_list: event 담당자 — tools/event.py 완성
+# execute_transfer: transfer 담당자 — tools/transfer.py 완성
+# lookup_recipient: transfer 담당자 — tools/lookup_recipient.py 완성
+# execute_auto_transfer: auto_transfer 담당자 — tools/auto_transfer.py 완성
+# cancel_auto_transfer: auto_transfer 담당자 — tools/auto_transfer.py 완성
+# add_note: transfer 담당자 — tools/transfer.py 완성
+# add_auto_transfer_note: auto_transfer 담당자 — tools/auto_transfer.py 완성
 _REAL_TOOLS: list = [
     get_event_list,
     execute_transfer,
     lookup_recipient,
     execute_auto_transfer,
     cancel_auto_transfer,
-    # execute_balance,
-    # execute_history,
     add_note,  # 이체 직후 메모 (tx_id 기반)
     add_auto_transfer_note,  # 자동이체 직후 메모 (order_id 기반)
-    # lookup_recipient,   # 공통 — tools/lookup_recipient.py 완성 후 주석 해제
     # execute_balance,    # balance 담당자 — tools/balance.py 완성 후 주석 해제
     # execute_history,    # history 담당자 — tools/history.py 완성 후 주석 해제
-    # register_auto_transfer,  # auto_transfer 담당자 — auto_transfer.py 완성 후 해제
 ]
 
 TRANSFER_TOOLS: list = [
