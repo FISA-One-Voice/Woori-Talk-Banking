@@ -184,6 +184,52 @@ def get_expense_summary(
     }
 
 
+# ── 화면 TTS 문구 생성 ────────────────────────────────────────────────────────
+# REST API 응답에 포함되어 프론트엔드가 재생만 하도록 한다.
+# 프론트엔드에서 문자열을 직접 조합하지 않고 이 함수가 생성한 값을 사용한다.
+
+KST = timezone(timedelta(hours=9))
+
+
+def _format_amount(amount: int) -> str:
+    """금액을 TTS 친화적 한국어 표현으로 변환한다."""
+    if amount >= 100_000_000:
+        eok = amount // 100_000_000
+        man = (amount % 100_000_000) // 10_000
+        return f"{eok}억 {man:,}만원" if man else f"{eok}억원"
+    if amount >= 10_000:
+        return f"{amount // 10_000:,}만원"
+    return f"{amount:,}원"
+
+
+def build_summary_tts(accounts: list, total_asset: int) -> str:
+    """자산 요약 화면 진입 시 재생할 TTS 문구를 생성한다."""
+    account_voice = ", ".join(
+        f"{a.alias or a.account_type} {_format_amount(a.balance)}"
+        for a in accounts
+    )
+    return (
+        f"총 자산은 {_format_amount(total_asset)}입니다. "
+        f"{account_voice}. "
+        f"지출 수입 내역이나 거래내역은 화면을 꾹 눌러 음성으로 말씀하시면 알 수 있습니다."
+    )
+
+
+def build_transaction_tts(t) -> str:
+    """거래 내역 카드 탭 시 재생할 TTS 문구를 생성한다."""
+    try:
+        dt = t.created_at
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(KST).replace(tzinfo=None)
+        date_str = f"{dt.month}월 {dt.day}일"
+    except Exception:
+        date_str = ""
+    sign = "입금" if t.category == "수입" else "출금"
+    name = t.to_name or t.category or ""
+    memo_str = f". 메모 {t.memo}" if t.memo else ""
+    return f"{date_str} {name} {sign} {abs(t.amount):,}원{memo_str}"
+
+
 # ── 슬롯 변환 헬퍼 ────────────────────────────────────────────────────────────
 # STT 음성 인식 결과를 시스템 내부 값으로 정규화하는 유틸 함수 모음.
 # tools/asset.py의 @tool 함수에서 슬롯 값을 전처리할 때 사용한다.

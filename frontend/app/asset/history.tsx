@@ -258,10 +258,7 @@ export default function HistoryScreen() {
             transactions.map((tx) => {
               const speakTx = () => {
                 if (Date.now() - pressInTimeRef.current >= 450) return;
-                const date = new Date(tx.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
-                const sign = tx.amount > 0 ? '입금' : '출금';
-                const memo = tx.memo ? `. 메모 ${tx.memo}` : '';
-                speakText(`${date} ${tx.to_name ?? ''} ${sign} ${Math.abs(tx.amount).toLocaleString()}원${memo}`);
+                speakText(tx.tts_text);
               };
               return (
                 <TouchableOpacity

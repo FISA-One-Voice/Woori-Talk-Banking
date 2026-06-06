@@ -46,31 +46,16 @@ export default function AssetScreen() {
 
   useEffect(() => {
     fetchAssetSummary()
-      .then(({ accounts, total_asset }) => {
+      .then(({ accounts, total_asset, tts_text }) => {
         setAccounts(accounts);
         setTotalAsset(total_asset);
-        const accountText = accounts
-          .map((a) => `${a.bank_name} ${a.alias ?? a.account_type} ${formatAmount(a.balance)}`)
-          .join(', ');
-        const text =
-          `내 자산 조회 화면입니다. 총 자산은 ${formatAmount(total_asset)}입니다. ` +
-          `계좌별로는 ${accountText}입니다. ` +
-          `화면 아래의 지출·수입이나 거래내역 버튼을 눌러 확인하실 수 있습니다. ` +
-          `꾹 누르시면 음성으로 조회할 수 있습니다.`;
-        setAnnounceText(text);
-        const accountVoice = accounts
-          .map((a) => `${a.alias ?? a.account_type} ${formatAmount(a.balance)}`)
-          .join(', ');
+        setAnnounceText(tts_text);
         // 음성 명령으로 이동 시 에이전트 TTS가 이미 재생 중 — 화면 자동 TTS 생략
         const lastResp = useVoiceResponseStore.getState().lastResponse;
         const navigatedViaVoice = !!lastResp?.audio &&
           (lastResp?.navigate_to === 'asset' || lastResp?.navigate_to?.startsWith('asset'));
         if (!navigatedViaVoice) {
-          speakText(
-            `총 자산은 ${formatAmount(total_asset)}입니다. ` +
-            `${accountVoice}. ` +
-            `지출 수입 내역이나 거래내역은 화면을 꾹 눌러 음성으로 말씀하시면 알 수 있습니다.`
-          );
+          speakText(tts_text);
         }
       })
       .catch((err: Error) => Alert.alert('안내', getTtsMessage(err.message)))

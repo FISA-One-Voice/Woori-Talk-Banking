@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.jwt_utils import get_current_user_id
 from app.features.account import service
 from app.features.account.schema import (
     AccountDetail,
@@ -25,7 +26,10 @@ router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
 
 @router.get("/summary")
-def get_account_summary(db: Session = Depends(get_db)):
+def get_account_summary(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
     """
     계좌 목록 및 총 자산 조회.
 
@@ -33,7 +37,7 @@ def get_account_summary(db: Session = Depends(get_db)):
     성공: {"success": true, "data": {"totalAsset": int, "accounts": [...]}, "message": "..."}
     실패: {"success": false, "data": null, "message": "...", "error_code": "ACCOUNT_NOT_FOUND"}
     """
-    accounts = service.get_user_accounts(db, TEMP_USER_ID)
+    accounts = service.get_user_accounts(db, user_id)
     total_asset = sum(a.balance for a in accounts)
 
     data = AccountSummaryResponse(
@@ -61,7 +65,10 @@ def get_account_summary(db: Session = Depends(get_db)):
 
 
 @router.get("/list")
-def get_account_list(db: Session = Depends(get_db)):
+def get_account_list(
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
     """
     출금 가능 계좌 목록 조회 (송금 화면에서 계좌 선택용).
 
@@ -69,7 +76,7 @@ def get_account_list(db: Session = Depends(get_db)):
     성공: {"success": true, "data": {"accounts": [...]}, "message": "..."}
     실패: {"success": false, "data": null, "message": "...", "error_code": "ACCOUNT_NOT_FOUND"}
     """
-    accounts = service.get_user_accounts(db, TEMP_USER_ID)
+    accounts = service.get_user_accounts(db, user_id)
 
     data = AccountListResponse(
         accounts=[

@@ -48,14 +48,6 @@ class Settings(BaseSettings):
     CLOVA_SECRET_KEY: str = ""
     CLOVA_URL: str = "https://clovaspeech-gw.ncloud.com/recog/v1/stt?lang=Kor"
 
-    AZURE_SPEECH_KEY: str = ""
-    AZURE_SPEECH_REGION: str = "koreacentral"
-
-    # Azure Cognitive Services Text-to-Speech (TTS)
-    # ─ AZURE_TTS_KEY:    Azure 포털에서 발급받은 구독 키
-    # ─ AZURE_TTS_REGION: 리소스가 배포된 Azure 리전 (기본값: 한국 중부)
-    AZURE_TTS_KEY: str = ""
-    AZURE_TTS_REGION: str = "koreacentral"
     # AES-256-GCM 암호화 키 (base64url 인코딩된 32바이트)
     # 생성: python -c "import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
     CRYPTO_KEY: str = ""

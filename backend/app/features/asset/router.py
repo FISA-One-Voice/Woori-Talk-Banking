@@ -26,6 +26,7 @@ from app.features.asset.schema import (
     TransactionItem,
     TransactionListResponse,
 )
+from app.features.asset.service import build_summary_tts, build_transaction_tts
 
 router = APIRouter(prefix="/api/asset", tags=["asset"])
 
@@ -50,19 +51,21 @@ def get_asset_summary(
     accounts = service.get_asset_summary(db, user_id)
     total_asset = sum(a.balance for a in accounts)
 
+    account_items = [
+        AccountBalanceItem(
+            account_id=str(a.account_id),
+            bank_name=a.bank_name,
+            account_type=a.account_type,
+            alias=a.alias,
+            balance=a.balance,
+            is_primary=a.is_primary,
+        )
+        for a in accounts
+    ]
     data = AssetSummaryResponse(
         total_asset=total_asset,
-        accounts=[
-            AccountBalanceItem(
-                account_id=str(a.account_id),
-                bank_name=a.bank_name,
-                account_type=a.account_type,
-                alias=a.alias,
-                balance=a.balance,
-                is_primary=a.is_primary,
-            )
-            for a in accounts
-        ],
+        accounts=account_items,
+        tts_text=build_summary_tts(accounts, total_asset),
     )
 
     return {
@@ -149,6 +152,7 @@ def get_transaction_history(
                 category=t.category,
                 memo=t.memo,
                 created_at=t.created_at,
+                tts_text=build_transaction_tts(t),
             )
             for t in transactions
         ],
