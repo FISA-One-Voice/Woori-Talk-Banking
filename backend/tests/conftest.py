@@ -32,7 +32,19 @@ from sqlalchemy.orm import Session
 
 import app.models  # noqa: F401 — Base.metadata에 모든 테이블 등록
 from app.core.database import Base, SessionLocal, engine
-from app.main import app
+from app.main import app, scheduler
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _disable_apscheduler_for_tests() -> Generator[None, None, None]:
+    """TestClient startup이 scheduler.start()를 반복 호출하지 않도록 테스트 전용 no-op 처리."""
+    original_start = scheduler.start
+    original_shutdown = scheduler.shutdown
+    scheduler.start = lambda *args, **kwargs: None  # type: ignore[method-assign]
+    scheduler.shutdown = lambda *args, **kwargs: None  # type: ignore[method-assign]
+    yield
+    scheduler.start = original_start
+    scheduler.shutdown = original_shutdown
 
 
 # ── DB 세션 ────────────────────────────────────────────────────────────────────

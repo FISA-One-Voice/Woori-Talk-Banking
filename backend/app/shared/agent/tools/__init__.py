@@ -22,19 +22,10 @@ from app.shared.agent.tools.history import (
     get_recent_history,
 )
 
-ALL_TOOLS: list = [
-    get_total_balance,
-    get_account_balance_by_id,
-    get_recent_history,
-    get_category_history,
-    get_monthly_expense,
-]
-
 # ── Dev-B (TransferAgent tools) ───────────────────────────────────────────────
 from app.core.config import settings
 from app.shared.agent.tools.auto_transfer import add_auto_transfer_note
 from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
-from app.shared.agent.tools.event import get_event_list
 from app.shared.agent.tools.execute_auto_transfer import execute_auto_transfer
 from app.shared.agent.tools.lookup_recipient import lookup_recipient
 from app.shared.agent.tools.mock_tools import (
@@ -45,6 +36,9 @@ from app.shared.agent.tools.mock_tools import (
     mock_register_auto_transfer,
 )
 from app.shared.agent.tools.transfer import add_note, execute_transfer
+
+# ── 기존 단일 graph 호환 tool ─────────────────────────────────────────────────
+from app.shared.agent.tools.event import get_event_list
 
 # ── Dev-C (AssetAgent tools) ──────────────────────────────────────────────────
 # Dev-C: 이 구역에만 추가
@@ -65,6 +59,12 @@ MOCK_TOOLS: list = [
     mock_execute_transfer,
     mock_register_auto_transfer,
     get_event_list,
+]
+
+TRANSFER_MOCK_TOOLS: list = [
+    mock_lookup_recipient,
+    mock_execute_transfer,
+    mock_register_auto_transfer,
 ]
 
 # ── 실제 tool 목록 ─────────────────────────────────────────────────────────────
@@ -93,9 +93,18 @@ _REAL_TOOLS: list = [
     # register_auto_transfer,  # auto_transfer 담당자 — auto_transfer.py 완성 후 해제
 ]
 
+TRANSFER_TOOLS: list = [
+    execute_transfer,
+    add_note,
+    execute_auto_transfer,
+    add_auto_transfer_note,
+    cancel_auto_transfer,
+    lookup_recipient,
+]
+
 # ── 활성 tool 목록 ─────────────────────────────────────────────────────────────
 # USE_MOCK_TOOLS=true  → MOCK_TOOLS 사용 (개발/테스트 환경)
 # USE_MOCK_TOOLS=false → 실제 tool 사용 (Phase 2 완료 후)
 ALL_TOOLS: list = MOCK_TOOLS if settings.USE_MOCK_TOOLS else _REAL_TOOLS
 
-__all__ = ["ALL_TOOLS"]
+__all__ = ["ALL_TOOLS", "TRANSFER_MOCK_TOOLS", "TRANSFER_TOOLS"]
