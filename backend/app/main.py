@@ -19,11 +19,11 @@
 # =============================================================================
 
 import logging
+from datetime import datetime, timedelta, timezone
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+from app.core.logging_config import setup_logging
+
+setup_logging()
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -117,6 +117,7 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
         exc.status_code,
         exc.message,
     )
+    app_error_total.labels(code=exc.code).inc()
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -137,7 +138,14 @@ Base.metadata.create_all(bind=engine)
 # 새 화면(feature)을 추가할 때마다 이 파일에 두 줄씩 추가합니다:
 # from app.features.{name}.router import router as {name}_router
 # app.include_router({name}_router)
+from prometheus_fastapi_instrumentator import Instrumentator
+
 from app.core.config import settings as _settings
+from app.core.metrics import app_error_total, auto_transfer_scheduler_runs_total
+from app.core.middleware import RequestLoggingMiddleware
+
+Instrumentator().instrument(app).expose(app)
+app.add_middleware(RequestLoggingMiddleware)
 
 logger.info("[Startup] ASV_SERVER_URL = %s", _settings.ASV_SERVER_URL)
 
@@ -168,10 +176,32 @@ scheduler = BackgroundScheduler()
 
 @app.on_event("startup")
 def start_scheduler():
-    def job():
+    def job() -> None:
+        job_id = f"auto_transfer_{datetime.now(timezone(timedelta(hours=9))).isoformat()}"
         db = SessionLocal()
         try:
-            run_due_auto_transfers(db, user_id=None)  # 전체 유저 실행
+            run_due_auto_transfers(db, user_id=None)
+            logger.info(
+                "auto_transfer_executed",
+                extra={
+                    "event": "auto_transfer_executed",
+                    "job_id": job_id,
+                    "status": "success",
+                },
+            )
+        except Exception as e:
+            logger.error(
+                "auto_transfer_executed",
+                extra={
+                    "event": "auto_transfer_executed",
+                    "job_id": job_id,
+                    "status": "failed",
+                    "error": str(e),
+                },
+            )
+            auto_transfer_scheduler_runs_total.labels(status="failed").inc()
+        else:
+            auto_transfer_scheduler_runs_total.labels(status="success").inc()
         finally:
             db.close()
 
