@@ -24,7 +24,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from langchain_core.messages import HumanMessage
@@ -209,7 +209,7 @@ async def _record_voice_pipeline(
         navigate_to: 에이전트가 설정한 화면 이동 경로.
     """
     record: dict = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%dT%H:%M:%S+09:00"),
         "request_id": get_request_id(),
         "user_id": user_id,
         "stt_ms": stt_ms,
