@@ -13,7 +13,7 @@ import {
   useState,
 } from 'react';
 import { apiClient } from '@/utils/api';
-import { stopCurrentTts } from '@/utils/ttsPlayer';
+import { stopAllTts } from '@/utils/ttsManager';
 import * as FileSystem from 'expo-file-system';
 
 export type VoiceState = 'idle' | 'listening' | 'processing' | 'error';
@@ -62,7 +62,7 @@ export function MicProvider({ children }: { children: ReactNode }) {
     stopRequestedRef.current = false;
 
     // TTS 재생 중이면 즉시 멈추기
-    await stopCurrentTts();
+    await stopAllTts();
     setVoiceState('listening');
 
     try {

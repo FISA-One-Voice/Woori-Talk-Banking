@@ -310,7 +310,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
             f"mock_execute_{action}",
             f"mock_register_{action}",
             f"mock_get_{action}",
-            f"mock_query_{action}",
             f"execute_{action}",
             f"register_{action}",
             f"query_{action}",
@@ -708,16 +707,9 @@ def build_graph(tools: list) -> CompiledStateGraph:
             # asset 인텐트: 액션별 화면 이동 분기
             if result.intent == "asset":
                 action = dict(result.extracted_slots).get("action")
-                if action == "transaction_list":
-                    # 거래내역 목록 화면 (type=history)
-                    period_val = dict(result.extracted_slots).get("period", "")
-                    nav = f"asset/history?type=history&period={period_val}" if period_val else "asset/history?type=history"
-                    updates["navigate_to"] = nav
-                elif action in ("history", "category", "top_category"):
-                    # 지출수입 요약 화면
-                    period_val = dict(result.extracted_slots).get("period", "")
-                    nav = f"asset/history?period={period_val}" if period_val else "asset/history"
-                    updates["navigate_to"] = nav
+                if action in ("transaction_list", "history", "category", "top_category"):
+                    # 세부 분기(기간·타입)는 프론트엔드가 슬롯 기반으로 처리
+                    updates["navigate_to"] = "asset/history"
                 else:
                     updates["navigate_to"] = "asset"
             if result.intent == "transfer":
@@ -744,7 +736,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 existing = {"action": new_action}
                 updates["navigate_to"] = (
                     "asset" if new_action == "balance"
-                    else f"asset/history?type=history" if new_action == "transaction_list"
                     else "asset/history"
                 )
             for key, val in result.extracted_slots.items():
@@ -1094,14 +1085,11 @@ def build_graph(tools: list) -> CompiledStateGraph:
         # transfer/auto_transfer 등 완료 화면이 있는 액션만 navigate_to 덮어씀.
         if pending in COMPLETE_SCREEN_MAP:
             updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
-        # asset 인텐트: 실행 후 period 포함한 정확한 화면으로 이동
+        # asset 인텐트: 기능 단위로만 라우팅, 세부 분기는 프론트엔드 처리
         if pending == "asset":
             action = slots.get("action", "")
-            period = slots.get("period", "")
-            if action == "transaction_list":
-                updates["navigate_to"] = f"asset/history?type=history&period={period}" if period else "asset/history?type=history"
-            elif action in ("history", "category", "top_category"):
-                updates["navigate_to"] = f"asset/history?period={period}" if period else "asset/history"
+            if action in ("transaction_list", "history", "category", "top_category"):
+                updates["navigate_to"] = "asset/history"
             elif action == "balance":
                 updates["navigate_to"] = "asset"
         return updates
