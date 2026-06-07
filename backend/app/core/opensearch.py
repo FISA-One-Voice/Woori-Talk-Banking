@@ -2,12 +2,16 @@
 # backend/app/core/opensearch.py
 #
 # [인덱스 구성]
-# ├─ financial_docs : RAG 용 금융 지식 문서 (키워드 검색)
-# └─ chatbot_logs   : 사용자별 챗봇 대화 이력
+# ├─ financial_docs  : RAG 용 금융 지식 문서 (키워드 검색)
+# ├─ chatbot_logs    : 사용자별 챗봇 대화 이력
+# ├─ app_logs        : 모든 API 요청/응답 로그 — Fluent Bit 경유 (30일)
+# ├─ voice_pipeline  : STT/agent/TTS 단계별 레이턴시 — 앱 직접 기록 (90일)
+# └─ transfer_audit  : 이체·자동이체 감사 로그 — Fluent Bit 경유 (365일)
 #
 # [다른 파일과의 관계]
-# ├─ config.py  → OPENSEARCH_* 설정값을 가져와 클라이언트 생성에 사용
-# └─ main.py    → 서버 시작 시 create_indices_if_not_exists() 호출
+# ├─ config.py             → OPENSEARCH_* 설정값을 가져와 클라이언트 생성에 사용
+# ├─ main.py               → 서버 시작 시 create_indices_if_not_exists() 호출
+# └─ core/opensearch_writer.py → voice_pipeline 인덱스에 직접 기록
 # =============================================================================
 
 from collections.abc import Generator
@@ -20,6 +24,9 @@ from app.core.exception import OpenSearchIndexError
 
 FINANCIAL_DOCS_INDEX = "financial_docs"
 CHATBOT_LOGS_INDEX = "chatbot_logs"
+APP_LOGS_INDEX = "app_logs"
+VOICE_PIPELINE_INDEX = "voice_pipeline"
+TRANSFER_AUDIT_INDEX = "transfer_audit"
 
 _FINANCIAL_DOCS_MAPPING: dict[str, Any] = {
     "mappings": {
@@ -44,6 +51,57 @@ _CHATBOT_LOGS_MAPPING: dict[str, Any] = {
             "role": {"type": "keyword"},  # "user" | "assistant"
             "message": {"type": "text", "analyzer": "standard"},
             "timestamp": {"type": "date"},
+        }
+    },
+}
+
+_APP_LOGS_MAPPING: dict[str, Any] = {
+    "mappings": {
+        "properties": {
+            "timestamp":   {"type": "date"},
+            "level":       {"type": "keyword"},
+            "logger":      {"type": "keyword"},
+            "request_id":  {"type": "keyword"},
+            "feature":     {"type": "keyword"},
+            "event":       {"type": "keyword"},
+            "message":     {"type": "text", "analyzer": "standard"},
+            "duration_ms": {"type": "integer"},
+            "status_code": {"type": "integer"},
+            "method":      {"type": "keyword"},
+            "path":        {"type": "keyword"},
+        }
+    },
+}
+
+_VOICE_PIPELINE_MAPPING: dict[str, Any] = {
+    "mappings": {
+        "properties": {
+            "timestamp":   {"type": "date"},
+            "request_id":  {"type": "keyword"},
+            "user_id":     {"type": "keyword"},
+            "stt_ms":      {"type": "integer"},
+            "agent_ms":    {"type": "integer"},
+            "tts_ms":      {"type": "integer"},
+            "total_ms":    {"type": "integer"},
+            "intent":      {"type": "keyword"},
+            "navigate_to": {"type": "keyword"},
+            "success":     {"type": "boolean"},
+        }
+    },
+}
+
+_TRANSFER_AUDIT_MAPPING: dict[str, Any] = {
+    "mappings": {
+        "properties": {
+            "timestamp":         {"type": "date"},
+            "request_id":        {"type": "keyword"},
+            "user_id":           {"type": "keyword"},
+            "tx_id":             {"type": "keyword"},
+            "amount":            {"type": "integer"},
+            "to_bank":           {"type": "keyword"},
+            "to_account_masked": {"type": "keyword"},
+            "status":            {"type": "keyword"},
+            "duration_ms":       {"type": "integer"},
         }
     },
 }
@@ -96,7 +154,7 @@ def get_os() -> Generator[OpenSearch, None, None]:
 
 
 def create_indices_if_not_exists() -> None:
-    """financial_docs, chatbot_logs 인덱스가 없으면 생성합니다.
+    """모든 인덱스가 없으면 생성합니다.
 
     이미 존재하는 인덱스는 건너뜁니다. (덮어쓰지 않습니다)
     """
@@ -105,6 +163,9 @@ def create_indices_if_not_exists() -> None:
         for index, mapping in [
             (FINANCIAL_DOCS_INDEX, _FINANCIAL_DOCS_MAPPING),
             (CHATBOT_LOGS_INDEX, _CHATBOT_LOGS_MAPPING),
+            (APP_LOGS_INDEX, _APP_LOGS_MAPPING),
+            (VOICE_PIPELINE_INDEX, _VOICE_PIPELINE_MAPPING),
+            (TRANSFER_AUDIT_INDEX, _TRANSFER_AUDIT_MAPPING),
         ]:
             if not client.indices.exists(index=index):
                 client.indices.create(index=index, body=mapping)
