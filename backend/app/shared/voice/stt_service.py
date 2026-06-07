@@ -5,6 +5,7 @@ import mutagen
 
 from app.core.config import settings
 from app.core.exception import STTError
+from app.core.metrics import external_api_calls_total
 
 SUPPORTED_CONTENT_TYPES = frozenset(
     {
@@ -44,12 +45,14 @@ async def transcribe_audio(
                 params={"lang": "Kor"},
             )
     except httpx.TimeoutException as exc:
+        external_api_calls_total.labels(service="clova_stt", status="error").inc()
         raise STTError(
             code="STT_FAILED",
             message="Clova Speech API 요청 시간이 초과됐습니다.",
             user_message="음성 인식 서비스가 응답하지 않습니다. 잠시 후 다시 시도해 주세요.",
         ) from exc
     except httpx.RequestError as exc:
+        external_api_calls_total.labels(service="clova_stt", status="error").inc()
         raise STTError(
             code="SERVICE_UNAVAILABLE",
             message="Clova Speech API에 연결할 수 없습니다.",
@@ -57,6 +60,7 @@ async def transcribe_audio(
         ) from exc
 
     if response.status_code != 200:
+        external_api_calls_total.labels(service="clova_stt", status="error").inc()
         raise STTError(
             code="STT_FAILED",
             message=f"Clova Speech API 오류: status={response.status_code}, body={response.text}",
@@ -66,11 +70,13 @@ async def transcribe_audio(
     payload = response.json()
     text: str | None = payload.get("text")
     if not text:
+        external_api_calls_total.labels(service="clova_stt", status="error").inc()
         raise STTError(
             code="STT_FAILED",
             message="Clova Speech 응답에 텍스트가 없습니다.",
         )
 
+    external_api_calls_total.labels(service="clova_stt", status="success").inc()
     return text
 
 
