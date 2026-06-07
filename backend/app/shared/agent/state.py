@@ -68,3 +68,4 @@ class VoiceState(TypedDict):
     last_order_id: str | None
     agent_domain: str | None
     analytics_period: str | None
+    remaining_steps: int

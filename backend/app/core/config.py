@@ -124,6 +124,9 @@ class Settings(BaseSettings):
     ANTI_SPOOFING_EC2_URL: str = "http://localhost:8003"
     USE_ANTI_SPOOFING: bool = False
 
+    # ── 한국은행 API 키 ─────────────────────
+    BOK_ECOS_API_KEY: str = ""
+
     # ── LangSmith 트레이싱 (개발 전용 — 프로덕션에서는 미설정) ────────────────────────
     # .env에 LANGSMITH_* 형식으로 설정한다.
     # LangChain/LangGraph는 os.environ을 직접 읽으므로 model_post_init에서 반영한다.

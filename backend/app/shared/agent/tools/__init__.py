@@ -29,8 +29,8 @@ from app.shared.agent.tools.transfer import add_note, execute_transfer
 
 # ── Dev-D (RAGAgent tools) ────────────────────────────────────────────────────
 # Dev-D: 이 구역에만 추가
-# from app.shared.agent.tools.financial_qa import search_financial_docs
-# from app.shared.agent.tools.market_info import get_exchange_rate, get_base_rate
+from app.shared.agent.tools.financial_qa import search_financial_docs
+from app.shared.agent.tools.market_info import get_exchange_rate, get_base_rate
 
 
 # TransferAgent 서브그래프 전용 tool 목록.

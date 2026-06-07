@@ -196,6 +196,8 @@ async def _handle_normal_flow(
     Args:
         audio_bytes: 원시 오디오 바이트.
         user_id: JWT 사용자 ID.
+        db: SQLAlchemy DB 세션.
+        content_type: 오디오 포맷.
         config: LangGraph thread_id 설정.
         graph: 컴파일된 StateGraph 인스턴스.
 
