@@ -6,10 +6,13 @@
 """
 
 import json
+import logging
 import re
 import uuid
 
 from langchain_core.tools import tool
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import SessionLocal
 from app.core.exception import AutoTransferError, RecipientError
@@ -167,6 +170,14 @@ def execute_auto_transfer(
             f"{result.amount:,}원 자동이체가 등록되었습니다."
         )
 
+        logger.info(
+            "auto_transfer_register_success",
+            extra={
+                "event": "auto_transfer_register_success",
+                "order_id": result.order_id,
+                "user_id": user_id,
+            },
+        )
         return json.dumps(
             {
                 "success": True,
@@ -178,11 +189,28 @@ def execute_auto_transfer(
         )
 
     except (AutoTransferError, RecipientError) as e:
+        logger.warning(
+            "auto_transfer_register_failed",
+            extra={
+                "event": "auto_transfer_register_failed",
+                "user_id": user_id,
+                "error_code": e.code,
+            },
+        )
         return json.dumps(
             {"success": False, "error_code": e.code, "tts_text": e.user_message or e.message},
             ensure_ascii=False,
         )
-    except Exception:
+    except Exception as e:
+        logger.error(
+            "auto_transfer_register_failed",
+            extra={
+                "event": "auto_transfer_register_failed",
+                "user_id": user_id,
+                "error_code": "INTERNAL_ERROR",
+                "error": str(e),
+            },
+        )
         return json.dumps(
             {
                 "success": False,
