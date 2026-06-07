@@ -37,7 +37,7 @@
       },
       "targets": [
         {
-          "expr": "rate(http_requests_total{handler=~\"/api/voice.*\",status=~\"2..\"}[5m]) / rate(http_requests_total{handler=~\"/api/voice.*\"}[5m]) * 100",
+          "expr": "rate(http_requests_total{handler=\"/api/voice/voice\",status=~\"2..\"}[5m]) / rate(http_requests_total{handler=\"/api/voice/voice\"}[5m]) * 100",
           "legendFormat": "성공률",
           "refId": "A"
         }
@@ -61,17 +61,17 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{handler=~\"/api/voice.*\"}[5m]))",
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{handler=\"/api/voice/voice\"}[5m]))",
           "legendFormat": "P50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{handler=~\"/api/voice.*\"}[5m]))",
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{handler=\"/api/voice/voice\"}[5m]))",
           "legendFormat": "P95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{handler=~\"/api/voice.*\"}[5m]))",
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{handler=\"/api/voice/voice\"}[5m]))",
           "legendFormat": "P99",
           "refId": "C"
         }
@@ -114,7 +114,7 @@
       "id": 4,
       "title": "ASV 인증 결과",
       "type": "bargauge",
-      "gridPos": { "h": 4, "w": 16, "x": 0, "y": 4 },
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "short", "min": 0 },
@@ -133,6 +133,41 @@
         {
           "expr": "asv_verification_total",
           "legendFormat": "{{result}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "ASV 통과율",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "sum(asv_verification_total{result=\"pass\"}) / sum(asv_verification_total) * 100",
+          "legendFormat": "통과율",
           "refId": "A"
         }
       ]
@@ -177,7 +212,7 @@
       },
       "targets": [
         {
-          "expr": "rate(http_requests_total{handler=~\"/api/voice.*\"}[1m])",
+          "expr": "rate(http_requests_total{handler=\"/api/voice/voice\"}[1m])",
           "legendFormat": "요청/초",
           "refId": "A"
         }
