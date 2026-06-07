@@ -1,0 +1,214 @@
+{
+  "title": "음성 파이프라인 현황",
+  "uid": "woori-voice-pipeline",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["woori"],
+  "panels": [
+    {
+      "id": 1,
+      "title": "파이프라인 성공률",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 90 },
+              { "color": "green", "value": 95 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{handler=~\"/api/voice.*\",status=~\"2..\"}[5m]) / rate(http_requests_total{handler=~\"/api/voice.*\"}[5m]) * 100",
+          "legendFormat": "성공률",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "전체 P50 / P95 / P99 응답시간",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 10, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{handler=~\"/api/voice.*\"}[5m]))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{handler=~\"/api/voice.*\"}[5m]))",
+          "legendFormat": "P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{handler=~\"/api/voice.*\"}[5m]))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "STT / Agent / TTS 단계별 평균 레이턴시",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "min": 0 },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "displayMode": "gradient"
+      },
+      "targets": [
+        {
+          "expr": "rate(voice_pipeline_stage_duration_seconds_sum{stage=\"stt\"}[5m]) / rate(voice_pipeline_stage_duration_seconds_count{stage=\"stt\"}[5m]) * 1000",
+          "legendFormat": "STT",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(voice_pipeline_stage_duration_seconds_sum{stage=\"agent\"}[5m]) / rate(voice_pipeline_stage_duration_seconds_count{stage=\"agent\"}[5m]) * 1000",
+          "legendFormat": "Agent",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(voice_pipeline_stage_duration_seconds_sum{stage=\"tts\"}[5m]) / rate(voice_pipeline_stage_duration_seconds_count{stage=\"tts\"}[5m]) * 1000",
+          "legendFormat": "TTS",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "ASV 인증 결과",
+      "type": "bargauge",
+      "gridPos": { "h": 4, "w": 16, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "min": 0 },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "spoofing" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "fail" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "pass" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "displayMode": "gradient"
+      },
+      "targets": [
+        {
+          "expr": "asv_verification_total",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "단계별 레이턴시 시계열",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "lineWidth": 2 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(voice_pipeline_stage_duration_seconds_sum{stage=\"stt\"}[5m]) / rate(voice_pipeline_stage_duration_seconds_count{stage=\"stt\"}[5m]) * 1000",
+          "legendFormat": "STT",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(voice_pipeline_stage_duration_seconds_sum{stage=\"agent\"}[5m]) / rate(voice_pipeline_stage_duration_seconds_count{stage=\"agent\"}[5m]) * 1000",
+          "legendFormat": "Agent",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(voice_pipeline_stage_duration_seconds_sum{stage=\"tts\"}[5m]) / rate(voice_pipeline_stage_duration_seconds_count{stage=\"tts\"}[5m]) * 1000",
+          "legendFormat": "TTS",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "초당 음성 요청 수",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{handler=~\"/api/voice.*\"}[1m])",
+          "legendFormat": "요청/초",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "인텐트 분포 (OpenSearch)",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "pieType": "donut", "legendDisplayMode": "table", "placement": "right" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "voice_pipeline",
+          "query": "intent:*",
+          "metrics": [{ "type": "count", "id": "1" }],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "terms",
+              "field": "intent.keyword",
+              "id": "2",
+              "settings": { "size": "10", "order": "desc", "orderBy": "1", "min_doc_count": "1" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
