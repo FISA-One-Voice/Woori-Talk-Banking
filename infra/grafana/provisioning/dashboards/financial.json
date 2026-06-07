@@ -2,7 +2,7 @@
   "title": "금융 거래 현황",
   "uid": "woori-financial",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "time": { "from": "now-1h", "to": "now" },
   "timezone": "browser",
@@ -12,7 +12,7 @@
       "id": 1,
       "title": "이체 성공 / 실패 건수",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "short" },
@@ -28,23 +28,16 @@
         "graphMode": "none"
       },
       "targets": [
-        {
-          "expr": "transfer_total{status=\"success\"}",
-          "legendFormat": "성공",
-          "refId": "A"
-        },
-        {
-          "expr": "transfer_total{status=\"failed\"}",
-          "legendFormat": "실패",
-          "refId": "B"
-        }
+        { "expr": "transfer_total{status=\"success\"}", "legendFormat": "성공", "refId": "A" },
+        { "expr": "transfer_total{status=\"failed\"}", "legendFormat": "실패", "refId": "B" }
       ]
     },
     {
       "id": 2,
-      "title": "자동이체 스케줄러 실행 결과",
+      "title": "자동이체 스케줄러 실시간 성공 / 실패",
+      "description": "APScheduler 실행 결과 — 방금 성공했는지 실패했는지 실시간 확인 (Prometheus)",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": { "unit": "short" },
@@ -60,23 +53,46 @@
         "graphMode": "none"
       },
       "targets": [
+        { "expr": "auto_transfer_scheduler_runs_total{status=\"success\"}", "legendFormat": "성공", "refId": "A" },
+        { "expr": "auto_transfer_scheduler_runs_total{status=\"failed\"}", "legendFormat": "실패", "refId": "B" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "자동이체 누적 실행 이력 (PostgreSQL)",
+      "description": "transactions 테이블 tx_type=auto_transfer 기준 전체 누적 성공/실패 건수",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "postgres" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "성공" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "실패" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
         {
-          "expr": "auto_transfer_scheduler_runs_total{status=\"success\"}",
-          "legendFormat": "성공",
-          "refId": "A"
-        },
-        {
-          "expr": "auto_transfer_scheduler_runs_total{status=\"failed\"}",
-          "legendFormat": "실패",
-          "refId": "B"
+          "refId": "A",
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "rawSql": "SELECT COUNT(*) FILTER (WHERE status = 'completed') AS \"성공\", COUNT(*) FILTER (WHERE status = 'failed') AS \"실패\" FROM transactions WHERE tx_type = 'auto_transfer'",
+          "format": "table",
+          "rawQuery": true
         }
       ]
     },
     {
       "id": 3,
       "title": "자동이체 등록 건수 (PostgreSQL)",
+      "description": "standing_orders 테이블 전체 등록 건수 — 실제 DB 기준",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
       "datasource": { "type": "postgres", "uid": "postgres" },
       "fieldConfig": {
         "defaults": { "unit": "short", "color": { "fixedColor": "blue", "mode": "fixed" } },
