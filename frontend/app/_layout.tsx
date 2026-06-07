@@ -10,6 +10,7 @@ import { FALLBACK_MESSAGE } from '@/utils/errorHandler';
 import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { speakText, stopAllTts } from '@/utils/ttsManager';
 import { agentPathFromNavigateTo, shouldNavigateToRoute } from '@/utils/voiceNavigation';
+import { Audio } from 'expo-av';
 import { Href, Stack, useRouter, useSegments } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
@@ -221,6 +222,12 @@ export default function RootLayout() {
   );
 
   const hasVoiceRegistered = useAuthStore((state) => state.hasVoiceRegistered);
+
+  useEffect(() => {
+    if (hasVoiceRegistered) {
+      Audio.requestPermissionsAsync();
+    }
+  }, [hasVoiceRegistered]);
 
   return (
     <Pressable
