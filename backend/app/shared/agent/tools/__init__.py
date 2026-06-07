@@ -53,7 +53,7 @@ from app.shared.agent.tools.transfer import add_note, execute_transfer
 # ── Dev-D (RAGAgent tools) ────────────────────────────────────────────────────
 # Dev-D: 이 구역에만 추가
 from app.shared.agent.tools.financial_qa import search_financial_docs
-# from app.shared.agent.tools.market_info import get_exchange_rate, get_base_rate
+from app.shared.agent.tools.market_info import get_exchange_rate, get_base_rate
 
 # ── Mock tool 목록 ─────────────────────────────────────────────────────────────
 # 실제 tool 완성 전까지 사용하는 mock 구현체.
@@ -94,6 +94,8 @@ _REAL_TOOLS: list = [
     
     # Dev-D (RAG)
     search_financial_docs,
+    get_exchange_rate,
+    get_base_rate,
 ]
 
 # ── 활성 tool 목록 ─────────────────────────────────────────────────────────────
