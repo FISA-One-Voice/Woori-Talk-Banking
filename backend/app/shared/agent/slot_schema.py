@@ -56,6 +56,9 @@ MEMO_OFFER_SUFFIX: str = (
     "건너뛰기라고 말씀해 주세요."
 )
 
+# 이체 실패 TTS 끝 — 프론트 transfer/failed 자동 홈 이동과 동기화
+TRANSFER_FAILED_HOME_SUFFIX: str = " 홈 화면으로 이동합니다."
+
 # ── 슬롯별 TTS 질문 템플릿 ────────────────────────────────────────────────────────
 # slot_fill_node에서 첫 번째 누락 슬롯의 질문을 TTS로 반환한다.
 SLOT_QUESTIONS: dict[str, str] = {
@@ -84,6 +87,11 @@ COMPLETE_SCREEN_MAP: dict[str, str] = {
     "transfer": "transfer/complete",
     "auto_transfer": "auto-transfer/complete",
     "cancel_auto_transfer": "auto-transfer",
+}
+
+# execute_node 이체 실패 시 프론트엔드 실패 화면 (SCR004-F08)
+FAILED_SCREEN_MAP: dict[str, str] = {
+    "transfer": "transfer/failed",
 }
 
 # ── 확인(네/아니오) TTS 안내 ─────────────────────────────────────────────────────

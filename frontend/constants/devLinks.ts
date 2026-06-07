@@ -14,5 +14,6 @@ export const DEV_LINKS: DevLinkItem[] = [
   { label: '자동이체 완료 화면', path: '/auto-transfer/complete' },
   { label: '송금 화면 (Real API)', path: '/transfer' },
   { label: '송금 완료 화면', path: '/transfer/complete' },
+  { label: '송금 실패 (SCR004-F08)', path: '/transfer/failed' },
   { label: '[테스트] 이체 플로우 시나리오', path: '/dev/transfer-test' },
 ];

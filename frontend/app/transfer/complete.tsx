@@ -6,6 +6,7 @@ import { COLORS, LAYOUT } from '@/constants/theme';
 import { useTransferStore } from '@/store/transferStore';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { saveMemo } from '@/services/transferService';
+import { extractApiErrorMessage } from '@/utils/errorHandler';
 import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { resolveCompletePhase, type CompletePhase } from './completeStepResolver';
 import { CompleteSummaryView } from './views/CompleteSummaryView';
@@ -17,6 +18,7 @@ export default function TransferCompleteScreen() {
   const lastResponse = useVoiceResponseStore((s) => s.lastResponse);
   const [localPhase, setLocalPhase] = useState<CompletePhase>('summary');
   const [memoSaved, setMemoSaved] = useState<string | null>(null);
+  const [memoErrorMessage, setMemoErrorMessage] = useState('');
 
   const phase = resolveCompletePhase(localPhase);
 
@@ -31,10 +33,10 @@ export default function TransferCompleteScreen() {
   }, []);
 
   useEffect(() => {
-    if (!txId && !recipient) {
+    if (!txId) {
       goHome();
     }
-  }, [txId, recipient, goHome]);
+  }, [txId, goHome]);
 
   useEffect(() => {
     if (lastResponse?.navigate_to === 'home') {
@@ -51,7 +53,8 @@ export default function TransferCompleteScreen() {
       await saveMemo(txId, category);
       setMemoSaved(category);
       setLocalPhase('memo_done');
-    } catch {
+    } catch (err) {
+      setMemoErrorMessage(extractApiErrorMessage(err));
       setLocalPhase('error');
     }
   };
@@ -67,7 +70,9 @@ export default function TransferCompleteScreen() {
       <View style={styles.body}>
         <TopBar variant="back" title="송금" onBack={goHome} />
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {phase === 'error' && <CompleteErrorView onGoHome={goHome} />}
+          {phase === 'error' && (
+            <CompleteErrorView errorMessage={memoErrorMessage} onGoHome={goHome} />
+          )}
           {phase === 'memo_done' && (
             <CompleteMemoDoneView category={memoSaved ?? ''} onGoHome={goHome} />
           )}
