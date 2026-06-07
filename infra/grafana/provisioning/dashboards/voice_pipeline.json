@@ -37,7 +37,7 @@
       },
       "targets": [
         {
-          "expr": "rate(http_requests_total{handler=\"/api/voice/voice\",status=~\"2..\"}[5m]) / rate(http_requests_total{handler=\"/api/voice/voice\"}[5m]) * 100",
+          "expr": "rate(http_requests_total{handler=\"/api/voice/voice\",status=\"2xx\"}[5m]) / rate(http_requests_total{handler=\"/api/voice/voice\"}[5m]) * 100",
           "legendFormat": "성공률",
           "refId": "A"
         }

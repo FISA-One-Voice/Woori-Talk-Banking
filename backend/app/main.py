@@ -112,10 +112,13 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 @app.exception_handler(AppError)
 async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
     logger.error(
-        "[AppError] code=%s status=%s message=%s",
-        exc.code,
-        exc.status_code,
-        exc.message,
+        "app_error",
+        extra={
+            "event": "app_error",
+            "code": exc.code,
+            "status_code": exc.status_code,
+            "error_message": exc.message,
+        },
     )
     app_error_total.labels(code=exc.code).inc()
     return JSONResponse(

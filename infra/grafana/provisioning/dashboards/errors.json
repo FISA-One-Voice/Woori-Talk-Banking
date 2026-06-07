@@ -2,7 +2,7 @@
   "title": "에러 분석",
   "uid": "woori-errors",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "time": { "from": "now-1h", "to": "now" },
   "timezone": "browser",
@@ -11,8 +11,82 @@
     {
       "id": 1,
       "title": "HTTP 5xx 발생 건수",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 100,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"] },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "targets": [
+        {
+          "expr": "increase(http_requests_total{status=\"5xx\"}[5m])",
+          "legendFormat": "5xx (5분)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "전체 에러율",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{status=~\"4xx|5xx\"}[5m]) / rate(http_requests_total[5m]) * 100",
+          "legendFormat": "에러율",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "최다 발생 에러 코드",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
@@ -22,22 +96,23 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 10 }
             ]
           }
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "calcs": ["sum"] },
+        "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "background",
         "graphMode": "none",
         "textMode": "value_and_name"
       },
       "targets": [
         {
-          "expr": "increase(http_requests_total{status=~\"5..\"}[5m])",
-          "legendFormat": "5xx (5분)",
+          "expr": "topk(1, app_error_total)",
+          "legendFormat": "{{code}}",
           "refId": "A"
         }
       ]
@@ -46,12 +121,12 @@
       "id": 2,
       "title": "HTTP 4xx / 5xx 비율 시계열",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "custom": { "lineWidth": 2 }
+          "custom": { "lineWidth": 2, "fillOpacity": 15 }
         },
         "overrides": [
           { "matcher": { "id": "byName", "options": "5xx 비율" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
@@ -60,12 +135,12 @@
       },
       "targets": [
         {
-          "expr": "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) * 100",
+          "expr": "rate(http_requests_total{status=\"5xx\"}[5m]) / rate(http_requests_total[5m]) * 100",
           "legendFormat": "5xx 비율",
           "refId": "A"
         },
         {
-          "expr": "rate(http_requests_total{status=~\"4..\"}[5m]) / rate(http_requests_total[5m]) * 100",
+          "expr": "rate(http_requests_total{status=\"4xx\"}[5m]) / rate(http_requests_total[5m]) * 100",
           "legendFormat": "4xx 비율",
           "refId": "B"
         }
@@ -75,7 +150,7 @@
       "id": 3,
       "title": "AppError 코드별 발생 건수",
       "type": "bargauge",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 14 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
@@ -102,14 +177,14 @@
       "id": 4,
       "title": "에러 스파이크 타임라인 (분당 전체 에러)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 14 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "custom": {
             "lineWidth": 2,
-            "fillOpacity": 20,
+            "fillOpacity": 30,
             "drawStyle": "line"
           },
           "color": { "fixedColor": "red", "mode": "fixed" }
@@ -118,7 +193,7 @@
       },
       "targets": [
         {
-          "expr": "rate(http_requests_total{status=~\"[45]..\"}[1m]) * 60",
+          "expr": "rate(http_requests_total{status=~\"4xx|5xx\"}[1m]) * 60",
           "legendFormat": "에러/분",
           "refId": "A"
         }
@@ -127,14 +202,19 @@
     {
       "id": 7,
       "title": "에러 코드별 발생 추이",
-      "description": "에러가 발생한 코드만 라인으로 표시 (0인 코드는 숨김)",
+      "description": "에러가 발생한 코드만 표시 (0인 코드는 숨김)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 23 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 80,
+            "drawStyle": "bars",
+            "stacking": { "mode": "normal", "group": "A" }
+          },
           "color": { "mode": "palette-classic" }
         },
         "overrides": []
@@ -151,7 +231,7 @@
       "id": 5,
       "title": "에러 로그 검색 (OpenSearch — level:ERROR 최신 30건)",
       "type": "table",
-      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 24 },
+      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 31 },
       "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
       "fieldConfig": { "defaults": {}, "overrides": [] },
       "options": { "sortBy": [] },
@@ -170,51 +250,74 @@
     {
       "id": 6,
       "title": "기능별 에러 분포",
-      "type": "piechart",
-      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 24 },
+      "type": "barchart",
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 31 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": {}, "overrides": [] },
-      "options": { "pieType": "donut", "legendDisplayMode": "table", "placement": "bottom" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "vertical",
+        "barRadius": 0.05,
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "stacking": "none",
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" },
+        "xTickLabelRotation": -30
+      },
       "targets": [
         {
           "expr": "sum(app_error_total{code=~\"TOKEN_INVALID|UNAUTHORIZED|USER_NOT_FOUND\"})",
           "legendFormat": "인증",
-          "refId": "A"
+          "refId": "A",
+          "instant": true
         },
         {
           "expr": "sum(app_error_total{code=~\"STT_FAILED|VOICE_AUDIO_INVALID_FORMAT|VOICE_AUDIO_TOO_LARGE|VOICE_AUDIO_TOO_LONG|VOICE_VECTOR_EXTRACT_FAILED|TTS_SPEED_OUT_OF_RANGE\"})",
           "legendFormat": "음성처리",
-          "refId": "B"
+          "refId": "B",
+          "instant": true
         },
         {
           "expr": "sum(app_error_total{code=~\"ASV_NOT_ENROLLED|ASV_SERVER_ERROR|ASV_TIMEOUT\"})",
           "legendFormat": "ASV",
-          "refId": "C"
+          "refId": "C",
+          "instant": true
         },
         {
           "expr": "sum(app_error_total{code=~\"ACCOUNT_NOT_FOUND|INVALID_ACCOUNT_FORMAT|INSUFFICIENT_BALANCE|TRANSFER_ACCOUNT_NOT_FOUND|TRANSFER_PENDING|TRANSFER_RECIPIENT_NOT_FOUND|TRANSACTION_NOT_FOUND|IDEMPOTENCY_KEY_USED|TX_NOT_FOUND\"})",
           "legendFormat": "이체",
-          "refId": "D"
+          "refId": "D",
+          "instant": true
         },
         {
           "expr": "sum(app_error_total{code=~\"AUTO_ORDER_ACCOUNT_NOT_FOUND|AUTO_ORDER_NOT_FOUND|AUTO_ORDER_STATUS_INVALID|AUTO_ORDER_TERMS_NOT_AGREED|AUTO_ORDER_WITHDRAWAL_PASSWORD_INVALID\"})",
           "legendFormat": "자동이체",
-          "refId": "E"
+          "refId": "E",
+          "instant": true
         },
         {
           "expr": "sum(app_error_total{code=~\"AGENT_CONFIG_ERROR|AGENT_INIT_FAILED\"})",
           "legendFormat": "에이전트",
-          "refId": "F"
+          "refId": "F",
+          "instant": true
         },
         {
           "expr": "sum(app_error_total{code=~\"EVENT_NOT_FOUND|INVALID_EVENT_ID|ALREADY_PARTICIPATED\"})",
           "legendFormat": "이벤트",
-          "refId": "G"
+          "refId": "G",
+          "instant": true
         },
         {
           "expr": "sum(app_error_total{code=~\"SEARCH_FAILED|INDEX_CREATION_FAILED|RECIPIENT_NOT_FOUND|INTERNAL_ERROR|INVALID_REQUEST|SERVICE_UNAVAILABLE\"})",
           "legendFormat": "기타",
-          "refId": "H"
+          "refId": "H",
+          "instant": true
         }
       ]
     }
