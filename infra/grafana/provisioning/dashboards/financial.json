@@ -74,35 +74,26 @@
     },
     {
       "id": 3,
-      "title": "자동이체 등록 건수 (OpenSearch)",
+      "title": "자동이체 등록 건수 (PostgreSQL)",
       "type": "stat",
       "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
-      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "datasource": { "type": "postgres", "uid": "postgres" },
       "fieldConfig": {
         "defaults": { "unit": "short", "color": { "fixedColor": "blue", "mode": "fixed" } },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "calcs": ["sum"] },
+        "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "background",
         "graphMode": "none"
       },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
-          "index": "app_logs",
-          "query": "event:agent_auto_transfer_registered",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": { "interval": "auto", "min_doc_count": "0" }
-            }
-          ]
+          "datasource": { "type": "postgres", "uid": "postgres" },
+          "rawSql": "SELECT COUNT(*) AS \"등록건수\" FROM standing_orders",
+          "format": "table",
+          "rawQuery": true
         }
       ]
     },
