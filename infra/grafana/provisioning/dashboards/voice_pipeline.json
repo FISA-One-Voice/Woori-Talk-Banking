@@ -260,7 +260,7 @@
           "refId": "A",
           "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
           "index": "voice_pipeline",
-          "query": "intent:*",
+          "query": "NOT intent:unknown",
           "metrics": [{ "type": "count", "id": "1" }],
           "timeField": "timestamp",
           "bucketAggs": [
@@ -268,7 +268,7 @@
               "type": "terms",
               "field": "intent.keyword",
               "id": "2",
-              "settings": { "size": "10", "order": "desc", "orderBy": "1", "min_doc_count": "1" }
+              "settings": { "size": "20", "order": "desc", "orderBy": "1", "min_doc_count": "1" }
             }
           ]
         }
