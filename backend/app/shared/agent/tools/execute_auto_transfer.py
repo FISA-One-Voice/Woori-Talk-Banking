@@ -171,10 +171,10 @@ def execute_auto_transfer(
         )
 
         logger.info(
-            "auto_transfer_register_success",
+            "agent_auto_transfer_registered",
             extra={
-                "event": "auto_transfer_register_success",
-                "order_id": result.order_id,
+                "event": "agent_auto_transfer_registered",
+                "order_id": str(result.order_id),
                 "user_id": user_id,
             },
         )
