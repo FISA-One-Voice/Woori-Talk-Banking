@@ -39,7 +39,13 @@ MOCK_TOOLS: list = [
     mock_get_events,
 ]
 
-from app.shared.agent.tools.asset import query_asset
+from app.shared.agent.tools.asset import (
+    get_balance,
+    get_category_expense,
+    get_income_expense_summary,
+    get_top_spending_category,
+    get_transaction_list,
+)
 from app.shared.agent.tools.auto_transfer import add_auto_transfer_note
 from app.shared.agent.tools.balance import get_account_balance_by_id, get_total_balance
 from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
@@ -64,7 +70,11 @@ from app.shared.agent.tools.transfer import add_note, execute_transfer, get_tran
 #   auto_transfer (D): from app.shared.agent.tools.auto_transfer import (
 #                          register_auto_transfer)
 _REAL_TOOLS: list = [
-    query_asset,
+    get_balance,
+    get_income_expense_summary,
+    get_category_expense,
+    get_top_spending_category,
+    get_transaction_list,
     get_total_balance,
     get_account_balance_by_id,
     get_recent_history,

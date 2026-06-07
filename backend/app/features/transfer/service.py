@@ -1,17 +1,27 @@
 """이체 비즈니스 로직."""
 
+import logging
 import re
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.exception import TransferError
-from app.features.recipients.service import resolve_by_id
+from app.core.exception import AppError, TransferError
+from app.features.recipients.service import (
+    lookup_recipient_for_transfer,
+    resolve_by_id,
+    resolve_direct_account,
+)
 from app.models.account import Account
 from app.models.transaction import Transaction
 from app.shared.crypto import decrypt, encrypt
+
+logger = logging.getLogger(__name__)
+
+_KST = timezone(timedelta(hours=9))
 
 _ACCOUNT_RE = re.compile(r"^\d{10,14}$")
 
@@ -251,3 +261,103 @@ def get_recent_recipients(db: Session, user_id: str, limit: int = 5) -> list[dic
             }
         )
     return result
+
+
+# ── 에이전트 tool용 TTS 래퍼 ─────────────────────────────────────────────────
+# tools/transfer.py는 아래 함수를 호출하는 thin wrapper만 둔다.
+
+def execute_transfer_tts(
+    db: Session,
+    user_id: str,
+    recipient: str,
+    amount: int,
+    collected_slots: dict | None = None,
+) -> tuple[str, str | None]:
+    """이체를 실행하고 (TTS 메시지, tx_id)를 반환한다."""
+    slots = collected_slots or {}
+    try:
+        user_uuid = uuid.UUID(user_id)
+        recipient_id = slots.get("recipient_id")
+        if recipient_id:
+            resolved = resolve_by_id(db, user_uuid, str(recipient_id))
+        elif slots.get("account_number") and slots.get("bank_name"):
+            resolved = resolve_direct_account(
+                str(slots["account_number"]),
+                str(slots["bank_name"]),
+                recipient_name=str(slots.get("recipient") or recipient or "수취인"),
+            )
+        else:
+            resolved = lookup_recipient_for_transfer(
+                db,
+                user_uuid,
+                recipient,
+                bank_name=str(slots["bank_name"]) if slots.get("bank_name") else None,
+            )
+
+        if resolved is None:
+            return f"{recipient}님을 찾을 수 없습니다. 다시 확인해 주세요.", None
+
+        display_name = str(slots.get("recipient") or recipient or resolved.recipient_name)
+        receipt = execute_transfer(
+            db=db,
+            user_id=user_id,
+            recipient=resolved.account_number,
+            bank_name=resolved.bank_name,
+            amount=amount,
+            idempotency_key=str(uuid.uuid4()),
+            recipient_name=resolved.recipient_name,
+            recipient_id=str(resolved.recipient_id) if resolved.recipient_id else None,
+        )
+        return f"{display_name}님께 {amount:,}원 이체가 완료되었습니다.", receipt["txId"]
+    except AppError as e:
+        logger.warning("execute_transfer_tts AppError: user=%s code=%s", user_id, e.code)
+        return e.user_message or e.message, None
+    except Exception as e:
+        logger.error("execute_transfer_tts 실패: user=%s error=%s", user_id, e)
+        return "이체 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.", None
+
+
+def add_note_tts(db: Session, user_id: str, memo: str, tx_id: str) -> str:
+    """이체 거래에 메모를 추가하고 TTS 메시지를 반환한다."""
+    try:
+        update_memo(db=db, user_id=user_id, tx_id=tx_id, memo=memo)
+        return f"'{memo}' 메모가 추가되었습니다."
+    except AppError as e:
+        logger.warning("add_note_tts AppError: user=%s code=%s", user_id, e.code)
+        return e.user_message or e.message
+    except Exception as e:
+        logger.error("add_note_tts 실패: user=%s tx_id=%s error=%s", user_id, tx_id, e)
+        return "메모 추가 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+
+
+def get_transfer_history_tts(db: Session, user_id: str, days: int = 30) -> str:
+    """최근 이체 내역을 TTS 문자열로 반환한다."""
+    try:
+        user_uuid = uuid.UUID(user_id)
+        since = datetime.now(_KST).replace(tzinfo=None) - timedelta(days=days)
+        txs = (
+            db.query(Transaction)
+            .filter(
+                Transaction.user_id == user_uuid,
+                Transaction.status == "completed",
+                Transaction.tx_type.in_(["transfer", "auto_transfer"]),
+                Transaction.created_at >= since,
+            )
+            .order_by(Transaction.created_at.desc())
+            .limit(10)
+            .all()
+        )
+        if not txs:
+            return f"최근 {days}일간 이체 내역이 없습니다."
+        parts = []
+        for tx in txs:
+            type_label = "자동이체" if tx.tx_type == "auto_transfer" else "이체"
+            name = tx.to_name or "수취인"
+            text = f"{name}에게 {tx.amount:,}원 {type_label}"
+            if tx.memo:
+                text += f", 메모 '{tx.memo}'"
+            parts.append(text)
+        return f"이체 내역 알려드리겠습니다. 최근 {len(txs)}건입니다. " + ". ".join(parts) + "."
+    except Exception as e:
+        logger.error("get_transfer_history_tts 실패: user=%s error=%s", user_id, e)
+        return "이체 내역 조회 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
