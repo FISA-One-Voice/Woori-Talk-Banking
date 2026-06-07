@@ -7,6 +7,7 @@ import pytest
 from langchain_core.messages import HumanMessage
 
 from app.core.exception import AgentError
+from app.features.recipients.schema import ResolvedRecipient
 from app.shared.agent.graph import build_graph
 from app.shared.agent.subgraphs.transfer import (
     IntentResult,
@@ -14,7 +15,7 @@ from app.shared.agent.subgraphs.transfer import (
     build_transfer_graph,
     validate_transfer_delta,
 )
-from app.shared.agent.tools import MOCK_TOOLS, TRANSFER_MOCK_TOOLS
+from app.shared.agent.tools import ALL_TOOLS, TRANSFER_TOOLS
 
 
 def _thread_config() -> dict:
@@ -26,13 +27,13 @@ def _minimal_transfer_state(text: str) -> dict:
     """TRANSFER_READ 기준 최소 실행 state를 만든다."""
     return {
         "messages": [HumanMessage(content=text)],
-        "user_id": "test-user",
+        "user_id": "00000000-0000-0000-0000-000000000001",
         "pending_action": None,
         "collected_slots": {},
         "awaiting_confirmation": False,
         "awaiting_asv_audio": False,
         "execution_ready": False,
-        "recipient_validated": False,
+        "recipient_validated": True,
         "asv_retry_count": 0,
         "awaiting_memo_decision": False,
         "awaiting_transfer_clarification": False,
@@ -40,6 +41,11 @@ def _minimal_transfer_state(text: str) -> dict:
         "last_tx_id": None,
         "last_order_id": None,
     }
+
+
+def _mock_db():
+    """DB 세션 mock — tool 내 get_db() / SessionLocal() 대체."""
+    return MagicMock()
 
 
 def test_transfer_domain_actions_are_local_contract() -> None:
@@ -71,13 +77,13 @@ def test_validate_transfer_delta_rejects_invalid_navigate_to() -> None:
 
 def test_build_transfer_graph_has_no_own_checkpointer() -> None:
     """TransferAgent 서브그래프는 부모 checkpointer를 공유한다."""
-    graph = build_transfer_graph(TRANSFER_MOCK_TOOLS)
+    graph = build_transfer_graph(TRANSFER_TOOLS)
     assert getattr(graph, "checkpointer", None) is None
 
 
 def test_existing_build_graph_public_api_is_preserved() -> None:
     """기존 voice pipeline이 의존하는 build_graph(tools)를 유지한다."""
-    graph = build_graph(MOCK_TOOLS)
+    graph = build_graph(ALL_TOOLS)
     assert hasattr(graph, "invoke")
     assert hasattr(graph, "ainvoke")
 
@@ -93,7 +99,7 @@ def test_transfer_intent_sets_pending_action_and_navigate_to() -> None:
         "langchain_openai.ChatOpenAI.with_structured_output",
         return_value=mock_llm,
     ):
-        graph = build_transfer_graph(TRANSFER_MOCK_TOOLS)
+        graph = build_transfer_graph(TRANSFER_TOOLS)
         result = graph.invoke(
             _minimal_transfer_state("엄마한테 이체해줘"),
             config=_thread_config(),
@@ -110,7 +116,7 @@ def test_awaiting_asv_audio_ends_without_llm_call() -> None:
         "langchain_openai.ChatOpenAI.with_structured_output",
         return_value=mock_llm,
     ):
-        graph = build_transfer_graph(TRANSFER_MOCK_TOOLS)
+        graph = build_transfer_graph(TRANSFER_TOOLS)
         state = _minimal_transfer_state("인증용 음성")
         state.update({
             "pending_action": "transfer",
@@ -128,19 +134,35 @@ def test_awaiting_asv_audio_ends_without_llm_call() -> None:
 def test_execution_ready_routes_to_execute_without_llm_call() -> None:
     """ASV 성공 후 execution_ready=True이면 execute_node로 직행한다."""
     mock_llm = MagicMock()
-    with patch(
-        "langchain_openai.ChatOpenAI.with_structured_output",
-        return_value=mock_llm,
-    ):
-        graph = build_transfer_graph(TRANSFER_MOCK_TOOLS)
-        state = _minimal_transfer_state("인증 완료")
-        state.update({
-            "pending_action": "transfer",
-            "execution_ready": True,
-            "recipient_validated": True,
-            "collected_slots": {"recipient": "엄마", "amount": 50000},
-        })
-        result = graph.invoke(state, config=_thread_config())
+    mock_resolved = ResolvedRecipient(
+        recipient_id="rec-001",
+        bank_name="우리은행",
+        account_number="1002-123-456789",
+        recipient_name="홍어머니",
+    )
+
+    def _fake_get_db():
+        yield _mock_db()
+
+    with patch("langchain_openai.ChatOpenAI.with_structured_output", return_value=mock_llm):
+        with patch("app.core.database.get_db", side_effect=_fake_get_db):
+            with patch(
+                "app.shared.agent.tools.transfer.lookup_recipient_for_transfer",
+                return_value=mock_resolved,
+            ):
+                with patch(
+                    "app.features.transfer.service.execute_transfer",
+                    return_value={"txId": "test-tx-001"},
+                ):
+                    graph = build_transfer_graph(TRANSFER_TOOLS)
+                    state = _minimal_transfer_state("인증 완료")
+                    state.update({
+                        "pending_action": "transfer",
+                        "execution_ready": True,
+                        "recipient_validated": True,
+                        "collected_slots": {"recipient": "엄마", "amount": 50000},
+                    })
+                    result = graph.invoke(state, config=_thread_config())
 
     mock_llm.invoke.assert_not_called()
     assert result["pending_action"] is None

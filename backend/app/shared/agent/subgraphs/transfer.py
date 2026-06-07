@@ -183,7 +183,7 @@ def _missing_slots(pending_action: str, collected_slots: dict) -> list[str]:
 
 def _valid_scheduled_day(value: object, cycle: object) -> bool:
     """자동이체 주기에 맞는 scheduled_day 값인지 확인한다."""
-    if value is None:
+    if value is None or cycle is None:
         return False
     try:
         day = int(value)
@@ -193,7 +193,7 @@ def _valid_scheduled_day(value: object, cycle: object) -> bool:
         return 1 <= day <= 31
     if cycle == "weekly":
         return 0 <= day <= 6
-    return True
+    return False
 
 
 def _enrich_slots_from_resolved(
@@ -447,8 +447,23 @@ def _merge_slot_update(state: VoiceState, extracted_slots: dict) -> dict:
     missing_now = _missing_slots(pending or "", existing)
     allowed_updates = {}
     for key, value in extracted_slots.items():
-        if key == "scheduled_day" or key in missing_now or existing.get(key) is None:
+        # scheduled_day·cycle은 항상 업데이트 허용 (상호 의존적, 사용자 수정 가능)
+        if (
+            key in ("scheduled_day", "cycle")
+            or key in missing_now
+            or existing.get(key) is None
+        ):
             allowed_updates[key] = value
+    # cycle이 변경됐고 이번 턴에 scheduled_day를 새로 제공하지 않았다면
+    # 기존 scheduled_day는 새 cycle에서 무효할 수 있으므로 초기화한다
+    old_cycle = existing.get("cycle")
+    new_cycle = allowed_updates.get("cycle")
+    if (
+        new_cycle is not None
+        and new_cycle != old_cycle
+        and "scheduled_day" not in allowed_updates
+    ):
+        existing.pop("scheduled_day", None)
     updated_slots = _normalize_scheduled_day(existing, allowed_updates)
     updates: dict = {"collected_slots": updated_slots, "navigate_to": None}
     if pending == "add_note" and updated_slots.get("memo"):

@@ -1,4 +1,4 @@
-"""Supervisor 도메인 결정 단위 테스트 — _decide_domain 6개 케이스.
+"""Supervisor 도메인 결정 단위 테스트 — _decide_domain 6개 + build_supervisor 3개.
 
 Design Ref: docs/02-design/features/dev-a-supervisor-plan.design.md §4.6
 
@@ -15,7 +15,31 @@ from unittest.mock import AsyncMock, patch
 
 from langchain_core.messages import HumanMessage
 
-from app.shared.agent.supervisor import _decide_domain
+from app.shared.agent.supervisor import _decide_domain, build_supervisor
+
+
+# ── build_supervisor() 빌드 검증 ──────────────────────────────────────────────
+
+
+def test_build_supervisor_returns_compiled_graph() -> None:
+    """build_supervisor()가 오류 없이 CompiledStateGraph를 반환한다."""
+    graph = build_supervisor()
+    assert graph is not None
+    assert hasattr(graph, "invoke")
+    assert hasattr(graph, "ainvoke")
+
+
+def test_build_supervisor_has_transfer_subgraph_node() -> None:
+    """Supervisor 그래프에 TransferAgent 서브그래프 노드('transfer')가 등록되어 있다."""
+    graph = build_supervisor()
+    assert "transfer" in graph.nodes
+
+
+def test_build_supervisor_has_required_nodes() -> None:
+    """Supervisor 그래프 노드 구성: supervisor_node, cancel_node, transfer 포함."""
+    graph = build_supervisor()
+    nodes = set(graph.nodes)
+    assert {"supervisor_node", "cancel_node", "transfer"}.issubset(nodes)
 
 
 def _make_state(**kwargs) -> dict:

@@ -228,22 +228,17 @@ async def cancel_node(state: VoiceState) -> dict:
 
 
 def route_after_supervisor(state: VoiceState) -> str:
-    """supervisor_node 이후 조건부 엣지 함수.
-
-    Phase 1: cancel → cancel_node, 나머지 → END
-    Phase 2: 아래 주석 해제 후 transfer/asset/rag 서브그래프 노드로 라우팅.
-    """
+    """supervisor_node 이후 조건부 엣지 함수."""
     domain = state.get("agent_domain")
     if domain == "cancel":
         return "cancel_node"
-    # Phase 2: 서브그래프 노드 추가 후 아래 주석 해제
-    # if domain == "transfer":
-    #     return "transfer"
+    if domain == "transfer":
+        return "transfer"
     # if domain == "asset":
     #     return "asset"
     # if domain == "rag":
     #     return "rag"
-    return END  # navigate / unknown / transfer / asset / rag (Phase 1 임시)
+    return END
 
 
 # ── 그래프 빌드 ──────────────────────────────────────────────────────────────────
@@ -254,28 +249,24 @@ def build_supervisor():
 
     MemorySaver는 이 레벨에만 설정한다. 서브그래프는 checkpointer 없이
     builder.compile()만 호출해야 세션 상태가 분리되지 않는다.
-
-    Phase 2: Dev-B/C/D 서브그래프 PR 머지 후 주석 해제.
     """
-    # Phase 2 서브그래프 import (Dev-B/C/D PR 머지 후 주석 해제)
-    # from app.shared.agent.subgraphs.transfer import transfer_graph
-    # from app.shared.agent.subgraphs.asset import asset_graph
-    # from app.shared.agent.subgraphs.consultation import rag_graph
+    from app.shared.agent.subgraphs.transfer import build_transfer_graph
+    from app.shared.agent.tools import TRANSFER_TOOLS
+
+    transfer_graph = build_transfer_graph(TRANSFER_TOOLS)
 
     builder = StateGraph(VoiceState)
     builder.add_node("supervisor_node", supervisor_node)
     builder.add_node("cancel_node", cancel_node)
-
-    # Phase 2 활성화 (subgraph import 해제 후 아래 6줄 주석 해제)
-    # builder.add_node("transfer", transfer_graph)
+    builder.add_node("transfer", transfer_graph)
     # builder.add_node("asset", asset_graph)
     # builder.add_node("rag", rag_graph)
-    # builder.add_edge("transfer", END)
-    # builder.add_edge("asset", END)
-    # builder.add_edge("rag", END)
 
     builder.set_entry_point("supervisor_node")
     builder.add_conditional_edges("supervisor_node", route_after_supervisor)
     builder.add_edge("cancel_node", END)
+    builder.add_edge("transfer", END)
+    # builder.add_edge("asset", END)
+    # builder.add_edge("rag", END)
 
     return builder.compile(checkpointer=MemorySaver())

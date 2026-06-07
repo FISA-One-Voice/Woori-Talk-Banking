@@ -10,7 +10,6 @@
       예: features/balance/ → tools/balance.py
 """
 
-# ── Dev-B (TransferAgent tools) ───────────────────────────────────────────────
 from app.shared.agent.tools.auto_transfer import add_auto_transfer_note
 from app.shared.agent.tools.balance import get_account_balance_by_id, get_total_balance
 from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
@@ -21,17 +20,8 @@ from app.shared.agent.tools.history import (
     get_monthly_expense,
     get_recent_history,
 )
-
-# ── Dev-B (TransferAgent tools) ───────────────────────────────────────────────
-from app.core.config import settings
-from app.shared.agent.tools.auto_transfer import add_auto_transfer_note
-from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
-from app.shared.agent.tools.execute_auto_transfer import execute_auto_transfer
 from app.shared.agent.tools.lookup_recipient import lookup_recipient
 from app.shared.agent.tools.transfer import add_note, execute_transfer
-
-# ── 기존 단일 graph 호환 tool ─────────────────────────────────────────────────
-from app.shared.agent.tools.event import get_event_list
 
 # ── Dev-C (AssetAgent tools) ──────────────────────────────────────────────────
 # Dev-C: 이 구역에만 추가
@@ -42,64 +32,9 @@ from app.shared.agent.tools.event import get_event_list
 # from app.shared.agent.tools.financial_qa import search_financial_docs
 # from app.shared.agent.tools.market_info import get_exchange_rate, get_base_rate
 
-# ── Mock tool 목록 ─────────────────────────────────────────────────────────────
-# 실제 tool 완성 전까지 사용하는 mock 구현체.
-# 화면 담당자가 실제 tool을 완성하면 _REAL_TOOLS로 이동.
-MOCK_TOOLS: list = [
-    mock_lookup_recipient,
-    mock_get_balance,
-    mock_get_history,
-    mock_execute_transfer,
-    mock_register_auto_transfer,
-    mock_get_events, # get_event_list -> mock_get_event 로 수정했음. 확인하고 이상없으면 주석 지워줘
-]
 
-TRANSFER_MOCK_TOOLS: list = [
-    mock_lookup_recipient,
-    mock_execute_transfer,
-    mock_register_auto_transfer,
-]
-
-# ── 실제 tool 목록 ─────────────────────────────────────────────────────────────
-# Phase 2 담당자가 완성한 실제 tool을 여기에 추가한다.
-#
-# 추가 순서 (담당자별):
-#   공통:          from app.shared.agent.tools.lookup_recipient import lookup_recipient
-#   balance  (B):  from app.shared.agent.tools.balance import execute_balance
-#   history  (B):  from app.shared.agent.tools.history import execute_history
-#   transfer (C):  from app.shared.agent.tools.transfer import execute_transfer
-#   auto_transfer (D): from app.shared.agent.tools.auto_transfer import (
-#                          register_auto_transfer)
-#
-# get_event_list: event 담당자 — tools/event.py 완성
-# execute_transfer: transfer 담당자 — tools/transfer.py 완성
-# lookup_recipient: transfer 담당자 — tools/lookup_recipient.py 완성
-# execute_auto_transfer: auto_transfer 담당자 — tools/auto_transfer.py 완성
-# cancel_auto_transfer: auto_transfer 담당자 — tools/auto_transfer.py 완성
-# add_note: transfer 담당자 — tools/transfer.py 완성
-# add_auto_transfer_note: auto_transfer 담당자 — tools/auto_transfer.py 완성
-
-ALL_TOOLS: list = [
-    # Balance
-    get_total_balance,
-    get_account_balance_by_id,
-    # History
-    get_recent_history,
-    get_category_history,
-    get_monthly_expense,
-    # Dev-B: Transfer
-    get_event_list,
-    execute_transfer,
-    lookup_recipient,
-    add_note,
-    execute_auto_transfer,
-    cancel_auto_transfer,
-    add_note,  # 이체 직후 메모 (tx_id 기반)
-    add_auto_transfer_note,  # 자동이체 직후 메모 (order_id 기반)
-    # execute_balance,    # balance 담당자 — tools/balance.py 완성 후 주석 해제
-    # execute_history,    # history 담당자 — tools/history.py 완성 후 주석 해제
-]
-
+# TransferAgent 서브그래프 전용 tool 목록.
+# Phase 2: supervisor.py에서 build_transfer_graph(TRANSFER_TOOLS)로 전달.
 TRANSFER_TOOLS: list = [
     execute_transfer,
     add_note,
@@ -109,12 +44,18 @@ TRANSFER_TOOLS: list = [
     lookup_recipient,
 ]
 
-# ── 활성 tool 목록 ─────────────────────────────────────────────────────────────
-# USE_MOCK_TOOLS=true  → MOCK_TOOLS 사용 (개발/테스트 환경)
-# USE_MOCK_TOOLS=false → 실제 tool 사용 (Phase 2 완료 후)
-ALL_TOOLS: list = MOCK_TOOLS if settings.USE_MOCK_TOOLS else _REAL_TOOLS
-
-__all__ = ["ALL_TOOLS", "TRANSFER_MOCK_TOOLS", "TRANSFER_TOOLS"]
-
-
-__all__ = ["ALL_TOOLS"]
+# 전체 단일 graph용 tool 목록 (build_graph / voice pipeline)
+ALL_TOOLS: list = [
+    get_total_balance,
+    get_account_balance_by_id,
+    get_recent_history,
+    get_category_history,
+    get_monthly_expense,
+    get_event_list,
+    execute_transfer,
+    lookup_recipient,
+    add_note,
+    execute_auto_transfer,
+    cancel_auto_transfer,
+    add_auto_transfer_note,
+]
