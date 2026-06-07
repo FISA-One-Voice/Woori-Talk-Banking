@@ -312,10 +312,13 @@
       },
       "options": {
         "orientation": "horizontal",
-        "reduceOptions": { "calcs": ["sum"] },
+        "reduceOptions": { "values": true, "limit": 10, "calcs": ["sum"] },
         "displayMode": "gradient",
         "showUnfilled": true
       },
+      "transformations": [
+        { "id": "reduce", "options": { "reducers": ["sum"] } }
+      ],
       "targets": [
         {
           "refId": "A",
