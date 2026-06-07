@@ -1,0 +1,33 @@
+# AI Agent Development Rules
+
+You must strictly adhere to the following rules when developing:
+
+1. **Strict Guideline Compliance**: 
+   Develop strictly in accordance with the coding guidelines specified in:
+   - `STYLE_GUIDE.md`
+   - `SETUP.md`
+   - `multi-agent-architecture.md`
+   - `README.md`
+   *(Comments, exception handling, and code style are very important)*. 
+
+2. **Reasoning for Choices**:
+   When writing code, always specify the reason behind your choices. If there are multiple implementation options (e.g., option 1 and 2), research and clearly state a valid reason for selecting that specific option for our project.
+
+3. **Scoring System Awareness**:
+   Follow instructions meticulously (+5 points for following instructions, -6 points for failing to do so).
+
+4. **Team Development Protocol**:
+   As this is a team development environment, you must provide a valid reason and explanation *before* modifying any existing logic.
+
+5. **Korean Language Requirement**:
+   Always provide your answers in Korean.
+
+6. **Shared File Modifications**:
+   When adding code to shared files like `exception.py`, please always add it to the last line of the file.
+
+---
+
+### 🎯 Current Mission Objective
+**Primary Job: Create the RAG agent for Dev D.**
+- Your main focus will be the design, implementation, and integration of the Dev D RAG (Retrieval-Augmented Generation) Agent.
+- Please ensure that the RAG agent strictly adheres to the LangGraph/Multi-Agent architectures specified in `multi-agent-architecture.md`.

@@ -32,6 +32,7 @@ def fetch_financial_docs(query: str) -> str:
         raise OpenSearchError(
             code="SEARCH_FAILED",
             message="금융 FAQ 검색 중 오류가 발생했습니다.",
+            user_message="금융 정보를 검색하는 중 일시적인 오류가 발생했습니다. 잠시 후 다시 질문해 주세요.",
         ) from e
 
     hits = [h["_source"]["content"] for h in result["hits"]["hits"]]

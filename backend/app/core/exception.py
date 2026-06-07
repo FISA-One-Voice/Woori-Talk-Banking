@@ -103,8 +103,6 @@ class AgentError(AppError):
     """
 
     pass
-
-
 class EventError(AppError):
     """이벤트 기능(features/event/) 관련 커스텀 에러 기반 클래스."""
 
@@ -140,3 +138,9 @@ class TransferError(AppError):
 
 class AutoTransferError(AppError):
     """자동이체 등록·실행 중 발생하는 예외."""
+
+
+class MarketError(AppError):
+    """시장 지표(환율, 금리) 조회 관련 커스텀 에러 — features/market/"""
+
+    pass

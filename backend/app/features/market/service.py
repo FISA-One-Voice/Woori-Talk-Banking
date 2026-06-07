@@ -4,6 +4,7 @@
 from datetime import datetime, timedelta
 import httpx
 from app.core.config import settings
+from app.core.exception import MarketError
 
 def fetch_exchange_rate(currency: str) -> str:
     """특정 통화의 최신 일일 환율(매매기준율)을 조회합니다.
@@ -35,7 +36,12 @@ def fetch_exchange_rate(currency: str) -> str:
 
     api_key = settings.BOK_ECOS_API_KEY
     if not api_key:
-        return "한국은행 API 키가 설정되지 않았습니다."
+        raise MarketError(
+            code="MISSING_API_KEY",
+            message="한국은행 API 키가 설정되지 않았습니다.",
+            user_message="시스템 설정 오류로 환율 조회를 할 수 없습니다.",
+            status_code=500,
+        )
 
     try:
         end_date = datetime.now()
@@ -59,8 +65,20 @@ def fetch_exchange_rate(currency: str) -> str:
                     return f"현재 {currency} 환율은 1단위당 {latest_rate}원 입니다."
                     
         return "한국은행 API에서 환율 데이터를 찾을 수 없습니다."
+    except httpx.HTTPError as e:
+        raise MarketError(
+            code="MARKET_API_HTTP_ERROR",
+            message=f"한국은행 API 통신 중 오류가 발생했습니다: {str(e)}",
+            user_message="환율 정보를 불러오는 중 일시적인 네트워크 오류가 발생했습니다.",
+            status_code=502,
+        ) from e
     except Exception as e:
-        return f"환율 조회 중 오류가 발생했습니다: {str(e)}"
+        raise MarketError(
+            code="MARKET_API_FAILED",
+            message=f"환율 조회 중 알 수 없는 오류가 발생했습니다: {str(e)}",
+            user_message="환율 정보를 처리하는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+            status_code=500,
+        ) from e
 
 def fetch_base_rate(country: str) -> str:
     """특정 국가의 최신 정책 기준 금리를 조회합니다.
@@ -76,7 +94,12 @@ def fetch_base_rate(country: str) -> str:
     """
     api_key = settings.BOK_ECOS_API_KEY
     if not api_key:
-        return "한국은행 API 키가 설정되지 않았습니다."
+        raise MarketError(
+            code="MISSING_API_KEY",
+            message="한국은행 API 키가 설정되지 않았습니다.",
+            user_message="시스템 설정 오류로 금리 조회를 할 수 없습니다.",
+            status_code=500,
+        )
 
     country_lower = country.lower()
 
@@ -139,5 +162,17 @@ def fetch_base_rate(country: str) -> str:
                         
             return f"한국은행 API에서 {country} 금리 데이터를 찾을 수 없습니다."
             
+    except httpx.HTTPError as e:
+        raise MarketError(
+            code="MARKET_API_HTTP_ERROR",
+            message=f"한국은행 API 통신 중 오류가 발생했습니다: {str(e)}",
+            user_message="금리 정보를 불러오는 중 일시적인 네트워크 오류가 발생했습니다.",
+            status_code=502,
+        ) from e
     except Exception as e:
-        return f"기준 금리 조회 중 오류가 발생했습니다: {str(e)}"
+        raise MarketError(
+            code="MARKET_API_FAILED",
+            message=f"기준 금리 조회 중 알 수 없는 오류가 발생했습니다: {str(e)}",
+            user_message="금리 정보를 처리하는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+            status_code=500,
+        ) from e

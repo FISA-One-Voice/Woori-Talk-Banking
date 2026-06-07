@@ -255,6 +255,7 @@ async def _handle_normal_flow(
         awaiting_transfer_clarification=awaiting_transfer_clarification,
         transcript=transcript,
         pending_action=pending_action,
+        user_message=response_text,
     )
 
 
