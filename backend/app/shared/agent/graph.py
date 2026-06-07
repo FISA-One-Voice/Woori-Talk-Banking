@@ -262,15 +262,33 @@ def _amount_to_korean(amount: int) -> str:
 def build_graph(tools: list) -> CompiledStateGraph:
     """모든 tool을 받아 LangGraph StateGraph를 빌드한다.
 
+    Phase 1 시그니처(tools: list) → CompiledStateGraph를 그대로 유지하므로
+    voice/router.py(Issue #7) 호출부는 수정 없이 동작한다.
+
     Args:
         tools: LangChain @tool 데코레이터로 정의된 함수 목록.
+               빈 리스트([])도 허용 — Phase 1 골격 초기화 목적.
+               MOCK_TOOLS 또는 실제 tool을 전달한다.
 
     Returns:
         MemorySaver가 연결된 CompiledStateGraph.
+        thread_id=user_id로 ainvoke() 호출 시 멀티턴 상태 유지.
 
     Raises:
         AgentError(code="AGENT_CONFIG_ERROR"): OPENAI_CHAT_API_KEY 미설정 오류.
         AgentError(code="AGENT_INIT_FAILED"): 그래프 컴파일 중 예기치 못한 오류.
+
+    Usage:
+        graph = build_graph(ALL_TOOLS)
+        result = await graph.ainvoke(
+            {"messages": [HumanMessage(content=text)], "user_id": uid},
+            config={"configurable": {"thread_id": uid}},
+        )
+        response_text = result["messages"][-1].content
+
+    Phase 2.5 내부 구현 (Issue #21):
+        StateGraph + MemorySaver + VoiceState 기반.
+        노드: intent_node → slot_fill_node / confirm_node / execute_node
     """
     # ── LLM 초기화 ──────────────────────────────────────────────────────────────
     try:
