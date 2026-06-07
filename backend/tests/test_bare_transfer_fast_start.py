@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from app.shared.agent.graph import IntentResult, build_graph
 from app.shared.agent.slot_schema import SLOT_QUESTIONS
-from app.shared.agent.tools import MOCK_TOOLS
+from app.shared.agent.tools import ALL_TOOLS
 from app.shared.agent.transfer_intent import (
     build_bare_transfer_start_update,
     should_use_bare_transfer_fast_start,
@@ -42,7 +42,7 @@ class TestBareTransferFastStartDetection:
 class TestBareTransferFastStartGraph:
     @pytest.fixture(scope="class")
     def graph_with_mocks(self):
-        return build_graph(MOCK_TOOLS)
+        return build_graph(ALL_TOOLS)
 
     def test_bare_start_without_llm(self, graph_with_mocks):
         """bare 발화는 LLM 없이 transfer + 수취인 질문."""

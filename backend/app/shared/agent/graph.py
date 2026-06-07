@@ -273,7 +273,6 @@ def build_graph(tools: list) -> CompiledStateGraph:
     Args:
         tools: LangChain @tool 데코레이터로 정의된 함수 목록.
                빈 리스트([])도 허용 — Phase 1 골격 초기화 목적.
-               MOCK_TOOLS 또는 실제 tool을 전달한다.
 
     Returns:
         MemorySaver가 연결된 CompiledStateGraph.
@@ -318,18 +317,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
     # ── tool registry: 액션 이름 → tool 함수 매핑 ───────────────────────────────
     # SLOT_SCHEMA에 정의된 액션과 tool 이름(함수명)으로 매핑한다.
-    # 실제 tool 이름은 "mock_execute_transfer" 또는 "execute_transfer" 패턴을 따른다.
     tool_registry: dict[str, object] = {t.name: t for t in tools}
 
-    # 액션 → tool 이름 매핑 (mock과 실제 tool 모두 지원)
-    # tool 이름 패턴: "mock_{action}" 또는 "{action}_tool"
+    # 액션 → tool 이름 매핑. 패턴: "{action}" 또는 "execute_{action}" 또는 "{action}_tool"
     def _find_tool_for_action(action: str) -> object | None:
         """액션 이름에 해당하는 tool을 registry에서 찾는다."""
         candidates = [
             action,
-            f"mock_execute_{action}",
-            f"mock_register_{action}",
-            f"mock_get_{action}",
             f"execute_{action}",
             f"register_{action}",
             f"{action}_tool",
