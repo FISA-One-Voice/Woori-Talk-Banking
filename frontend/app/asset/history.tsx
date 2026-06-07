@@ -13,6 +13,7 @@ import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { getTtsMessage } from '@/utils/errorHandler';
 import { fetchExpenseSummary, fetchTransactionHistory, CategoryItem, TransactionItem } from '@/services/assetService';
 import { speakText, stopAllTts } from '@/utils/ttsManager';
+import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 
 type Step = 'slot' | 'result' | 'history' | 'error';
 
@@ -33,10 +34,19 @@ export default function HistoryScreen() {
   const { type, period: rawInitialPeriod } = useLocalSearchParams<{ type: string; period: string }>();
   const initialPeriod = rawInitialPeriod ? normalizePeriod(rawInitialPeriod) : '';
 
+  // 음성 명령으로 진입한 경우 슬롯에서 period 추출
+  const lastResponse = useVoiceResponseStore.getState().lastResponse;
+  const voiceSlots = lastResponse?.collected_slots as Record<string, string> | undefined;
+  const voicePeriod = voiceSlots?.period ? normalizePeriod(voiceSlots.period) : '';
+  const isVoiceNavigation = !!lastResponse?.audio &&
+    (lastResponse?.navigate_to === 'asset/history' || lastResponse?.navigate_to?.startsWith('asset/history'));
+
+  const resolvedPeriod = initialPeriod || (isVoiceNavigation ? voicePeriod : '');
+
   const [step, setStep] = useState<Step>(
-    type === 'history' ? 'history' : (initialPeriod ? 'result' : 'slot')
+    type === 'history' ? 'history' : (resolvedPeriod ? 'result' : 'slot')
   );
-  const [period, setPeriod] = useState(initialPeriod || '이번달');
+  const [period, setPeriod] = useState(resolvedPeriod || '이번달');
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [topCategories, setTopCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,10 +86,11 @@ export default function HistoryScreen() {
       .finally(() => setLoading(false));
   };
 
-  // 음성 명령으로 period 파라미터와 함께 진입 시 자동 데이터 로드
+  // 음성 명령 또는 period 파라미터로 진입 시 자동 데이터 로드
   useEffect(() => {
-    if (!initialPeriod) return;
-    const days = periodToDays(initialPeriod);
+    const activePeriod = initialPeriod || (isVoiceNavigation ? voicePeriod : '');
+    if (!activePeriod) return;
+    const days = periodToDays(activePeriod);
     announcedRef.current = false;
     fetchHistory(days);
     setCategoriesLoading(true);

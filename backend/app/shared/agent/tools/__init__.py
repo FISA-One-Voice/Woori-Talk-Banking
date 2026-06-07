@@ -57,7 +57,7 @@ from app.shared.agent.tools.history import (
     get_recent_history,
 )
 from app.shared.agent.tools.lookup_recipient import lookup_recipient
-from app.shared.agent.tools.transfer import add_note, execute_transfer, get_transfer_history
+from app.shared.agent.tools.transfer import add_note, execute_transfer
 
 # ── 실제 tool 목록 ─────────────────────────────────────────────────────────────
 # Phase 2 담당자가 완성한 실제 tool을 여기에 추가한다.
@@ -80,7 +80,6 @@ _REAL_TOOLS: list = [
     get_recent_history,
     get_category_history,
     get_monthly_expense,
-    get_transfer_history,
     execute_transfer,
     lookup_recipient,
     add_note,  # 이체 직후 메모 (tx_id 기반)

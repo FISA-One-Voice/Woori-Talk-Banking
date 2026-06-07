@@ -707,8 +707,11 @@ def build_graph(tools: list) -> CompiledStateGraph:
             # asset 인텐트: 액션별 화면 이동 분기
             if result.intent == "asset":
                 action = dict(result.extracted_slots).get("action")
-                if action in ("transaction_list", "history", "category", "top_category"):
-                    # 세부 분기(기간·타입)는 프론트엔드가 슬롯 기반으로 처리
+                if action == "transaction_list":
+                    # 거래내역 화면 (지출/수입 화면과 다른 화면)
+                    updates["navigate_to"] = "asset/history?type=history"
+                elif action in ("history", "category", "top_category"):
+                    # 지출/수입 요약 화면
                     updates["navigate_to"] = "asset/history"
                 else:
                     updates["navigate_to"] = "asset"
@@ -955,6 +958,19 @@ def build_graph(tools: list) -> CompiledStateGraph:
 
         tool_obj = _find_tool_for_action(pending)
 
+        # asset 인텐트는 action 슬롯에 따라 분리된 tool로 라우팅
+        if tool_obj is None and pending == "asset":
+            _ASSET_TOOL_MAP = {
+                "balance": "get_balance",
+                "history": "get_income_expense_summary",
+                "category": "get_category_expense",
+                "top_category": "get_top_spending_category",
+                "transaction_list": "get_transaction_list",
+                "expense_summary": "get_top_spending_category",
+            }
+            action = slots.get("action", "balance")
+            tool_obj = tool_registry.get(_ASSET_TOOL_MAP.get(action, "get_balance"))
+
         if tool_obj is None:
             logger.warning(
                 "execute_node: '%s' 액션에 대한 tool을 찾을 수 없습니다.", pending
@@ -981,7 +997,8 @@ def build_graph(tools: list) -> CompiledStateGraph:
             invoke_args = {"user_id": state.get("user_id", ""), **slots}
             new_last_tx_id: str | None = state.get("last_tx_id")
             new_last_order_id: str | None = state.get("last_order_id")
-            completed_slots: dict = {}
+            # asset은 실행 후에도 슬롯을 유지해 프론트엔드가 period 등을 읽을 수 있게 한다
+            completed_slots: dict = slots if pending == "asset" else {}
             note_consumed = False
             awaiting_memo_next = False
             response_text = ""
@@ -1052,6 +1069,23 @@ def build_graph(tools: list) -> CompiledStateGraph:
                         )
                         if "추가되었습니다" in response_text:
                             note_consumed = True
+                elif pending == "asset":
+                    # action 슬롯에 따라 분리된 tool로 라우팅
+                    _ASSET_TOOL_MAP = {
+                        "balance": "get_balance",
+                        "history": "get_income_expense_summary",
+                        "category": "get_category_expense",
+                        "top_category": "get_top_spending_category",
+                        "transaction_list": "get_transaction_list",
+                        "expense_summary": "get_top_spending_category",
+                    }
+                    action = slots.get("action", "balance")
+                    asset_tool_name = _ASSET_TOOL_MAP.get(action, "get_balance")
+                    asset_tool = tool_registry.get(asset_tool_name)
+                    if asset_tool:
+                        response_text = asset_tool.invoke(invoke_args)
+                    else:
+                        response_text = "해당 기능을 사용할 수 없습니다."
                 else:
                     response_text = tool_obj.invoke(invoke_args)
             except Exception as e:
@@ -1085,10 +1119,12 @@ def build_graph(tools: list) -> CompiledStateGraph:
         # transfer/auto_transfer 등 완료 화면이 있는 액션만 navigate_to 덮어씀.
         if pending in COMPLETE_SCREEN_MAP:
             updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
-        # asset 인텐트: 기능 단위로만 라우팅, 세부 분기는 프론트엔드 처리
+        # asset 인텐트: 거래내역/지출수입 화면 구분
         if pending == "asset":
             action = slots.get("action", "")
-            if action in ("transaction_list", "history", "category", "top_category"):
+            if action == "transaction_list":
+                updates["navigate_to"] = "asset/history?type=history"
+            elif action in ("history", "category", "top_category"):
                 updates["navigate_to"] = "asset/history"
             elif action == "balance":
                 updates["navigate_to"] = "asset"
