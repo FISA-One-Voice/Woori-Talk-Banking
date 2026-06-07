@@ -367,7 +367,8 @@ def _transfer_response_rules() -> list[str]:
         "- amount는 원화 정수 문자열로 추출하십시오.",
         "- recipient는 이름, 별명, 전화번호, 계좌번호를 발화 그대로 추출하십시오.",
         "- cycle은 monthly 또는 weekly만 사용하십시오.",
-        "- scheduled_day는 날짜 또는 요일을 명시한 경우에만 추출하십시오.",
+        "- scheduled_day: 날짜·요일 명시 시만 추출."
+        " weekly→0(월)~6(일) 정수, monthly→1~31 정수로 반환하십시오.",
         "- bank_name은 사용자가 은행명을 말한 경우에만 추출하십시오.",
         "- TransferAgent가 처리하지 않는 요청은 intent=null로 두십시오.",
     ]
@@ -402,17 +403,32 @@ def _find_tool_for_action(action: str, tool_registry: dict[str, object]) -> obje
     return None
 
 
+_KOR_DOW_MAP: dict[str, int] = {
+    "월": 0, "월요일": 0,
+    "화": 1, "화요일": 1,
+    "수": 2, "수요일": 2,
+    "목": 3, "목요일": 3,
+    "금": 4, "금요일": 4,
+    "토": 5, "토요일": 5,
+    "일": 6, "일요일": 6,
+}
+
+
 def _normalize_scheduled_day(slots: dict, extracted_slots: dict) -> dict:
-    """STT가 '6일'을 '61'로 인식하는 scheduled_day 오류를 보정한다."""
+    """STT 오류 보정 및 한글 요일명 → 정수 변환."""
     normalized = dict(slots)
     for key, value in extracted_slots.items():
         if key == "scheduled_day" and value is not None:
-            try:
-                day_int = int(value)
-            except (TypeError, ValueError):
-                day_int = None
-            if day_int is not None and 32 <= day_int <= 91 and day_int % 10 == 1:
-                value = day_int // 10
+            kor_key = str(value).replace(" ", "")
+            if kor_key in _KOR_DOW_MAP:
+                value = _KOR_DOW_MAP[kor_key]
+            else:
+                try:
+                    day_int = int(value)
+                except (TypeError, ValueError):
+                    day_int = None
+                if day_int is not None and 32 <= day_int <= 91 and day_int % 10 == 1:
+                    value = day_int // 10
         normalized[key] = value
     return normalized
 
@@ -746,7 +762,7 @@ def _build_intent_update(
 
     if state.get("awaiting_confirmation") and result.extracted_slots:
         existing = dict(state.get("collected_slots", {}))
-        existing.update(result.extracted_slots)
+        existing = _normalize_scheduled_day(existing, result.extracted_slots)
         return {
             "collected_slots": existing,
             "awaiting_confirmation": False,
