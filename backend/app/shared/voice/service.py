@@ -27,11 +27,7 @@ import httpx
 from langchain_core.messages import HumanMessage
 from sqlalchemy.orm import Session
 
-try:
-    from pydub import AudioSegment as _AudioSegment
-    _PYDUB_AVAILABLE = True
-except ImportError:
-    _PYDUB_AVAILABLE = False
+from pydub import AudioSegment
 
 from app.core.config import settings
 from app.core.exception import ASVError
@@ -264,10 +260,7 @@ def _to_wav_bytes(audio_bytes: bytes) -> bytes:
     Returns:
         WAV PCM 포맷 바이트.
     """
-    if not _PYDUB_AVAILABLE:
-        # pydub 미설치(Python 3.13+ 호환성 이슈) 시 원본 그대로 반환
-        return audio_bytes
-    audio = _AudioSegment.from_file(io.BytesIO(audio_bytes))
+    audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
     buf = io.BytesIO()
     audio.export(buf, format="wav")
     return buf.getvalue()
