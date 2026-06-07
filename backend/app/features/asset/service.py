@@ -293,12 +293,22 @@ def query_transaction_list_tts(
     try:
         txs = get_transaction_history(db, user_id, days=days)
     except HistoryError:
-        return f"{label} 거래 내역이 없습니다."
+        raise HistoryError(
+            code="TX_NOT_FOUND",
+            message="거래 내역을 찾을 수 없습니다.",
+            status_code=404,
+            user_message=f"{label} 거래 내역이 없습니다.",
+        )
 
     # status="completed" 건만 읽어줌 (pending/failed 제외)
     completed = [t for t in txs if t.status == "completed"]
     if not completed:
-        return f"{label} 거래 내역이 없습니다."
+        raise HistoryError(
+            code="TX_NOT_FOUND",
+            message="거래 내역을 찾을 수 없습니다.",
+            status_code=404,
+            user_message=f"{label} 거래 내역이 없습니다.",
+        )
 
     total = len(completed)
     income_cnt = sum(1 for t in completed if t.category == "수입")
@@ -345,11 +355,21 @@ def query_history_tts(
     try:
         txs = get_transaction_history(db, user_id, days=days)
     except HistoryError:
-        return f"{label} 거래 내역이 없습니다."
+        raise HistoryError(
+            code="TX_NOT_FOUND",
+            message="거래 내역을 찾을 수 없습니다.",
+            status_code=404,
+            user_message=f"{label} 거래 내역이 없습니다.",
+        )
 
     completed = [t for t in txs if t.status == "completed"]
     if not completed:
-        return f"{label} 거래 내역이 없습니다."
+        raise HistoryError(
+            code="TX_NOT_FOUND",
+            message="거래 내역을 찾을 수 없습니다.",
+            status_code=404,
+            user_message=f"{label} 거래 내역이 없습니다.",
+        )
 
     income = sum(t.amount for t in completed if t.category == "수입")
     expense = sum(t.amount for t in completed if t.category != "수입")
@@ -397,7 +417,12 @@ def query_category_tts(
     try:
         txs = get_transaction_history(db, user_id, days=days, category=category)
     except HistoryError:
-        return f"{label} {category} 내역이 없습니다."
+        raise HistoryError(
+            code="TX_NOT_FOUND",
+            message="거래 내역을 찾을 수 없습니다.",
+            status_code=404,
+            user_message=f"{label} {category} 내역이 없습니다.",
+        )
     total = sum(t.amount for t in txs)
     return f"{label} {category} 내역 알려드리겠습니다. 총 {len(txs)}건, {total:,}원 지출하셨습니다."
 
