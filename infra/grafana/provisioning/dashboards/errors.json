@@ -125,10 +125,33 @@
       ]
     },
     {
+      "id": 7,
+      "title": "에러 코드별 발생 추이",
+      "description": "에러가 발생한 코드만 라인으로 표시 (0인 코드는 숨김)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "app_error_total > 0",
+          "legendFormat": "{{code}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
       "id": 5,
       "title": "에러 로그 검색 (OpenSearch — level:ERROR 최신 30건)",
       "type": "table",
-      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 16 },
+      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 24 },
       "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
       "fieldConfig": { "defaults": {}, "overrides": [] },
       "options": { "sortBy": [] },
@@ -146,28 +169,52 @@
     },
     {
       "id": 6,
-      "title": "기능별 에러 분포 (OpenSearch)",
+      "title": "기능별 에러 분포",
       "type": "piechart",
-      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 16 },
-      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": {}, "overrides": [] },
       "options": { "pieType": "donut", "legendDisplayMode": "table", "placement": "bottom" },
       "targets": [
         {
-          "refId": "A",
-          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
-          "index": "app_logs",
-          "query": "level:ERROR",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "terms",
-              "field": "feature.keyword",
-              "id": "2",
-              "settings": { "size": "10", "order": "desc", "orderBy": "1", "min_doc_count": "1" }
-            }
-          ]
+          "expr": "sum(app_error_total{code=~\"TOKEN_INVALID|UNAUTHORIZED|USER_NOT_FOUND\"})",
+          "legendFormat": "인증",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(app_error_total{code=~\"STT_FAILED|VOICE_AUDIO_INVALID_FORMAT|VOICE_AUDIO_TOO_LARGE|VOICE_AUDIO_TOO_LONG|VOICE_VECTOR_EXTRACT_FAILED|TTS_SPEED_OUT_OF_RANGE\"})",
+          "legendFormat": "음성처리",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(app_error_total{code=~\"ASV_NOT_ENROLLED|ASV_SERVER_ERROR|ASV_TIMEOUT\"})",
+          "legendFormat": "ASV",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(app_error_total{code=~\"ACCOUNT_NOT_FOUND|INVALID_ACCOUNT_FORMAT|INSUFFICIENT_BALANCE|TRANSFER_ACCOUNT_NOT_FOUND|TRANSFER_PENDING|TRANSFER_RECIPIENT_NOT_FOUND|TRANSACTION_NOT_FOUND|IDEMPOTENCY_KEY_USED|TX_NOT_FOUND\"})",
+          "legendFormat": "이체",
+          "refId": "D"
+        },
+        {
+          "expr": "sum(app_error_total{code=~\"AUTO_ORDER_ACCOUNT_NOT_FOUND|AUTO_ORDER_NOT_FOUND|AUTO_ORDER_STATUS_INVALID|AUTO_ORDER_TERMS_NOT_AGREED|AUTO_ORDER_WITHDRAWAL_PASSWORD_INVALID\"})",
+          "legendFormat": "자동이체",
+          "refId": "E"
+        },
+        {
+          "expr": "sum(app_error_total{code=~\"AGENT_CONFIG_ERROR|AGENT_INIT_FAILED\"})",
+          "legendFormat": "에이전트",
+          "refId": "F"
+        },
+        {
+          "expr": "sum(app_error_total{code=~\"EVENT_NOT_FOUND|INVALID_EVENT_ID|ALREADY_PARTICIPATED\"})",
+          "legendFormat": "이벤트",
+          "refId": "G"
+        },
+        {
+          "expr": "sum(app_error_total{code=~\"SEARCH_FAILED|INDEX_CREATION_FAILED|RECIPIENT_NOT_FOUND|INTERNAL_ERROR|INVALID_REQUEST|SERVICE_UNAVAILABLE\"})",
+          "legendFormat": "기타",
+          "refId": "H"
         }
       ]
     }
