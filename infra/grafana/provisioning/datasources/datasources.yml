@@ -25,3 +25,20 @@ datasources:
       basicAuthPassword: "${OPENSEARCH_PASSWORD}"
     basicAuth: true
     basicAuthUser: ${OPENSEARCH_USER}
+
+  - name: PostgreSQL
+    type: postgres
+    uid: postgres
+    url: ${POSTGRES_HOST}:${POSTGRES_PORT}
+    editable: false
+    jsonData:
+      database: ${POSTGRES_DATABASE}
+      sslmode: require
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+    secureJsonData:
+      password: "${POSTGRES_PASSWORD}"
+    user: ${POSTGRES_USER}
