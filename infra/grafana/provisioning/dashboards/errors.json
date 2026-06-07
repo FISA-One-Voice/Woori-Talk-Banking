@@ -1,0 +1,175 @@
+{
+  "title": "에러 분석",
+  "uid": "woori-errors",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["woori"],
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP 5xx 발생 건수",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "increase(http_requests_total{status=~\"5..\"}[5m])",
+          "legendFormat": "5xx (5분)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "HTTP 4xx / 5xx 비율 시계열",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": { "lineWidth": 2 }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "5xx 비율" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "4xx 비율" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) * 100",
+          "legendFormat": "5xx 비율",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(http_requests_total{status=~\"4..\"}[5m]) / rate(http_requests_total[5m]) * 100",
+          "legendFormat": "4xx 비율",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "AppError 코드별 발생 건수",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": { "fixedColor": "orange", "mode": "fixed" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "displayMode": "gradient"
+      },
+      "targets": [
+        {
+          "expr": "app_error_total",
+          "legendFormat": "{{code}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "에러 스파이크 타임라인 (분당 전체 에러)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "drawStyle": "line"
+          },
+          "color": { "fixedColor": "red", "mode": "fixed" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{status=~\"[45]..\"}[1m]) * 60",
+          "legendFormat": "에러/분",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "에러 로그 검색 (OpenSearch — level:ERROR 최신 30건)",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 16 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "sortBy": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "app_logs",
+          "query": "level:ERROR",
+          "metrics": [{ "type": "raw_data", "id": "1", "settings": { "size": "30" } }],
+          "timeField": "timestamp",
+          "bucketAggs": []
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "기능별 에러 분포 (OpenSearch)",
+      "type": "piechart",
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 16 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "pieType": "donut", "legendDisplayMode": "table", "placement": "bottom" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "app_logs",
+          "query": "level:ERROR",
+          "metrics": [{ "type": "count", "id": "1" }],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "terms",
+              "field": "feature.keyword",
+              "id": "2",
+              "settings": { "size": "10", "order": "desc", "orderBy": "1", "min_doc_count": "1" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
