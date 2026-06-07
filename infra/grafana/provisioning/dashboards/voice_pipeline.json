@@ -241,7 +241,7 @@
       },
       "targets": [
         {
-          "expr": "rate(agent_tool_duration_seconds_sum[5m]) / rate(agent_tool_duration_seconds_count[5m]) * 1000",
+          "expr": "agent_tool_duration_seconds_sum / agent_tool_duration_seconds_count * 1000",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
@@ -260,12 +260,12 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(agent_tool_duration_seconds_bucket[5m])) * 1000",
+          "expr": "histogram_quantile(0.95, rate(agent_tool_duration_seconds_bucket[$__rate_interval])) * 1000",
           "legendFormat": "{{node}} P95",
           "refId": "A"
         },
         {
-          "expr": "rate(agent_tool_duration_seconds_sum[5m]) / rate(agent_tool_duration_seconds_count[5m]) * 1000",
+          "expr": "rate(agent_tool_duration_seconds_sum[$__rate_interval]) / rate(agent_tool_duration_seconds_count[$__rate_interval]) * 1000",
           "legendFormat": "{{node}} 평균",
           "refId": "B"
         }
