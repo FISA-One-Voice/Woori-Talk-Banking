@@ -206,52 +206,16 @@ async def _handle_normal_flow(
     # 1. STT: 오디오 → 텍스트
     transcript = await transcribe_audio(audio_bytes, content_type)
 
-    # 2. RAG 에이전트 인터셉터 (임시)
-    rag_keywords = ["환율", "수수료", "자동이체", "금리", "조건", "이벤트", "안내"]
-    if any(k in transcript for k in rag_keywords):
-        from app.shared.agent.state import VoiceState
-        from app.shared.agent.subgraphs.consultation import rag_node
-        rag_state = VoiceState(
-            messages=[HumanMessage(content=transcript)],
-            user_id=user_id,
-            pending_action=None,
-            collected_slots={},
-            awaiting_confirmation=False,
-            awaiting_asv_audio=False,
-            awaiting_memo_decision=False,
-            awaiting_transfer_clarification=False,
-            draft_recipient=None,
-            asv_retry_count=0,
-            navigate_to=None,
-            execution_ready=False,
-            recipient_validated=False,
-            last_tx_id=None,
-            last_order_id=None,
-            agent_domain=None,
-            analytics_period=None,
-            remaining_steps=10,
-        )
-        rag_result = await rag_node(rag_state)
-        response_text = tts_text_from_messages(rag_result.get("messages", []))
-        result = {
-            "navigate_to": None,
-            "collected_slots": {},
-            "pending_action": None,
-            "awaiting_confirmation": False,
-            "awaiting_asv_audio": False,
-            "awaiting_memo_decision": False,
-            "awaiting_transfer_clarification": False,
-        }
-    else:
-        # 기존 LangGraph 에이전트 호출
-        result = await graph.ainvoke(
-            {
-                "messages": [HumanMessage(content=transcript)],
-                "user_id": user_id,
-            },
-            config=config,
-        )
-        response_text = tts_text_from_messages(result["messages"])
+    # 2. LangGraph 에이전트 호출
+    result = await graph.ainvoke(
+        {
+            "messages": [HumanMessage(content=transcript)],
+            "user_id": user_id,
+        },
+        config=config,
+    )
+    
+    response_text = tts_text_from_messages(result["messages"])
 
     # 3. TTS: 텍스트 → MP3
     audio_mp3 = await synthesize_speech(response_text)
