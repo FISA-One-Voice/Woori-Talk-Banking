@@ -184,10 +184,39 @@
       ]
     },
     {
+      "id": 8,
+      "title": "에이전트 액션별 실행 횟수",
+      "description": "LangGraph execute_node에서 tool 호출이 완료된 액션별 누적 횟수 (node=pending_action)",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "displayMode": "gradient",
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "expr": "agent_node_executions_total",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
       "id": 7,
       "title": "인텐트 분포 (OpenSearch)",
       "type": "piechart",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
       "fieldConfig": { "defaults": {}, "overrides": [] },
       "options": { "pieType": "donut", "legendDisplayMode": "table", "placement": "right" },
