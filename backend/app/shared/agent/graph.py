@@ -32,7 +32,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exception import AgentError
-from app.core.metrics import agent_node_executions_total
+from app.core.metrics import agent_node_executions_total, agent_tool_duration_seconds
 from app.features.recipients.schema import ResolvedRecipient
 from app.features.recipients.service import (
     classify_recipient_input,
@@ -1110,6 +1110,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                     },
                 )
                 agent_node_executions_total.labels(node=pending).inc()
+                agent_tool_duration_seconds.labels(node=pending).observe(_duration_ms / 1000)
 
         if post_execute_navigate == FAILED_SCREEN_MAP.get("transfer"):
             response_text = response_text.rstrip() + TRANSFER_FAILED_HOME_SUFFIX

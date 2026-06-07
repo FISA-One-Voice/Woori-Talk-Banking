@@ -13,6 +13,13 @@ agent_node_executions_total = Counter(
     labelnames=["node"],
 )
 
+agent_tool_duration_seconds = Histogram(
+    "agent_tool_duration_seconds",
+    "에이전트 tool별 실행 시간",
+    labelnames=["node"],
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0],
+)
+
 app_error_total = Counter(
     "app_error_total",
     "AppError 코드별 발생 횟수",
