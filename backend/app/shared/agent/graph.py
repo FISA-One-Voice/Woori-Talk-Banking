@@ -19,6 +19,7 @@ Design Ref (Issue #21):
 
 import json
 import logging
+import time
 import uuid
 
 import openai
@@ -31,6 +32,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exception import AgentError
+from app.core.metrics import agent_node_executions_total
 from app.features.recipients.schema import ResolvedRecipient
 from app.features.recipients.service import (
     classify_recipient_input,
@@ -971,6 +973,20 @@ def build_graph(tools: list) -> CompiledStateGraph:
             awaiting_memo_next = False
             response_text = ""
             post_execute_navigate: str | None = None
+            _user_id_log = state.get("user_id", "")
+            _tool_start = time.monotonic()
+            _tool_success = True
+
+            logger.info(
+                "agent_tool_call_start",
+                extra={
+                    "event": "agent_tool_call_start",
+                    "tool": tool_obj.name,
+                    "action": pending,
+                    "user_id": _user_id_log,
+                    **( {"amount": slots.get("amount")} if pending in ("transfer", "auto_transfer") else {}),
+                },
+            )
 
             try:
                 if pending == "transfer" and tool_obj.name == "execute_transfer":
@@ -984,15 +1000,22 @@ def build_graph(tools: list) -> CompiledStateGraph:
                         new_last_tx_id = tx_id
                         awaiting_memo_next = True
                         response_text = response_text + MEMO_OFFER_SUFFIX
-                        # 영수증: 프론트 prevSlots(recipient/amount) + tx_id
                         completed_slots = {"tx_id": tx_id}
                         post_execute_navigate = COMPLETE_SCREEN_MAP["transfer"]
+                        logger.info(
+                            "agent_transfer_completed",
+                            extra={"event": "agent_transfer_completed", "tx_id": tx_id, "user_id": _user_id_log, "amount": slots.get("amount")},
+                        )
                     else:
                         completed_slots = {
                             **slots,
                             "transfer_error_message": response_text,
                         }
                         post_execute_navigate = FAILED_SCREEN_MAP["transfer"]
+                        logger.warning(
+                            "agent_transfer_failed",
+                            extra={"event": "agent_transfer_failed", "user_id": _user_id_log, "reason": response_text},
+                        )
                 elif pending == "transfer":
                     response_text = tool_obj.invoke(invoke_args)
                 elif pending == "auto_transfer":
@@ -1010,6 +1033,17 @@ def build_graph(tools: list) -> CompiledStateGraph:
                             new_last_order_id = order_id
                             awaiting_memo_next = True
                             response_text = response_text + MEMO_OFFER_SUFFIX
+                            logger.info(
+                                "agent_auto_transfer_registered",
+                                extra={
+                                    "event": "agent_auto_transfer_registered",
+                                    "order_id": order_id,
+                                    "user_id": _user_id_log,
+                                    "amount": slots.get("amount"),
+                                    "to_bank": slots.get("bank_name"),
+                                    "recipient": slots.get("recipient"),
+                                },
+                            )
                         completed_slots = {}
                 elif pending == "add_note":
                     tx_id = slots.get("tx_id") or state.get("last_tx_id")
@@ -1048,6 +1082,7 @@ def build_graph(tools: list) -> CompiledStateGraph:
                 else:
                     response_text = tool_obj.invoke(invoke_args)
             except Exception as e:
+                _tool_success = False
                 logger.error("execute_node tool 호출 실패 (%s): %s", pending, e)
                 response_text = (
                     "처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
@@ -1061,6 +1096,20 @@ def build_graph(tools: list) -> CompiledStateGraph:
                         "transfer_error_message": response_text,
                     }
                     post_execute_navigate = FAILED_SCREEN_MAP["transfer"]
+            finally:
+                _duration_ms = int((time.monotonic() - _tool_start) * 1000)
+                logger.info(
+                    "agent_tool_call_end",
+                    extra={
+                        "event": "agent_tool_call_end",
+                        "tool": tool_obj.name,
+                        "action": pending,
+                        "user_id": _user_id_log,
+                        "duration_ms": _duration_ms,
+                        "success": _tool_success,
+                    },
+                )
+                agent_node_executions_total.labels(node=pending).inc()
 
         if post_execute_navigate == FAILED_SCREEN_MAP.get("transfer"):
             response_text = response_text.rstrip() + TRANSFER_FAILED_HOME_SUFFIX
