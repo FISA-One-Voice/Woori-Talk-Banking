@@ -34,7 +34,6 @@ def get_total_balance(user_id: str) -> str:  # noqa: D401
     Raises:
         BalanceError: 계좌를 찾을 수 없을 때.
     """
-    logger.info("balance_query", extra={"event": "balance_query", "user_id": user_id})
     db = next(get_db())
     try:
         accounts = get_asset_summary(db, user_id)
