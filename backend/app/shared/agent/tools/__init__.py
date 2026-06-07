@@ -25,8 +25,7 @@ from app.shared.agent.tools.lookup_recipient import lookup_recipient
 from app.shared.agent.tools.transfer import add_note, execute_transfer
 
 # ── Dev-C (AssetAgent tools) ──────────────────────────────────────────────────
-# Dev-C: 이 구역에만 추가
-# from app.shared.agent.tools.spending_analysis import get_monthly_spending_report
+from app.shared.agent.tools.spending_analysis import get_monthly_spending_report
 
 # ── Dev-D (RAGAgent tools) ────────────────────────────────────────────────────
 # Dev-D: 이 구역에만 추가
@@ -41,6 +40,8 @@ ALL_TOOLS: list = [
     get_recent_history,
     get_category_history,
     get_monthly_expense,
+    # Dev-C: Asset
+    get_monthly_spending_report,
     # Dev-B: Transfer
     get_event_list,
     execute_transfer,
