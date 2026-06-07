@@ -2,6 +2,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.exception import TTSError
+from app.core.metrics import external_api_calls_total
 
 TTS_SPEED_MIN = 0.25
 TTS_SPEED_MAX = 4.0
@@ -57,12 +58,14 @@ async def synthesize_speech(
                 },
             )
     except httpx.TimeoutException as exc:
+        external_api_calls_total.labels(service="azure_tts", status="error").inc()
         raise TTSError(
             code="SERVICE_UNAVAILABLE",
             message="Azure TTS API 요청 시간이 초과됐습니다.",
             user_message="음성 합성 서비스가 응답하지 않습니다. 잠시 후 다시 시도해 주세요.",
         ) from exc
     except httpx.RequestError as exc:
+        external_api_calls_total.labels(service="azure_tts", status="error").inc()
         raise TTSError(
             code="SERVICE_UNAVAILABLE",
             message="Azure TTS API에 연결할 수 없습니다.",
@@ -70,12 +73,14 @@ async def synthesize_speech(
         ) from exc
 
     if response.status_code != 200:
+        external_api_calls_total.labels(service="azure_tts", status="error").inc()
         raise TTSError(
             code="SERVICE_UNAVAILABLE",
             message=f"Azure TTS API 오류: status={response.status_code}",
             user_message="음성 합성 중 오류가 발생했습니다.",
         )
 
+    external_api_calls_total.labels(service="azure_tts", status="success").inc()
     return response.content
 
 
