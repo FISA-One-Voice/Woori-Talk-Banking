@@ -1,0 +1,196 @@
+{
+  "title": "금융 거래 현황",
+  "uid": "woori-financial",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["woori"],
+  "panels": [
+    {
+      "id": 1,
+      "title": "이체 성공 / 실패 건수",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "실패" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "성공" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "transfer_total{status=\"success\"}",
+          "legendFormat": "성공",
+          "refId": "A"
+        },
+        {
+          "expr": "transfer_total{status=\"failed\"}",
+          "legendFormat": "실패",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "자동이체 스케줄러 실행 결과",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "성공" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "실패" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "horizontal",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "expr": "auto_transfer_scheduler_runs_total{status=\"success\"}",
+          "legendFormat": "성공",
+          "refId": "A"
+        },
+        {
+          "expr": "auto_transfer_scheduler_runs_total{status=\"failed\"}",
+          "legendFormat": "실패",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "자동이체 등록 건수 (OpenSearch)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "color": { "fixedColor": "blue", "mode": "fixed" } },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"] },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "app_logs",
+          "query": "event:agent_auto_transfer_registered",
+          "metrics": [{ "type": "count", "id": "1" }],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "date_histogram",
+              "field": "timestamp",
+              "id": "2",
+              "settings": { "interval": "auto", "min_doc_count": "0" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "이체 실패율 시계열 (임계값 5%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2,
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(transfer_total{status=\"failed\"}[5m]) / (rate(transfer_total{status=\"success\"}[5m]) + rate(transfer_total{status=\"failed\"}[5m])) * 100",
+          "legendFormat": "실패율 %",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "시간대별 이체 건수 (OpenSearch)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "transfer_audit",
+          "query": "*",
+          "metrics": [{ "type": "count", "id": "1" }],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "date_histogram",
+              "field": "timestamp",
+              "id": "2",
+              "settings": { "interval": "auto", "min_doc_count": "0" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "최근 이체 감사 로그 (OpenSearch)",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "sortBy": [{ "desc": true, "displayName": "timestamp" }] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "transfer_audit",
+          "query": "*",
+          "metrics": [{ "type": "raw_data", "id": "1", "settings": { "size": "20" } }],
+          "timeField": "timestamp",
+          "bucketAggs": []
+        }
+      ]
+    }
+  ]
+}
