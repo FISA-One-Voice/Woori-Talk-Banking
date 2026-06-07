@@ -200,7 +200,7 @@ async def _handle_normal_flow(
         content_type: 오디오 포맷.
         config: LangGraph thread_id 설정.
         graph: 컴파일된 StateGraph 인스턴스.
-        
+
     Returns:
         VoiceResponseData: TTS 오디오 + 에이전트 상태 반영.
     """
@@ -215,7 +215,7 @@ async def _handle_normal_flow(
         },
         config=config,
     )
-    
+
     response_text = tts_text_from_messages(result["messages"])
 
     # 3. TTS: 텍스트 → MP3
@@ -255,7 +255,6 @@ async def _handle_normal_flow(
         awaiting_transfer_clarification=awaiting_transfer_clarification,
         transcript=transcript,
         pending_action=pending_action,
-        user_message=response_text,
     )
 
 
