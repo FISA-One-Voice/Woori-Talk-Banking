@@ -5,6 +5,9 @@
     - POST /api/transfer/{tx_id}/memo  : 메모 업데이트 성공 / 트랜잭션 없음
     - GET  /api/transfer/recent        : 최근 수취인 목록, 인증 없는 요청(401)
 
+구 API(multipart+ASV) 테스트는 test_transfer.py에서 제거되었으며,
+현재 JSON API 기준 시나리오는 이 파일에서 검증합니다.
+
 실행:
     cd backend
     CRYPTO_NOOP=true pytest tests/test_transfer_api.py -v
@@ -87,23 +90,56 @@ def api_setup(db: Session):
 
 
 @pytest.fixture(scope="module")
-def authed_client(api_setup):
+def authed_client(client: TestClient, api_setup):
     """get_current_user_id를 오버라이드해 JWT 로그인 없이 특정 user_id로 고정한 TestClient.
-    실제 DB는 그대로 사용 (get_db 오버라이드 없음).
+    session 공유 client를 재사용해 startup(scheduler) 중복 기동을 방지합니다.
     """
     app.dependency_overrides[get_current_user_id] = lambda: _USER_ID
-    with TestClient(app) as c:
-        yield c
-    # 다른 테스트 모듈에 영향이 없도록 오버라이드 해제
+    yield client
     app.dependency_overrides.pop(get_current_user_id, None)
+
+
+@pytest.fixture(scope="module")
+def registered_recipient(api_setup, db: Session) -> RegisteredRecipient:
+    """등록 수취인(recipientId) 이체 시나리오용 픽스처."""
+    r_id = str(uuid.uuid4())
+    recipient = RegisteredRecipient(
+        recipient_id=r_id,
+        user_id=_USER_UUID,
+        alias="API등록수취인",
+        bank_name="카카오뱅크",
+        account_number="3333023333333",
+        recipient_name="김철수",
+    )
+    db.add(recipient)
+    db.commit()
+    db.refresh(recipient)
+    yield recipient
+    db.query(Transaction).filter(Transaction.recipient_id == r_id).delete()
+    db.query(RegisteredRecipient).filter(
+        RegisteredRecipient.recipient_id == r_id
+    ).delete()
+    db.commit()
 
 
 # ── 인증 미적용 요청 테스트 (authed_client 활성화 전에 실행) ───────────────────
 def test_unauthorized_access(client: TestClient):
-    """[인증 없는 요청] Authorization 헤더 없이 API 호출 시 → 401 Unauthorized 반환.
-    이 테스트는 authed_client 픽스처가 아직 활성화되지 않은 시점에 실행되어야 한다.
-    """
+    """[인증 없는 요청] Authorization 헤더 없이 API 호출 시 → 401 Unauthorized 반환."""
     resp = client.get("/api/transfer/recent")
+    assert resp.status_code == 401
+
+
+def test_unauthorized_post_transfer(client: TestClient):
+    """[인증 없는 이체] POST /api/transfer/ 요청 시 → 401 Unauthorized."""
+    resp = client.post(
+        "/api/transfer/",
+        json={
+            "recipient": "12345678901",
+            "bankName": "하나은행",
+            "amount": 1_000,
+            "idempotencyKey": str(uuid.uuid4()),
+        },
+    )
     assert resp.status_code == 401
 
 
@@ -201,6 +237,146 @@ class TestCreateTransferAPI:
 
         assert resp.status_code == 400
         assert resp.json()["code"] == "INVALID_ACCOUNT_FORMAT"
+
+    def test_transfer_with_registered_recipient_id(
+        self,
+        authed_client: TestClient,
+        db: Session,
+        registered_recipient: RegisteredRecipient,
+    ):
+        """[등록 수취인 이체] recipientId로 이체 시 completed Transaction이 생성된다."""
+        key = str(uuid.uuid4())
+        resp = authed_client.post(
+            "/api/transfer/",
+            json={
+                "recipientId": str(registered_recipient.recipient_id),
+                "recipient": "unused-for-registered-mode",
+                "bankName": "카카오뱅크",
+                "amount": 10_000,
+                "idempotencyKey": key,
+            },
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["data"]["status"] == "completed"
+
+        tx = (
+            db.query(Transaction)
+            .filter(Transaction.idempotency_key == key)
+            .first()
+        )
+        assert tx is not None
+        assert tx.status == "completed"
+        assert str(tx.recipient_id) == str(registered_recipient.recipient_id)
+
+        db.query(Transaction).filter(Transaction.idempotency_key == key).delete()
+        db.commit()
+
+    def test_response_fields(
+        self,
+        authed_client: TestClient,
+        registered_recipient: RegisteredRecipient,
+    ):
+        """[응답 필드] 영수증 JSON에 txId, toName, toBankName, amount, status가 포함된다."""
+        key = str(uuid.uuid4())
+        amount = 12_000
+        resp = authed_client.post(
+            "/api/transfer/",
+            json={
+                "recipientId": str(registered_recipient.recipient_id),
+                "recipient": "unused-for-registered-mode",
+                "bankName": "카카오뱅크",
+                "amount": amount,
+                "idempotencyKey": key,
+            },
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert data["txId"]
+        assert data["toName"] == "김철수"
+        assert data["toBankName"] == "카카오뱅크"
+        assert data["amount"] == amount
+        assert data["status"] == "completed"
+
+    def test_balance_deducted_after_transfer(
+        self,
+        authed_client: TestClient,
+        db: Session,
+    ):
+        """[잔액 차감] 이체 성공 후 출금 계좌 balance가 amount만큼 감소한다."""
+        account = db.query(Account).filter(Account.account_id == _ACCOUNT_ID).one()
+        before_balance = account.balance
+        key = str(uuid.uuid4())
+        amount = 3_000
+
+        resp = authed_client.post(
+            "/api/transfer/",
+            json={
+                "recipient": "12345678901",
+                "bankName": "하나은행",
+                "amount": amount,
+                "idempotencyKey": key,
+            },
+        )
+        assert resp.status_code == 200
+
+        db.refresh(account)
+        assert account.balance == before_balance - amount
+
+        db.query(Transaction).filter(Transaction.idempotency_key == key).delete()
+        db.commit()
+
+    def test_recipient_not_found(
+        self,
+        authed_client: TestClient,
+    ):
+        """[수취인 없음] 존재하지 않는 recipientId → 404 RECIPIENT_NOT_FOUND."""
+        resp = authed_client.post(
+            "/api/transfer/",
+            json={
+                "recipientId": str(uuid.uuid4()),
+                "recipient": "12345678901",
+                "bankName": "하나은행",
+                "amount": 1_000,
+                "idempotencyKey": str(uuid.uuid4()),
+            },
+        )
+
+        assert resp.status_code == 404
+        assert resp.json()["code"] == "RECIPIENT_NOT_FOUND"
+
+    def test_idempotency_single_db_record(
+        self,
+        authed_client: TestClient,
+        db: Session,
+    ):
+        """[멱등성 DB] 동일 idempotencyKey 2회 요청 시 DB 레코드는 1건만 유지된다."""
+        key = str(uuid.uuid4())
+        payload = {
+            "recipient": "12345678901",
+            "bankName": "하나은행",
+            "amount": 4_000,
+            "idempotencyKey": key,
+        }
+
+        resp1 = authed_client.post("/api/transfer/", json=payload)
+        resp2 = authed_client.post("/api/transfer/", json=payload)
+        assert resp1.status_code == 200
+        assert resp2.status_code == 200
+        assert resp1.json()["data"]["txId"] == resp2.json()["data"]["txId"]
+
+        count = (
+            db.query(Transaction)
+            .filter(Transaction.idempotency_key == key)
+            .count()
+        )
+        assert count == 1
+
+        db.query(Transaction).filter(Transaction.idempotency_key == key).delete()
+        db.commit()
 
 
 # ── TestMemoAPI ────────────────────────────────────────────────────────────────

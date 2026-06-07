@@ -69,7 +69,11 @@ from app.shared.agent.transfer_clarification import (
     build_transfer_clarification_response,
     should_offer_transfer_clarification,
 )
-from app.shared.agent.transfer_intent import is_plain_transfer_start
+from app.shared.agent.transfer_intent import (
+    build_bare_transfer_start_update,
+    is_plain_transfer_start,
+    should_use_bare_transfer_fast_start,
+)
 from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 
 logger = logging.getLogger(__name__)
@@ -403,6 +407,13 @@ def build_graph(tools: list) -> CompiledStateGraph:
         )
 
         user_text = last_user_text(state.get("messages", []))
+        if should_use_bare_transfer_fast_start(user_text):
+            logger.info(
+                "[Graph →intent_node] bare transfer fast path text=%s",
+                user_text,
+            )
+            return build_bare_transfer_start_update(user_text)
+
         if should_offer_transfer_clarification(
             user_text,
             pending_action=state.get("pending_action"),
