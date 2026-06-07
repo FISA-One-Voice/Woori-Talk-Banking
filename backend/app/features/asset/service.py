@@ -290,15 +290,7 @@ def query_transaction_list_tts(
     since = date_range_to_since(date_range)
     days = None if since else period_to_days(period)
     label = period or "이번달"
-    try:
-        txs = get_transaction_history(db, user_id, days=days)
-    except HistoryError:
-        raise HistoryError(
-            code="TX_NOT_FOUND",
-            message="거래 내역을 찾을 수 없습니다.",
-            status_code=404,
-            user_message=f"{label} 거래 내역이 없습니다.",
-        )
+    txs = get_transaction_history(db, user_id, days=days)
 
     # status="completed" 건만 읽어줌 (pending/failed 제외)
     completed = [t for t in txs if t.status == "completed"]
@@ -352,15 +344,7 @@ def query_history_tts(
     since = date_range_to_since(date_range)
     days = None if since else period_to_days(period)
     label = period or "이번달"
-    try:
-        txs = get_transaction_history(db, user_id, days=days)
-    except HistoryError:
-        raise HistoryError(
-            code="TX_NOT_FOUND",
-            message="거래 내역을 찾을 수 없습니다.",
-            status_code=404,
-            user_message=f"{label} 거래 내역이 없습니다.",
-        )
+    txs = get_transaction_history(db, user_id, days=days)
 
     completed = [t for t in txs if t.status == "completed"]
     if not completed:
@@ -414,15 +398,7 @@ def query_category_tts(
         return "어떤 카테고리를 조회할까요? 예: 식비, 교통, 문화생활."
     days = period_to_days(period)
     label = period or "이번달"
-    try:
-        txs = get_transaction_history(db, user_id, days=days, category=category)
-    except HistoryError:
-        raise HistoryError(
-            code="TX_NOT_FOUND",
-            message="거래 내역을 찾을 수 없습니다.",
-            status_code=404,
-            user_message=f"{label} {category} 내역이 없습니다.",
-        )
+    txs = get_transaction_history(db, user_id, days=days, category=category)
     total = sum(t.amount for t in txs)
     return f"{label} {category} 내역 알려드리겠습니다. 총 {len(txs)}건, {total:,}원 지출하셨습니다."
 
