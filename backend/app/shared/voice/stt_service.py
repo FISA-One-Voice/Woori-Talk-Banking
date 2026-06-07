@@ -21,8 +21,6 @@ SUPPORTED_CONTENT_TYPES = frozenset(
         "audio/flac",
         "audio/ogg",
         "audio/mp3",
-        "audio/x-caf",
-        "audio/caf",
     }
 )
 
