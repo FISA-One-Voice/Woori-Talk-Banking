@@ -13,7 +13,6 @@
 from app.shared.agent.tools.auto_transfer import add_auto_transfer_note
 from app.shared.agent.tools.balance import get_account_balance_by_id, get_total_balance
 from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
-from app.shared.agent.tools.event import get_event_list
 from app.shared.agent.tools.execute_auto_transfer import execute_auto_transfer
 from app.shared.agent.tools.history import (
     get_category_history,
@@ -51,7 +50,6 @@ ALL_TOOLS: list = [
     get_recent_history,
     get_category_history,
     get_monthly_expense,
-    get_event_list,
     execute_transfer,
     lookup_recipient,
     add_note,
