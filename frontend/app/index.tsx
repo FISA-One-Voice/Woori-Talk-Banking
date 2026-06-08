@@ -15,16 +15,16 @@ export default function Index() {
       <Text style={styles.title}>우리톡뱅킹</Text>
       <Text style={styles.subtitle}>개발 진입</Text>
 
+      <Pressable style={styles.btn} onPress={() => router.push('/dev')}>
+        <Text style={styles.btnText}>🧪 테스트</Text>
+      </Pressable>
+
       <Pressable style={styles.btn} onPress={() => router.push('/showcase')}>
         <Text style={styles.btnText}>🎨 컴포넌트 쇼케이스</Text>
       </Pressable>
 
-      <Pressable style={[styles.btn, styles.btnPrimary]} onPress={() => router.push('/dev/login')}>
+      <Pressable style={[styles.btn, styles.btnPrimary]} onPress={() => router.push('/login')}>
         <Text style={[styles.btnText, styles.btnTextDark]}>🔐 로그인 (앱 시작)</Text>
-      </Pressable>
-
-      <Pressable style={styles.btn} onPress={() => router.push('/dev/login')}>
-        <Text style={styles.btnText}>🔐 로그인 화면</Text>
       </Pressable>
     </View>
   );
