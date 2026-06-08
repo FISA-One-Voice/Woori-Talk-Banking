@@ -72,10 +72,10 @@ def run_execute_transfer(
         tx_id = receipt["txId"]
         return f"{display_name}님께 {amount:,}원 이체가 완료되었습니다.", tx_id
     except AppError as e:
-        logger.warning("execute_transfer AppError: user=%s code=%s", user_id, e.code)
+        logger.warning("execute_transfer_error", extra={"event": "execute_transfer_error", "user_id": user_id, "code": e.code})
         return e.user_message or e.message, None
     except Exception as e:
-        logger.error("execute_transfer 실패: user=%s error=%s", user_id, e)
+        logger.error("execute_transfer_failed", extra={"event": "execute_transfer_failed", "user_id": user_id, "error": str(e)})
         return "이체 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.", None
     finally:
         db.close()
@@ -120,10 +120,10 @@ def add_note(user_id: str, memo: str, tx_id: str) -> str:
         transfer_service.update_memo(db=db, user_id=user_id, tx_id=tx_id, memo=memo)
         return f"'{memo}' 메모가 추가되었습니다."
     except AppError as e:
-        logger.warning("add_note AppError: user=%s code=%s", user_id, e.code)
+        logger.warning("add_note_error", extra={"event": "add_note_error", "user_id": user_id, "code": e.code})
         return e.user_message or e.message
     except Exception as e:
-        logger.error("add_note 실패: user=%s tx_id=%s error=%s", user_id, tx_id, e)
+        logger.error("add_note_failed", extra={"event": "add_note_failed", "user_id": user_id, "tx_id": tx_id, "error": str(e)})
         return "메모 추가 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
     finally:
         db.close()

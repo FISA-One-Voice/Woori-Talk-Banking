@@ -20,15 +20,15 @@ def lookup_recipient(user_id: str, recipient: str) -> str | None:
     Returns:
         수취인 실명(str). 찾지 못하면 None.
     """
-    logger.info("[lookup_recipient] user_id=%s recipient=%s", user_id, recipient)
+    logger.info("lookup_recipient_start", extra={"event": "lookup_recipient_start", "user_id": user_id, "recipient": recipient})
     db = SessionLocal()
     try:
         resolved = lookup_recipient_by_voice(db, uuid.UUID(user_id), recipient)
         result = resolved.recipient_name if resolved else None
-        logger.info("[lookup_recipient] result=%s", result)
+        logger.info("lookup_recipient_result", extra={"event": "lookup_recipient_result", "user_id": user_id, "result": result})
         return resolved.recipient_name if resolved else None
     except Exception as e:
-        logger.error("[lookup_recipient] 오류: %s", e)
+        logger.error("lookup_recipient_failed", extra={"event": "lookup_recipient_failed", "user_id": user_id, "error": str(e)})
         return None
     finally:
         db.close()
