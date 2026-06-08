@@ -48,7 +48,7 @@ _NAVIGATE_MAP: dict[str, str] = {
 }
 
 _BALANCE_KEYWORDS = frozenset({"잔액", "얼마 있", "돈 얼마", "통장"})
-_HISTORY_KEYWORDS = frozenset({"거래내역", "거래 내역", "내역", "소비 내역"})
+_HISTORY_KEYWORDS = frozenset({"거래내역", "거래 내역", "내역", "내용", "소비 내역", "거래 내용"})
 _ANALYSIS_KEYWORDS = frozenset({"분석", "리포트", "소비 분석", "지출 분석"})
 
 _QUERY_SYSTEM_PROMPT = """너는 자산 조회 전문 에이전트야.
