@@ -127,7 +127,7 @@
       },
       "targets": [
         {
-          "expr": "rate(http_requests_total{status=~\"4xx|5xx\"}[5m]) / rate(http_requests_total[5m]) * 100",
+          "expr": "sum(rate(http_requests_total{status=~\"4xx|5xx\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
           "legendFormat": "에러율",
           "refId": "A"
         }
@@ -248,12 +248,12 @@
       },
       "targets": [
         {
-          "expr": "rate(http_requests_total{status=\"5xx\"}[5m]) / rate(http_requests_total[5m]) * 100",
+          "expr": "sum(rate(http_requests_total{status=\"5xx\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
           "legendFormat": "5xx 비율",
           "refId": "A"
         },
         {
-          "expr": "rate(http_requests_total{status=\"4xx\"}[5m]) / rate(http_requests_total[5m]) * 100",
+          "expr": "sum(rate(http_requests_total{status=\"4xx\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
           "legendFormat": "4xx 비율",
           "refId": "B"
         }
@@ -314,7 +314,7 @@
           "bucketAggs": [
             {
               "type": "terms",
-              "field": "code",
+              "field": "code.keyword",
               "id": "2",
               "settings": {
                 "order": "desc",
@@ -328,11 +328,10 @@
       ],
       "transformations": [
         {
-          "id": "reduce",
+          "id": "rowsToFields",
           "options": {
-            "reducers": [
-              "sum"
-            ]
+            "nameField": "code.keyword",
+            "valueField": "Count"
           }
         }
       ]
@@ -461,7 +460,7 @@
     },
     {
       "id": 6,
-      "title": "기능별 에러 분포 (OpenSearch)",
+      "title": "기능별 에러 분포 (app_error + client_error)",
       "type": "barchart",
       "gridPos": {
         "h": 10,
@@ -514,7 +513,7 @@
             "uid": "opensearch"
           },
           "index": "app_logs",
-          "query": "event:app_error",
+          "query": "event:app_error OR event:client_error",
           "metrics": [
             {
               "type": "count",
@@ -525,7 +524,7 @@
           "bucketAggs": [
             {
               "type": "terms",
-              "field": "feature",
+              "field": "feature.keyword",
               "id": "2",
               "settings": {
                 "order": "desc",
@@ -537,15 +536,128 @@
           ]
         }
       ],
-      "transformations": [
+      "transformations": []
+    },
+    {
+      "id": 10,
+      "title": "클라이언트 에러 총 건수",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 41 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "fixedColor": "purple", "mode": "fixed" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "targets": [
         {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
+          "refId": "A",
+          "alias": "클라이언트 에러",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "app_logs",
+          "query": "event:client_error",
+          "metrics": [{ "type": "count", "id": "1" }],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "date_histogram",
+              "field": "timestamp",
+              "id": "2",
+              "settings": { "interval": "auto", "min_doc_count": "0" }
+            }
+          ]
         }
+      ],
+      "transformations": [{ "id": "reduce", "options": { "reducers": ["sum"] } }]
+    },
+    {
+      "id": 11,
+      "title": "클라이언트 에러 타입별 (timeout / network / 4xx / 5xx)",
+      "type": "bargauge",
+      "gridPos": { "h": 4, "w": 10, "x": 6, "y": 41 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": { "fixedColor": "purple", "mode": "fixed" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "values": true, "limit": 10, "calcs": ["sum"] },
+        "displayMode": "gradient"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "app_logs",
+          "query": "event:client_error",
+          "metrics": [{ "type": "count", "id": "1" }],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "terms",
+              "field": "error_type.keyword",
+              "id": "2",
+              "settings": { "order": "desc", "orderBy": "1", "size": "10", "min_doc_count": "1" }
+            }
+          ]
+        }
+      ],
+      "transformations": [
+        { "id": "rowsToFields", "options": { "nameField": "error_type.keyword", "valueField": "Count" } }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "클라이언트 에러 기능별",
+      "type": "bargauge",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 41 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": { "fixedColor": "purple", "mode": "fixed" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "values": true, "limit": 10, "calcs": ["sum"] },
+        "displayMode": "gradient"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "app_logs",
+          "query": "event:client_error",
+          "metrics": [{ "type": "count", "id": "1" }],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "terms",
+              "field": "feature.keyword",
+              "id": "2",
+              "settings": { "order": "desc", "orderBy": "1", "size": "10", "min_doc_count": "1" }
+            }
+          ]
+        }
+      ],
+      "transformations": [
+        { "id": "rowsToFields", "options": { "nameField": "feature.keyword", "valueField": "Count" } }
       ]
     }
   ]

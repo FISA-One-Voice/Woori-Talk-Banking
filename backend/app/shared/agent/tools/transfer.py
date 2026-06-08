@@ -1,12 +1,16 @@
 """이체 에이전트 tool — execute_transfer / add_note."""
 
 import logging
+import time
 import uuid
+from datetime import datetime, timezone
 
 from langchain_core.tools import tool
 
 from app.core.database import get_db
 from app.core.exception import AppError
+from app.core.opensearch_writer import write_transfer_audit_record
+from app.core.request_context import get_request_id
 from app.features.recipients.service import (
     lookup_recipient_for_transfer,
     resolve_by_id,
@@ -32,6 +36,7 @@ def run_execute_transfer(
     """
     db = next(get_db())
     slots = collected_slots or {}
+    start = time.monotonic()
     try:
         user_uuid = uuid.UUID(user_id)
         resolved = None
@@ -54,6 +59,14 @@ def run_execute_transfer(
             )
 
         if resolved is None:
+            write_transfer_audit_record({
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "request_id": get_request_id(),
+                "user_id": user_id,
+                "amount": amount,
+                "status": "failed",
+                "duration_ms": int((time.monotonic() - start) * 1000),
+            })
             return f"{recipient}님을 찾을 수 없습니다. 다시 확인해 주세요.", None
 
         display_name = str(
@@ -70,8 +83,18 @@ def run_execute_transfer(
             recipient_id=str(resolved.recipient_id) if resolved.recipient_id else None,
         )
         tx_id = receipt["txId"]
+        # transfer_service.execute_transfer() already logs event:transfer_executed
+        # which Fluent Bit routes to transfer_audit — no direct write needed here
         return f"{display_name}님께 {amount:,}원 이체가 완료되었습니다.", tx_id
     except AppError as e:
+        write_transfer_audit_record({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "request_id": get_request_id(),
+            "user_id": user_id,
+            "amount": amount,
+            "status": "failed",
+            "duration_ms": int((time.monotonic() - start) * 1000),
+        })
         logger.warning("execute_transfer_error", extra={"event": "execute_transfer_error", "user_id": user_id, "code": e.code})
         return e.user_message or e.message, None
     except Exception as e:

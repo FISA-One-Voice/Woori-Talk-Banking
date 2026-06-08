@@ -187,6 +187,29 @@ async def process_voice_pipeline(
 
 # ── 정상 흐름: STT → 에이전트 → TTS ────────────────────────────────────────────
 
+_NAVIGATE_TO_INTENT: dict[str, str] = {
+    "transfer":           "transfer",
+    "transfer/complete":  "transfer",
+    "transfer/failed":    "transfer",
+    "auto-transfer":      "auto_transfer",
+    "auto-transfer/complete": "auto_transfer",
+    "balance":            "balance",
+    "event":              "event",
+    "home":               "home",
+}
+
+
+def _infer_intent(result: dict) -> str | None:
+    """에이전트 결과에서 인텐트를 추출한다.
+
+    execute_node 실행 후 pending_action이 None으로 리셋되므로,
+    pending_action이 없으면 navigate_to로 역추론한다.
+    """
+    pending = result.get("pending_action")
+    if pending:
+        return pending
+    return _NAVIGATE_TO_INTENT.get(result.get("navigate_to") or "")
+
 
 async def _record_voice_pipeline(
     user_id: str,
@@ -281,7 +304,7 @@ async def _handle_normal_flow(
         agent_ms=agent_ms,
         tts_ms=tts_ms,
         total_ms=total_ms,
-        intent=result.get("pending_action"),
+        intent=_infer_intent(result),
         navigate_to=navigate_to,
     )
 

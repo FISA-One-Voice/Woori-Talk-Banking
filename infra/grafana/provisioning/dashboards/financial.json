@@ -15,7 +15,8 @@
   "panels": [
     {
       "id": 1,
-      "title": "이체 성공 / 실패 건수 (OpenSearch)",
+      "title": "이체 성공 / 실패 건수 (PostgreSQL)",
+      "description": "transactions 테이블 tx_type=transfer 기준 — 대시보드 시간 범위 내 건수",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -24,8 +25,8 @@
         "y": 0
       },
       "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
+        "type": "postgres",
+        "uid": "postgres"
       },
       "fieldConfig": {
         "defaults": {
@@ -77,76 +78,20 @@
       "targets": [
         {
           "refId": "A",
-          "alias": "성공",
           "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
+            "type": "postgres",
+            "uid": "postgres"
           },
-          "index": "transfer_audit",
-          "query": "status:success",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "B",
-          "alias": "실패",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "transfer_audit",
-          "query": "status:failed",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        }
-      ],
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
+          "rawSql": "SELECT COUNT(*) FILTER (WHERE status = 'completed') AS \"성공\", COUNT(*) FILTER (WHERE status = 'failed') AS \"실패\" FROM transactions WHERE tx_type = 'transfer' AND $__timeFilter(created_at)",
+          "format": "table",
+          "rawQuery": true
         }
       ]
     },
     {
       "id": 2,
-      "title": "자동이체 스케줄러 누적 성공 / 실패 (OpenSearch)",
-      "description": "APScheduler 실행 결과 누적 이력 — app_logs event:auto_transfer_executed 기준",
+      "title": "자동이체 성공 / 실패 건수 (PostgreSQL)",
+      "description": "transactions 테이블 tx_type=auto_transfer 기준 — 대시보드 시간 범위 내 건수",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -155,8 +100,8 @@
         "y": 0
       },
       "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
+        "type": "postgres",
+        "uid": "postgres"
       },
       "fieldConfig": {
         "defaults": {
@@ -208,69 +153,13 @@
       "targets": [
         {
           "refId": "A",
-          "alias": "성공",
           "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
+            "type": "postgres",
+            "uid": "postgres"
           },
-          "index": "app_logs",
-          "query": "event:auto_transfer_executed AND status:success",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "B",
-          "alias": "실패",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "app_logs",
-          "query": "event:auto_transfer_executed AND status:failed",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        }
-      ],
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
+          "rawSql": "SELECT COUNT(*) FILTER (WHERE status = 'completed') AS \"성공\", COUNT(*) FILTER (WHERE status = 'failed') AS \"실패\" FROM transactions WHERE tx_type = 'auto_transfer' AND $__timeFilter(created_at)",
+          "format": "table",
+          "rawQuery": true
         }
       ]
     },
@@ -445,7 +334,8 @@
     },
     {
       "id": 5,
-      "title": "시간대별 이체 건수 (OpenSearch)",
+      "title": "시간대별 이체 건수 (PostgreSQL)",
+      "description": "transactions 테이블 tx_type=transfer 기준 — 성공/실패 시계열",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -454,8 +344,8 @@
         "y": 4
       },
       "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
+        "type": "postgres",
+        "uid": "postgres"
       },
       "fieldConfig": {
         "defaults": {
@@ -465,35 +355,49 @@
             "lineWidth": 0
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "성공"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "실패"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "targets": [
         {
           "refId": "A",
           "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
+            "type": "postgres",
+            "uid": "postgres"
           },
-          "index": "transfer_audit",
-          "query": "*",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
+          "rawSql": "SELECT $__timeGroupAlias(created_at, $__interval, 0), COUNT(*) FILTER (WHERE status = 'completed') AS \"성공\", COUNT(*) FILTER (WHERE status = 'failed') AS \"실패\" FROM transactions WHERE tx_type = 'transfer' AND $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "rawQuery": true
         }
       ]
     },

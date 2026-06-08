@@ -1966,3 +1966,73 @@ Python 앱 → ~/woori-logs/app.log (JSON lines)
 |------|----------|
 | 시간대별 이체 건수 | `timestamp` (date histogram) |
 | 최근 이체 감사 로그 | 전체 필드 (table 뷰) |
+
+---
+
+## 16. 클라이언트 에러 수집 (프론트엔드 → OpenSearch)
+
+### 개요
+
+프론트엔드(React Native)에서 발생하는 Axios 에러를 백엔드를 통해 OpenSearch에 기록한다.  
+서버사이드 로그만으로는 타임아웃·네트워크 단절 등 **클라이언트에서만 관측 가능한 에러**를 알 수 없어 추가.
+
+### 데이터 흐름
+
+```
+Axios 에러 발생 (timeout / network / 4xx / 5xx)
+  → frontend/utils/api.ts  Response 인터셉터 catch
+  → URL에서 feature 자동 추출  (/api/transfer/ → "transfer")
+  → frontend/services/errorReportService.ts  에러 분류 + POST
+  → POST /api/client-errors/  (JWT 인증 필요)
+  → backend/app/features/client_errors/router.py
+  → write_client_error_async()  (opensearch_writer.py)
+  → OpenSearch  app_logs 인덱스
+```
+
+### 수집 위치 (코드)
+
+| 파일 | 역할 |
+|------|------|
+| `frontend/utils/api.ts` | Axios Response 인터셉터에서 모든 API 에러 자동 캐치. `/api/client-errors/` 자체 에러와 401 silent refresh 재시도 요청은 제외(무한루프 방지) |
+| `frontend/services/errorReportService.ts` | 에러를 `timeout` / `network` / `http_4xx` / `http_5xx` / `unknown`으로 분류. `axios.isAxiosError()` 체크 후 페이로드 구성. JWT 토큰 없으면 전송 생략. 전송 실패는 조용히 무시 |
+| `backend/app/features/client_errors/router.py` | `POST /api/client-errors/` 엔드포인트. JWT Depends로 user_id 추출. `asyncio.create_task()`로 fire-and-forget 기록 |
+| `backend/app/core/opensearch_writer.py` | `write_client_error_async()` — `app_logs` 인덱스에 비동기 기록 |
+
+### OpenSearch 저장 필드
+
+| 필드 | 타입 | 예시 값 |
+|------|------|---------|
+| `timestamp` | date | `2026-06-08T14:14:10Z` |
+| `level` | keyword | `ERROR` |
+| `event` | keyword | `client_error` |
+| `feature` | keyword | `transfer` / `voice` / `auto-transfer` |
+| `error_type` | keyword | `timeout` / `network` / `http_4xx` / `http_5xx` |
+| `error_message` | text | `timeout of 10000ms exceeded` |
+| `url` | keyword | `/api/transfer/` |
+| `method` | keyword | `POST` |
+| `status_code` | integer | `500` (없으면 null) |
+| `user_id` | keyword | JWT에서 추출한 사용자 UUID |
+| `platform` | keyword | `react-native` |
+
+> `event: client_error`로 app_error와 구분. `level: ERROR`이므로 "에러 로그 검색" 테이블에 자동 포함됨.
+
+### 에러 타입 분류 기준
+
+| `error_type` | 조건 |
+|---|---|
+| `timeout` | `error.code === 'ECONNABORTED'` 또는 메시지에 `"timeout"` 포함 |
+| `network` | `error.response`가 없음 (서버 응답 자체가 없는 경우) |
+| `http_5xx` | `status >= 500` |
+| `http_4xx` | `status >= 400` |
+| `unknown` | Axios 에러가 아닌 경우 |
+
+### Grafana 에러 분석 대시보드 패널
+
+| 패널 | 쿼리 | client_error 포함 |
+|------|------|---|
+| 에러 로그 검색 (table) | `level:ERROR` | ✅ |
+| 기능별 에러 분포 (barchart) | `event:app_error OR event:client_error` | ✅ |
+| 클라이언트 에러 총 건수 (stat) | `event:client_error` | ✅ 전용 |
+| 클라이언트 에러 타입별 (bargauge) | `event:client_error` + `error_type.keyword` | ✅ 전용 |
+| 클라이언트 에러 기능별 (bargauge) | `event:client_error` + `feature.keyword` | ✅ 전용 |
+| AppError 코드별 발생 건수 (bargauge) | `event:app_error` | ❌ (code 필드 없음) |
