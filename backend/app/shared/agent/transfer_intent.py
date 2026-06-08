@@ -27,9 +27,25 @@ _AUTO_TRANSFER_HINTS = (
     "매달이체",
 )
 
-_HOME_HINTS = ("홈으로", "처음으로", "홈화면", "홈이동", "메인화면")
+_HOME_HINTS = ("홈", "홈으로", "처음으로", "홈화면", "홈이동", "메인화면")
 
 _BALANCE_HINTS = ("잔액", "잔고", "얼마남", "남은돈", "계좌잔액")
+
+# "이체 한도 알려줘"처럼 이체 키워드가 있어도 정보 문의인 경우 transfer fast-path 제외
+_INFORMATIONAL_HINTS = (
+    "한도",
+    "수수료",
+    "방법",
+    "설명",
+    "알려줘",
+    "알려주세요",
+    "뭔가요",
+    "뭐야",
+    "뭐에요",
+    "뭔지",
+    "어떻게",
+    "어떤",
+)
 
 _RECIPIENT_PARTICLE = re.compile(r"(에게|한테|께)")
 _PHONE_IN_TEXT = re.compile(r"01[0-9][\s-]?[0-9]{3,4}[\s-]?[0-9]{4}")
@@ -40,13 +56,15 @@ def _normalize(text: str) -> str:
 
 
 def is_plain_transfer_start(text: str) -> bool:
-    """일회성 이체 시작 발화(자동이체·홈·잔액 제외)."""
+    """일회성 이체 시작 발화(자동이체·홈·잔액·정보문의 제외)."""
     normalized = _normalize(text)
     if any(hint in normalized for hint in _AUTO_TRANSFER_HINTS):
         return False
-    if any(hint in normalized for hint in _HOME_HINTS) or normalized in ("홈",):
+    if any(hint in normalized for hint in _HOME_HINTS):
         return False
     if any(hint in normalized for hint in _BALANCE_HINTS):
+        return False
+    if any(hint in normalized for hint in _INFORMATIONAL_HINTS):
         return False
     return any(hint in normalized for hint in _TRANSFER_START_HINTS)
 

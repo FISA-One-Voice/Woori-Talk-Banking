@@ -15,6 +15,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from app.core.config import settings
+from app.core.exception import EventError
 from app.shared.agent.prompts import DOMAIN_CLASSIFY_PROMPT
 from app.shared.agent.session_reset import clear_conversation_messages
 from app.shared.agent.state import VoiceState
@@ -59,6 +60,11 @@ _VALID_DOMAINS: frozenset[str] = frozenset({"transfer", "asset", "rag", "unknown
 # ── 헬퍼 함수 ────────────────────────────────────────────────────────────────────
 
 
+def _normalize(text: str) -> str:
+    """공백 제거 정규화."""
+    return text.replace(" ", "")
+
+
 def _last_user_text(state: VoiceState) -> str:
     """messages에서 가장 최신 HumanMessage 텍스트를 반환한다."""
     for msg in reversed(state.get("messages", [])):
@@ -69,14 +75,12 @@ def _last_user_text(state: VoiceState) -> str:
 
 def _is_cancel_utterance(text: str) -> bool:
     """취소 키워드 포함 여부."""
-    normalized = text.replace(" ", "")
-    return any(kw in normalized for kw in CANCEL_KEYWORDS)
+    return any(kw in _normalize(text) for kw in CANCEL_KEYWORDS)
 
 
 def _is_navigation_utterance(text: str) -> bool:
     """화면 이동(홈) 키워드 포함 여부."""
-    normalized = text.replace(" ", "")
-    return any(kw in normalized for kw in NAVIGATION_KEYWORDS)
+    return any(kw in _normalize(text) for kw in NAVIGATION_KEYWORDS)
 
 
 def _has_active_session(state: VoiceState) -> bool:
@@ -134,9 +138,13 @@ async def _decide_domain(text: str, state: VoiceState) -> str:
     """
     active_session = _has_active_session(state)
 
-    # 1. (취소 OR 홈 이동) + 활성 세션 → cancel (세션 포기로 취소와 동일 처리)
-    is_exit = _is_cancel_utterance(text) or _is_navigation_utterance(text)
-    if is_exit and active_session:
+    # 1. 홈 이동 키워드 → 세션 유무와 무관하게 항상 cancel
+    #    이벤트·RAG 화면처럼 active_session=False 상태에서도 홈 이동이 가능해야 한다.
+    if _is_navigation_utterance(text):
+        return "cancel"
+
+    # 1-b. 취소 키워드 + 활성 세션 → cancel (진행 중인 작업 포기)
+    if _is_cancel_utterance(text) and active_session:
         return "cancel"
 
     # 2. 활성 세션 → transfer 유지 (pending_action / awaiting_* / execution_ready 포함)
@@ -153,17 +161,19 @@ async def _decide_domain(text: str, state: VoiceState) -> str:
     if is_plain_transfer_start(text):
         return "transfer"
 
-    # ── 계획: asset / rag fast-path (Phase 2 이후) ────────────────────────────
+    # 5. 이벤트 fast-path — PostgreSQL 조회 전용 event 노드로 라우팅
+    #    이벤트는 OpenSearch가 아닌 DB에서 조회하므로 rag와 별도 처리
+    _EVENT_KEYWORDS = ("이벤트",)
+    if any(kw in _normalize(text) for kw in _EVENT_KEYWORDS):
+        return "event"
+
+    # ── 계획: asset fast-path (Phase 2 이후) ──────────────────────────────────
     # asset: 잔액·잔고·내역 키워드 → LLM 없이 즉시 "asset"
     #   예) kws = ("잔액", "잔고", "내역", "출금")
     #       if any(kw in _normalize(text) for kw in kws): return "asset"
-    # rag  : 이벤트·금리·환율 키워드 → LLM 없이 즉시 "rag"
-    #   예) kws = ("이벤트", "금리", "환율", "영업시간")
-    #       if any(kw in _normalize(text) for kw in kws): return "rag"
-    # 주의: 키워드가 복합 문장 맥락에서 오분류될 수 있으므로 LLM 폴백 비율을 측정 후 도입.
     # ─────────────────────────────────────────────────────────────────────────
 
-    # 5. gpt-4o-mini LLM 분류 (폴백: "unknown")
+    # 6. gpt-4o-mini LLM 분류 (폴백: "unknown")
     return await _llm_classify_domain(text)
 
 
@@ -195,16 +205,49 @@ async def supervisor_node(state: VoiceState) -> dict:
     return {"agent_domain": domain}
 
 
+async def event_node(state: VoiceState) -> dict:
+    """이벤트 목록 조회 + 이벤트 화면 이동.
+
+    graph.py execute_node(event) 처리를 Supervisor 레벨 노드로 구현.
+    get_event_list는 PostgreSQL에서 조회하므로 rag 에이전트와 분리된다.
+    """
+    from app.shared.agent.tools.event import get_event_list
+
+    user_id = state.get("user_id", "")
+    try:
+        response_text = get_event_list.invoke({"user_id": user_id})
+    except Exception as e:
+        logger.exception("event_node: get_event_list 호출 실패")
+        raise EventError(
+            code="EVENT_FETCH_ERROR",
+            message="이벤트 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+            status_code=500,
+            user_message="이벤트 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        ) from e
+
+    return {
+        "messages": [AIMessage(content=response_text)],
+        "navigate_to": "event",
+    }
+
+
 async def cancel_node(state: VoiceState) -> dict:
     """세션 전체 초기화 + 홈 이동 TTS 반환.
 
     P4 예외: 취소 발화 시 서브그래프를 거치지 않고 Supervisor에서 즉시 세션을 정리한다.
     TransferAgent 소유 필드를 직접 초기화하는 유일한 Supervisor 노드.
+    활성 세션이 없으면 "홈 화면으로 이동합니다."만 읽어 준다.
     """
+    has_session = _has_active_session(state)
+    tts = (
+        "취소했습니다. 홈 화면으로 이동합니다."
+        if has_session
+        else "홈 화면으로 이동합니다."
+    )
     return {
         "messages": [
             *clear_conversation_messages(),
-            AIMessage(content="취소했습니다. 홈 화면으로 이동합니다."),
+            AIMessage(content=tts),
         ],
         "navigate_to": "home",
         "pending_action": None,
@@ -236,8 +279,10 @@ def route_after_supervisor(state: VoiceState) -> str:
         return "transfer"
     # if domain == "asset":
     #     return "asset"
-    # if domain == "rag":
-    #     return "rag"
+    if domain == "rag":
+        return "rag"
+    if domain == "event":
+        return "event_node"
     return END
 
 
@@ -251,6 +296,7 @@ def build_supervisor():
     builder.compile()만 호출해야 세션 상태가 분리되지 않는다.
     """
     from app.shared.agent.subgraphs.transfer import build_transfer_graph
+    from app.shared.agent.subgraphs.consultation import rag_graph
     from app.shared.agent.tools import TRANSFER_TOOLS
 
     transfer_graph = build_transfer_graph(TRANSFER_TOOLS)
@@ -258,15 +304,17 @@ def build_supervisor():
     builder = StateGraph(VoiceState)
     builder.add_node("supervisor_node", supervisor_node)
     builder.add_node("cancel_node", cancel_node)
+    builder.add_node("event_node", event_node)
     builder.add_node("transfer", transfer_graph)
     # builder.add_node("asset", asset_graph)
-    # builder.add_node("rag", rag_graph)
+    builder.add_node("rag", rag_graph)
 
     builder.set_entry_point("supervisor_node")
     builder.add_conditional_edges("supervisor_node", route_after_supervisor)
     builder.add_edge("cancel_node", END)
+    builder.add_edge("event_node", END)
     builder.add_edge("transfer", END)
     # builder.add_edge("asset", END)
-    # builder.add_edge("rag", END)
+    builder.add_edge("rag", END)
 
     return builder.compile(checkpointer=MemorySaver())

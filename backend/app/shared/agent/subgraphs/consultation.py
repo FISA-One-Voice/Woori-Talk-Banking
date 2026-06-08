@@ -28,14 +28,14 @@ rag_agent = create_react_agent(
     state_schema=VoiceState,  # 반드시 명시: 부모 VoiceState와 스키마를 일치시킴
 )
 
-async def rag_node(state: VoiceState) -> dict:
+async def rag_graph(state: VoiceState) -> dict:
     """부모 그래프(Supervisor)에서 이 노드를 호출할 때 사용될 래퍼입니다.
-    
+
     RAG 에이전트 본체를 실행한 뒤, 아키텍처 원칙에 따라 화면 이동 권한이 없음을 보장하기 위해
     `navigate_to: None`을 하드코딩하여 반환합니다.
     """
     result = await rag_agent.ainvoke(state)
-    
+
     # React Agent가 반환한 메시지 목록에 navigate_to=None을 강제 주입하여 반환
     return {
         "messages": result["messages"],
