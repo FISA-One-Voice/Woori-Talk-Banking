@@ -12,6 +12,7 @@ export interface AccountItem {
 export interface AssetSummary {
   accounts: AccountItem[];
   total_asset: number;
+  tts_text: string;
 }
 
 export async function fetchAssetSummary(): Promise<AssetSummary> {
@@ -33,6 +34,7 @@ export interface TransactionItem {
   category: string | null;
   memo: string | null;
   created_at: string;
+  tts_text: string;
 }
 
 export async function fetchTransactionHistory(days: number): Promise<TransactionItem[]> {

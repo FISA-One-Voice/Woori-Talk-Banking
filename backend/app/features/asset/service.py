@@ -1,14 +1,23 @@
 from datetime import datetime, timedelta, timezone
+import logging
 import uuid
 
 from sqlalchemy.orm import Session
-
 from sqlalchemy import or_
 
 from app.core.exception import BalanceError, HistoryError
 from app.models.account import Account
 from app.models.transaction import Transaction
 
+logger = logging.getLogger(__name__)
+
+# 슬롯에서 허용되는 기간 값 (STT 정규화 후 이 셋 중 하나여야 유효)
+VALID_PERIODS: frozenset[str] = frozenset({"이번달", "지난달", "최근7일"})
+
+
+# ── DB 조회 ──────────────────────────────────────────────────────────────────
+# 아래 함수들은 순수 DB 조회만 담당한다.
+# 비즈니스 로직(TTS 문자열 생성 등)은 하단 TTS 응답 생성 섹션에서 처리한다.
 
 def get_asset_summary(db: Session, user_id: str) -> list[Account]:
     """사용자의 전체 계좌 목록과 잔액을 조회합니다.
@@ -29,7 +38,6 @@ def get_asset_summary(db: Session, user_id: str) -> list[Account]:
         .order_by(Account.is_primary.desc(), Account.created_at.asc())
         .all()
     )
-
     if not accounts:
         raise BalanceError(
             code="ACCOUNT_NOT_FOUND",
@@ -37,7 +45,6 @@ def get_asset_summary(db: Session, user_id: str) -> list[Account]:
             status_code=404,
             user_message="계좌를 찾을 수 없습니다.",
         )
-
     return accounts
 
 
@@ -63,7 +70,6 @@ def get_account_balance(db: Session, user_id: str, account_id: str) -> Account:
         )
         .first()
     )
-
     if not account:
         raise BalanceError(
             code="ACCOUNT_NOT_FOUND",
@@ -71,7 +77,6 @@ def get_account_balance(db: Session, user_id: str, account_id: str) -> Account:
             status_code=404,
             user_message="계좌를 찾을 수 없습니다.",
         )
-
     return account
 
 
@@ -93,9 +98,6 @@ def get_transaction_history(
 
     Returns:
         Transaction 객체 리스트 (최신순 정렬).
-
-    Raises:
-        HistoryError: 거래 내역이 없을 때.
     """
     query = db.query(Transaction).filter(Transaction.user_id == uuid.UUID(user_id))
 
@@ -103,6 +105,7 @@ def get_transaction_history(
         query = query.filter(Transaction.from_account_id == account_id)
 
     if days:
+        # KST 기준으로 since 날짜 계산 (DB 저장값이 naive datetime이므로 tzinfo 제거)
         since = datetime.now(timezone(timedelta(hours=9))).replace(
             tzinfo=None
         ) - timedelta(days=days)
@@ -151,12 +154,11 @@ def get_expense_summary(
             Transaction.status == "completed",
             or_(
                 Transaction.category.is_(None),
-                Transaction.category != "수입",
+                Transaction.category != "수입",  # 수입 제외, 지출만 집계
             ),
         )
         .all()
     )
-
     if not transactions:
         raise HistoryError(
             code="TX_NOT_FOUND",
@@ -167,6 +169,7 @@ def get_expense_summary(
 
     total = sum(t.amount for t in transactions)
 
+    # 카테고리별 합산
     category_totals: dict[str, int] = {}
     for t in transactions:
         cat = t.category or "기타"
@@ -179,3 +182,237 @@ def get_expense_summary(
         "days": days,
         "top_categories": [{"category": k, "amount": v} for k, v in top5],
     }
+
+
+# ── 화면 TTS 문구 생성 ────────────────────────────────────────────────────────
+# REST API 응답에 포함되어 프론트엔드가 재생만 하도록 한다.
+# 프론트엔드에서 문자열을 직접 조합하지 않고 이 함수가 생성한 값을 사용한다.
+
+KST = timezone(timedelta(hours=9))
+
+
+def _format_amount(amount: int) -> str:
+    """금액을 TTS 친화적 한국어 표현으로 변환한다."""
+    if amount >= 100_000_000:
+        eok = amount // 100_000_000
+        man = (amount % 100_000_000) // 10_000
+        return f"{eok}억 {man:,}만원" if man else f"{eok}억원"
+    if amount >= 10_000:
+        return f"{amount // 10_000:,}만원"
+    return f"{amount:,}원"
+
+
+def build_summary_tts(accounts: list, total_asset: int) -> str:
+    """자산 요약 화면 진입 시 재생할 TTS 문구를 생성한다."""
+    account_voice = ", ".join(
+        f"{a.alias or a.account_type} {_format_amount(a.balance)}"
+        for a in accounts
+    )
+    return (
+        f"총 자산은 {_format_amount(total_asset)}입니다. "
+        f"{account_voice}. "
+        f"지출 수입 내역이나 거래내역은 화면을 꾹 눌러 음성으로 말씀하시면 알 수 있습니다."
+    )
+
+
+def build_transaction_tts(t) -> str:
+    """거래 내역 카드 탭 시 재생할 TTS 문구를 생성한다."""
+    try:
+        dt = t.created_at
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(KST).replace(tzinfo=None)
+        date_str = f"{dt.month}월 {dt.day}일"
+    except Exception:
+        date_str = ""
+    sign = "입금" if t.category == "수입" else "출금"
+    name = t.to_name or t.category or ""
+    memo_str = f". 메모 {t.memo}" if t.memo else ""
+    return f"{date_str} {name} {sign} {abs(t.amount):,}원{memo_str}"
+
+
+# ── 슬롯 변환 헬퍼 ────────────────────────────────────────────────────────────
+# STT 음성 인식 결과를 시스템 내부 값으로 정규화하는 유틸 함수 모음.
+# tools/asset.py의 @tool 함수에서 슬롯 값을 전처리할 때 사용한다.
+
+def normalize_period(period: str | None) -> str | None:
+    """STT 오인식 보정 — '최근 7일', '최근칠일' 등을 정규화."""
+    if not period:
+        return period
+    p = period.replace(" ", "")
+    if p in ("최근7일", "최근칠일", "7일", "최근7", "최근칠"):
+        return "최근7일"
+    if p in ("이번달", "이번월", "이달"):
+        return "이번달"
+    if p in ("지난달", "저번달", "지난월", "전달", "저번월"):
+        return "지난달"
+    return period
+
+
+def period_to_days(period: str | None) -> int:
+    """period 슬롯 값을 조회 일수(int)로 변환한다."""
+    p = normalize_period(period)
+    if p == "최근7일":
+        return 7
+    if p == "지난달":
+        return 60
+    return 30  # 이번달 기본값
+
+
+def date_range_to_since(date_range: str | None) -> datetime | None:
+    """date_range 슬롯(YYYY-MM-DD)을 datetime으로 변환한다. 파싱 실패 시 None 반환."""
+    if not date_range:
+        return None
+    try:
+        return datetime.strptime(date_range, "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+# ── TTS 응답 생성 ─────────────────────────────────────────────────────────────
+# 각 함수는 DB 조회 결과를 TTS로 읽힐 자연어 문자열로 변환한다.
+# tools/asset.py의 query_asset @tool이 action 슬롯에 따라 아래 함수 중 하나를 호출한다.
+
+def query_balance_tts(db: Session, user_id: str) -> str:
+    """전체 잔액을 TTS 문자열로 반환한다."""
+    accounts = get_asset_summary(db, user_id)
+    total = sum(a.balance for a in accounts)
+    return f"잔액 조회해드리겠습니다. 전체 잔액은 {total:,}원입니다."
+
+
+def query_transaction_list_tts(
+    db: Session, user_id: str, period: str | None, date_range: str | None
+) -> str:
+    """거래내역 목록을 TTS 문자열로 반환한다 (최대 10건 읽어줌)."""
+    period = normalize_period(period)
+    if period and period not in VALID_PERIODS:
+        return "조회할 수 없는 기간입니다. 이번달, 지난달, 최근 7일 중 말씀해 주세요."
+
+    since = date_range_to_since(date_range)
+    days = None if since else period_to_days(period)
+    label = period or "이번달"
+    txs = get_transaction_history(db, user_id, days=days)
+
+    # status="completed" 건만 읽어줌 (pending/failed 제외)
+    completed = [t for t in txs if t.status == "completed"]
+    if not completed:
+        raise HistoryError(
+            code="TX_NOT_FOUND",
+            message="거래 내역을 찾을 수 없습니다.",
+            status_code=404,
+            user_message=f"{label} 거래 내역이 없습니다.",
+        )
+
+    total = len(completed)
+    income_cnt = sum(1 for t in completed if t.category == "수입")
+    expense_cnt = total - income_cnt
+    result = f"{label} 거래내역은 총 {total}건입니다. 입금 {income_cnt}건, 출금 {expense_cnt}건입니다. "
+
+    items = []
+    for t in completed[:10]:  # TTS가 너무 길어지지 않도록 최대 10건만 읽음
+        try:
+            dt = t.created_at
+            if dt.tzinfo is not None:
+                # DB가 timezone-aware datetime을 반환하면 KST로 변환 후 naive로 만든다
+                dt = dt.astimezone(timezone(timedelta(hours=9))).replace(tzinfo=None)
+            date_str = f"{dt.month}월 {dt.day}일"
+        except Exception:
+            date_str = ""
+        sign = "입금" if t.category == "수입" else "출금"
+        name = t.to_name or t.category or ""
+        memo_str = f" 메모 {t.memo}" if t.memo else ""
+        items.append(f"{date_str} {name} {sign} {abs(t.amount):,}원{memo_str}")
+
+    result += ". ".join(items) + "."
+    return result
+
+
+def query_history_tts(
+    db: Session,
+    user_id: str,
+    period: str | None,
+    date_range: str | None,
+    filter_type: str | None = None,
+) -> str:
+    """수입/지출 요약을 TTS 문자열로 반환한다.
+
+    filter_type: "income"=수입만, "expense"=지출만, None/"both"=둘다
+    """
+    period = normalize_period(period)
+    if period and period not in VALID_PERIODS:
+        return "조회할 수 없는 기간입니다. 이번달, 지난달, 최근 7일 중 말씀해 주세요."
+
+    since = date_range_to_since(date_range)
+    days = None if since else period_to_days(period)
+    label = period or "이번달"
+    txs = get_transaction_history(db, user_id, days=days)
+
+    completed = [t for t in txs if t.status == "completed"]
+    if not completed:
+        raise HistoryError(
+            code="TX_NOT_FOUND",
+            message="거래 내역을 찾을 수 없습니다.",
+            status_code=404,
+            user_message=f"{label} 거래 내역이 없습니다.",
+        )
+
+    income = sum(t.amount for t in completed if t.category == "수입")
+    expense = sum(t.amount for t in completed if t.category != "수입")
+
+    if filter_type == "income":
+        return f"{label} 수입 내역 알려드리겠습니다. 수입은 {income:,}원입니다."
+
+    if filter_type == "expense":
+        result = f"{label} 지출 내역 알려드리겠습니다. 지출은 {expense:,}원입니다."
+        try:
+            # 주요 지출 카테고리 상위 3개 추가 (실패해도 기본 메시지는 반환)
+            summary = get_expense_summary(db, user_id, days=days or 30)
+            top = summary["top_categories"][:3]
+            if top:
+                cat_text = ", ".join(f"{c['category']} {c['amount']:,}원" for c in top)
+                result += f" 주요 지출은 {cat_text}입니다."
+        except Exception as e:
+            logger.warning("카테고리 요약 조회 실패 (비필수): %s", e)
+        return result
+
+    # filter_type == "both" 또는 None — 수입·지출 모두 요약
+    result = (
+        f"{label} 지출 수입 내역 알려드리겠습니다. "
+        f"수입은 {income:,}원, 지출은 {expense:,}원입니다."
+    )
+    try:
+        summary = get_expense_summary(db, user_id, days=days or 30)
+        top = summary["top_categories"][:3]
+        if top:
+            cat_text = ", ".join(f"{c['category']} {c['amount']:,}원" for c in top)
+            result += f" 주요 지출은 {cat_text}입니다."
+    except Exception as e:
+        logger.warning("카테고리 요약 조회 실패 (비필수): %s", e)
+    return result
+
+
+def query_category_tts(
+    db: Session, user_id: str, period: str | None, category: str | None
+) -> str:
+    """카테고리별 지출을 TTS 문자열로 반환한다."""
+    if not category:
+        return "어떤 카테고리를 조회할까요? 예: 식비, 교통, 문화생활."
+    days = period_to_days(period)
+    label = period or "이번달"
+    txs = get_transaction_history(db, user_id, days=days, category=category)
+    total = sum(t.amount for t in txs)
+    return f"{label} {category} 내역 알려드리겠습니다. 총 {len(txs)}건, {total:,}원 지출하셨습니다."
+
+
+def query_top_category_tts(db: Session, user_id: str, period: str | None) -> str:
+    """카테고리 지출 순위 1위를 TTS 문자열로 반환한다."""
+    days = period_to_days(period)
+    label = period or "이번달"
+    summary = get_expense_summary(db, user_id, days=days)
+    top = summary["top_categories"]
+    if not top:
+        return f"{label} 지출 내역이 없습니다."
+    top_cat = top[0]
+    return (
+        f"{label} 지출 순위 알려드리겠습니다. "
+        f"가장 많이 지출한 항목은 {top_cat['category']}로 {top_cat['amount']:,}원입니다."
+    )
