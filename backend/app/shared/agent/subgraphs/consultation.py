@@ -11,7 +11,7 @@ from app.shared.agent.tools.market_info import get_exchange_rate, get_base_rate
 # Dev-D 소유: RAG 에이전트 도메인 액션
 # =====================================================================
 RAG_DOMAIN_ACTIONS: frozenset[str] = frozenset({
-    "financial_qa", "exchange_rate", "interest_rate", "event",
+    "financial_qa", "exchange_rate", "interest_rate",
 })
 
 # =====================================================================
@@ -30,13 +30,12 @@ rag_agent = create_react_agent(
 
 async def rag_graph(state: VoiceState) -> dict:
     """부모 그래프(Supervisor)에서 이 노드를 호출할 때 사용될 래퍼입니다.
-
-    RAG 에이전트 본체를 실행한 뒤, 아키텍처 원칙에 따라 화면 이동 권한이 없음을 보장하기 위해
-    `navigate_to: None`을 하드코딩하여 반환합니다.
+    
+    RAG 에이전트 본체를 실행한 뒤, 
+    화면 이동 권한이 없음을 보장하기 위해 `navigate_to: None`을 반환합니다.
     """
     result = await rag_agent.ainvoke(state)
 
-    # React Agent가 반환한 메시지 목록에 navigate_to=None을 강제 주입하여 반환
     return {
         "messages": result["messages"],
         "navigate_to": None,

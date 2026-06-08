@@ -29,6 +29,8 @@ _FINANCIAL_DOCS_MAPPING: dict[str, Any] = {
                 "fields": {"keyword": {"type": "keyword"}},
             },
             "content": {"type": "text", "analyzer": "standard"},
+            "title_tokens": {"type": "text", "analyzer": "whitespace"},
+            "content_tokens": {"type": "text", "analyzer": "whitespace"},
             "category": {"type": "keyword"},
             "source": {"type": "keyword"},
             "created_at": {"type": "date"},
