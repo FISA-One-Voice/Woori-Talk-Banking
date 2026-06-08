@@ -13,6 +13,7 @@ import { agentPathFromNavigateTo, shouldNavigateToRoute } from '@/utils/voiceNav
 import { Href, Stack, useRouter, useSegments } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAutoTransferFlowStore } from './auto-transfer/store';
 
 // ── V 제스처 감지 ─────────────────────────────────────────────────────────────
@@ -248,15 +249,17 @@ export default function RootLayout() {
   const hasVoiceRegistered = useAuthStore((state) => state.hasVoiceRegistered);
 
   return (
-    <Pressable
-      style={styles.root}
-      onTouchStart={hasVoiceRegistered ? handleTouchStart : undefined}
-      onTouchMove={hasVoiceRegistered ? handleTouchMove : undefined}
-      onTouchEnd={hasVoiceRegistered ? handleTouchEnd : undefined}
-    >
-      <Stack screenOptions={{ headerShown: false }} />
-      <VoiceStatusOverlay state={voiceState} />
-    </Pressable>
+    <SafeAreaProvider>
+      <Pressable
+        style={styles.root}
+        onTouchStart={hasVoiceRegistered ? handleTouchStart : undefined}
+        onTouchMove={hasVoiceRegistered ? handleTouchMove : undefined}
+        onTouchEnd={hasVoiceRegistered ? handleTouchEnd : undefined}
+      >
+        <Stack screenOptions={{ headerShown: false }} />
+        <VoiceStatusOverlay state={voiceState} />
+      </Pressable>
+    </SafeAreaProvider>
   );
 }
 
