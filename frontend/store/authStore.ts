@@ -46,7 +46,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       hasVoiceRegistered: false,
       ttsSpeed: 1.7,
-      setTokens: (token, refreshToken, hasVoiceRegistered = false, ttsSpeed) =>
+      setTokens: (token, refreshToken, hasVoiceRegistered, ttsSpeed) =>
         set((state) => ({
           token,
           refreshToken,
