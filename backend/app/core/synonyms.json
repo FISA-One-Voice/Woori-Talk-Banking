@@ -1,0 +1,2732 @@
+{
+  "HDRI": [
+    "debt service ratio",
+    "dsr",
+    "dta",
+    "debt to asset ratio"
+  ],
+  "debt service ratio": [
+    "HDRI"
+  ],
+  "dsr": [
+    "HDRI"
+  ],
+  "dta": [
+    "HDRI"
+  ],
+  "debt to asset ratio": [
+    "HDRI"
+  ],
+  "가계처분가능소득": [
+    "pdi",
+    "personal disposable income"
+  ],
+  "pdi": [
+    "가계처분가능소득"
+  ],
+  "personal disposable income": [
+    "가계처분가능소득"
+  ],
+  "가상자산": [
+    "코인",
+    "virtual asset",
+    "암호화폐",
+    "가상통화",
+    "crypto",
+    "비트코인"
+  ],
+  "코인": [
+    "가상자산",
+    "비트코인"
+  ],
+  "virtual asset": [
+    "가상자산",
+    "ICO"
+  ],
+  "암호화폐": [
+    "가상자산",
+    "비트코인"
+  ],
+  "가상통화": [
+    "가상자산"
+  ],
+  "crypto": [
+    "가상자산"
+  ],
+  "비트코인": [
+    "bitcoin",
+    "코인",
+    "가상자산",
+    "암호화폐"
+  ],
+  "ICO": [
+    "crowd funding",
+    "virtual asset",
+    "initial coin offering",
+    "ico",
+    "startup"
+  ],
+  "crowd funding": [
+    "ICO",
+    "크라우드펀딩"
+  ],
+  "initial coin offering": [
+    "ICO"
+  ],
+  "ico": [
+    "ICO"
+  ],
+  "startup": [
+    "ICO"
+  ],
+  "간접금융/직접금융": [
+    "indirect financing"
+  ],
+  "indirect financing": [
+    "간접금융/직접금융"
+  ],
+  "간접세/직접세": [
+    "indirect tax",
+    "direct tax"
+  ],
+  "indirect tax": [
+    "간접세/직접세"
+  ],
+  "direct tax": [
+    "간접세/직접세"
+  ],
+  "College": [
+    "home country",
+    "host country"
+  ],
+  "home country": [
+    "College"
+  ],
+  "host country": [
+    "College"
+  ],
+  "거래정보저장소": [
+    "trade repository",
+    "otc derivatives",
+    "tr",
+    "fmi"
+  ],
+  "trade repository": [
+    "거래정보저장소"
+  ],
+  "otc derivatives": [
+    "거래정보저장소"
+  ],
+  "tr": [
+    "거래정보저장소"
+  ],
+  "fmi": [
+    "거래정보저장소",
+    "금융시장인프라"
+  ],
+  "거시건전성 정책": [
+    "microprudential policy",
+    "systemic risk"
+  ],
+  "microprudential policy": [
+    "거시건전성 정책"
+  ],
+  "systemic risk": [
+    "거시건전성 정책"
+  ],
+  "결제": [
+    "settlement"
+  ],
+  "settlement": [
+    "결제"
+  ],
+  "겸업주의/전업주의": [
+    "universal banking",
+    "specialized banking"
+  ],
+  "universal banking": [
+    "겸업주의/전업주의"
+  ],
+  "specialized banking": [
+    "겸업주의/전업주의"
+  ],
+  "경기": [
+    "business conditions"
+  ],
+  "business conditions": [
+    "경기"
+  ],
+  "경기조절정책/경제안정화정책": [
+    "stabilization policy",
+    "business adjustment policy"
+  ],
+  "stabilization policy": [
+    "경기조절정책/경제안정화정책"
+  ],
+  "business adjustment policy": [
+    "경기조절정책/경제안정화정책"
+  ],
+  "경제 서프라이즈 지수": [
+    "esi",
+    "economic surprise index"
+  ],
+  "esi": [
+    "경제 서프라이즈 지수"
+  ],
+  "economic surprise index": [
+    "경제 서프라이즈 지수"
+  ],
+  "경제심리지수": [
+    "csi",
+    "bsi",
+    "business survey index",
+    "consumer survey index"
+  ],
+  "csi": [
+    "경제심리지수"
+  ],
+  "bsi": [
+    "경제심리지수",
+    "CBSI",
+    "CSI"
+  ],
+  "business survey index": [
+    "경제심리지수",
+    "CSI"
+  ],
+  "consumer survey index": [
+    "경제심리지수"
+  ],
+  "OECD": [
+    "oeec"
+  ],
+  "oeec": [
+    "OECD"
+  ],
+  "경제후생지표": [
+    "gni"
+  ],
+  "gni": [
+    "경제후생지표",
+    "GNI",
+    "조세부담률"
+  ],
+  "KYC": [
+    "verify",
+    "kyc",
+    "know your customer"
+  ],
+  "verify": [
+    "KYC"
+  ],
+  "kyc": [
+    "KYC"
+  ],
+  "know your customer": [
+    "KYC"
+  ],
+  "고용보조지표": [
+    "ilo"
+  ],
+  "ilo": [
+    "고용보조지표"
+  ],
+  "SB": [
+    "convertible bond",
+    "straight bond",
+    "cb"
+  ],
+  "convertible bond": [
+    "SB",
+    "CB"
+  ],
+  "straight bond": [
+    "SB"
+  ],
+  "cb": [
+    "SB"
+  ],
+  "고정환율제도/자유변동환율제도": [
+    "fixed exchange rate system",
+    "free floating exchange rate system"
+  ],
+  "fixed exchange rate system": [
+    "고정환율제도/자유변동환율제도"
+  ],
+  "free floating exchange rate system": [
+    "고정환율제도/자유변동환율제도"
+  ],
+  "골디락스경제": [
+    "goldilocks economy"
+  ],
+  "goldilocks economy": [
+    "골디락스경제"
+  ],
+  "공개시장운영": [
+    "open market operation"
+  ],
+  "open market operation": [
+    "공개시장운영"
+  ],
+  "SUT": [
+    "supply and use tables"
+  ],
+  "supply and use tables": [
+    "SUT"
+  ],
+  "공매도": [
+    "short selling"
+  ],
+  "short selling": [
+    "공매도"
+  ],
+  "EB": [
+    "exchangeable bond",
+    "eb"
+  ],
+  "exchangeable bond": [
+    "EB"
+  ],
+  "eb": [
+    "EB"
+  ],
+  "구매력평가 환율": [
+    "purchasing power parity",
+    "ppp"
+  ],
+  "purchasing power parity": [
+    "구매력평가 환율"
+  ],
+  "ppp": [
+    "구매력평가 환율"
+  ],
+  "GDP": [
+    "green gdp",
+    "gdp"
+  ],
+  "green gdp": [
+    "GDP"
+  ],
+  "gdp": [
+    "GDP",
+    "국민부담률",
+    "국민소득 3면 등가의 법칙",
+    "NOE"
+  ],
+  "국내총투자율": [
+    "gross domestic investment ratio"
+  ],
+  "gross domestic investment ratio": [
+    "국내총투자율"
+  ],
+  "국민대차대조표": [
+    "national balance sheet"
+  ],
+  "national balance sheet": [
+    "국민대차대조표"
+  ],
+  "국민부담률": [
+    "total tax revenue as percentage of gdp",
+    "gdp"
+  ],
+  "total tax revenue as percentage of gdp": [
+    "국민부담률"
+  ],
+  "국민소득": [
+    "national income",
+    "ni"
+  ],
+  "national income": [
+    "국민소득"
+  ],
+  "ni": [
+    "국민소득",
+    "요소비용 국민소득"
+  ],
+  "국민소득 3면 등가의 법칙": [
+    "gdp"
+  ],
+  "GNDI": [
+    "national disposable income",
+    "ndi"
+  ],
+  "national disposable income": [
+    "GNDI"
+  ],
+  "ndi": [
+    "GNDI"
+  ],
+  "GNI": [
+    "gni",
+    "gross national income"
+  ],
+  "gross national income": [
+    "GNI"
+  ],
+  "국부펀드": [
+    "sovereign fund"
+  ],
+  "sovereign fund": [
+    "국부펀드"
+  ],
+  "국외저축": [
+    "foreign savings"
+  ],
+  "foreign savings": [
+    "국외저축"
+  ],
+  "국외투자율": [
+    "gndi",
+    "gross national disposable income"
+  ],
+  "gndi": [
+    "국외투자율"
+  ],
+  "gross national disposable income": [
+    "국외투자율"
+  ],
+  "BIS": [
+    "bank for international settlements",
+    "bis"
+  ],
+  "bank for international settlements": [
+    "BIS"
+  ],
+  "bis": [
+    "BIS",
+    "1)",
+    "2)",
+    "CPMI",
+    "지급결제제도 감시",
+    "자기자본비율",
+    "은행"
+  ],
+  "IOSCO": [
+    "iosco",
+    "international organization of securities commissions"
+  ],
+  "iosco": [
+    "IOSCO"
+  ],
+  "international organization of securities commissions": [
+    "IOSCO"
+  ],
+  "IMM": [
+    "cme",
+    "imm",
+    "international monetary market"
+  ],
+  "cme": [
+    "IMM",
+    "CME",
+    "FedWatch"
+  ],
+  "imm": [
+    "IMM"
+  ],
+  "international monetary market": [
+    "IMM"
+  ],
+  "IIP": [
+    "iip",
+    "international investment position"
+  ],
+  "iip": [
+    "IIP"
+  ],
+  "international investment position": [
+    "IIP"
+  ],
+  "국제회계기준": [
+    "international financial reporting standards",
+    "international accounting standards board",
+    "iasb",
+    "ifrs"
+  ],
+  "international financial reporting standards": [
+    "국제회계기준"
+  ],
+  "international accounting standards board": [
+    "국제회계기준"
+  ],
+  "iasb": [
+    "국제회계기준"
+  ],
+  "ifrs": [
+    "국제회계기준"
+  ],
+  "규제 샌드박스": [
+    "regulatory sandbox"
+  ],
+  "regulatory sandbox": [
+    "규제 샌드박스"
+  ],
+  "근원인플레이션율": [
+    "core inflation rate"
+  ],
+  "core inflation rate": [
+    "근원인플레이션율"
+  ],
+  "GVC": [
+    "global value chain",
+    "gvc"
+  ],
+  "global value chain": [
+    "GVC"
+  ],
+  "gvc": [
+    "GVC"
+  ],
+  "글로벌 공급망 압력 지수": [
+    "global supply chain pressure index",
+    "gscpi"
+  ],
+  "global supply chain pressure index": [
+    "글로벌 공급망 압력 지수"
+  ],
+  "gscpi": [
+    "글로벌 공급망 압력 지수"
+  ],
+  "금리선물": [
+    "interest rate futures"
+  ],
+  "interest rate futures": [
+    "금리선물"
+  ],
+  "금리스왑": [
+    "interest rate swaps",
+    "irs"
+  ],
+  "interest rate swaps": [
+    "금리스왑"
+  ],
+  "irs": [
+    "금리스왑",
+    "스왑베이시스"
+  ],
+  "EDI": [
+    "electronic data interchange"
+  ],
+  "electronic data interchange": [
+    "EDI"
+  ],
+  "금융공황": [
+    "bank run",
+    "banking panic"
+  ],
+  "bank run": [
+    "금융공황"
+  ],
+  "banking panic": [
+    "금융공황"
+  ],
+  "FSI": [
+    "financial stress index",
+    "fsi"
+  ],
+  "financial stress index": [
+    "FSI"
+  ],
+  "fsi": [
+    "FSI"
+  ],
+  "FCI": [
+    "fci",
+    "financial conditions index"
+  ],
+  "fci": [
+    "FCI"
+  ],
+  "financial conditions index": [
+    "FCI"
+  ],
+  "금융시장인프라": [
+    "fmi",
+    "financial market infrastructure"
+  ],
+  "financial market infrastructure": [
+    "금융시장인프라"
+  ],
+  "FSB": [
+    "fsb",
+    "fsf",
+    "financial stability board"
+  ],
+  "fsb": [
+    "FSB"
+  ],
+  "fsf": [
+    "FSB"
+  ],
+  "financial stability board": [
+    "FSB"
+  ],
+  "금융연관비율(골드스미스비율)": [
+    "financial interrelations ratio"
+  ],
+  "financial interrelations ratio": [
+    "금융연관비율(골드스미스비율)"
+  ],
+  "금융의 증권화": [
+    "securitization",
+    "loan claim"
+  ],
+  "securitization": [
+    "금융의 증권화"
+  ],
+  "loan claim": [
+    "금융의 증권화"
+  ],
+  "금융의 탈중개화": [
+    "decentralization",
+    "disintermediation"
+  ],
+  "decentralization": [
+    "금융의 탈중개화",
+    "금융의 탈집중화"
+  ],
+  "disintermediation": [
+    "금융의 탈중개화"
+  ],
+  "금융의 탈집중화": [
+    "decentralization",
+    "unbundling"
+  ],
+  "unbundling": [
+    "금융의 탈집중화"
+  ],
+  "금융지주회사": [
+    "financial holding company"
+  ],
+  "financial holding company": [
+    "금융지주회사"
+  ],
+  "FVI": [
+    "vulnerability"
+  ],
+  "vulnerability": [
+    "FVI"
+  ],
+  "금융통화위원회": [
+    "monetary policy board"
+  ],
+  "monetary policy board": [
+    "금융통화위원회"
+  ],
+  "1)": [
+    "bis",
+    "unexpected loss"
+  ],
+  "unexpected loss": [
+    "1)"
+  ],
+  "기업공개": [
+    "ipo",
+    "initial public offering"
+  ],
+  "ipo": [
+    "기업공개"
+  ],
+  "initial public offering": [
+    "기업공개"
+  ],
+  "CBSI": [
+    "bsi",
+    "cbsi",
+    "composite business sentiment index"
+  ],
+  "cbsi": [
+    "CBSI"
+  ],
+  "composite business sentiment index": [
+    "CBSI"
+  ],
+  "CP": [
+    "commercial paper",
+    "cp"
+  ],
+  "commercial paper": [
+    "CP"
+  ],
+  "cp": [
+    "CP"
+  ],
+  "기저효과": [
+    "base effect"
+  ],
+  "base effect": [
+    "기저효과"
+  ],
+  "기초가격": [
+    "production tax",
+    "basic price",
+    "subsidy"
+  ],
+  "production tax": [
+    "기초가격"
+  ],
+  "basic price": [
+    "기초가격"
+  ],
+  "subsidy": [
+    "기초가격"
+  ],
+  "기후테크": [
+    "climate tech"
+  ],
+  "climate tech": [
+    "기후테크"
+  ],
+  "긴급수입제한조치": [
+    "safeguard"
+  ],
+  "safeguard": [
+    "긴급수입제한조치"
+  ],
+  "긴축정책": [
+    "contractionary policy"
+  ],
+  "contractionary policy": [
+    "긴축정책"
+  ],
+  "꼬리위험": [
+    "tail risk"
+  ],
+  "tail risk": [
+    "꼬리위험"
+  ],
+  "납부자자동이체": [
+    "standing order"
+  ],
+  "standing order": [
+    "납부자자동이체"
+  ],
+  "내부등급법": [
+    "bcbs"
+  ],
+  "bcbs": [
+    "내부등급법"
+  ],
+  "NSI": [
+    "nsi",
+    "news sentiment index"
+  ],
+  "nsi": [
+    "NSI"
+  ],
+  "news sentiment index": [
+    "NSI"
+  ],
+  "단기금융시장": [
+    "money market"
+  ],
+  "money market": [
+    "단기금융시장",
+    "장기금융시장(자본시장)"
+  ],
+  "단리/복리": [
+    "simple interest"
+  ],
+  "simple interest": [
+    "단리/복리"
+  ],
+  "단일금리방식/복수금리방식": [
+    "dutch",
+    "conventional"
+  ],
+  "dutch": [
+    "단일금리방식/복수금리방식"
+  ],
+  "conventional": [
+    "단일금리방식/복수금리방식"
+  ],
+  "대기성 여수신제도": [
+    "standing facilities"
+  ],
+  "standing facilities": [
+    "대기성 여수신제도"
+  ],
+  "대량지급": [
+    "direct credit"
+  ],
+  "direct credit": [
+    "대량지급"
+  ],
+  "대안정기": [
+    "nber",
+    "national bureau of economic research"
+  ],
+  "nber": [
+    "대안정기"
+  ],
+  "national bureau of economic research": [
+    "대안정기"
+  ],
+  "더블딥": [
+    "double",
+    "dip"
+  ],
+  "double": [
+    "더블딥"
+  ],
+  "dip": [
+    "더블딥"
+  ],
+  "독점/과점": [
+    "monopoly"
+  ],
+  "monopoly": [
+    "독점/과점"
+  ],
+  "ASEAN": [
+    "asean"
+  ],
+  "asean": [
+    "ASEAN",
+    "AMRO"
+  ],
+  "듀레이션": [
+    "duration"
+  ],
+  "duration": [
+    "듀레이션"
+  ],
+  "등록발행": [
+    "physical issue"
+  ],
+  "physical issue": [
+    "등록발행"
+  ],
+  "디레버리징": [
+    "deleveraging"
+  ],
+  "deleveraging": [
+    "디레버리징"
+  ],
+  "디커플링/커플링": [
+    "decoupling"
+  ],
+  "decoupling": [
+    "디커플링/커플링"
+  ],
+  "레그테크": [
+    "rt",
+    "it"
+  ],
+  "rt": [
+    "레그테크"
+  ],
+  "it": [
+    "레그테크"
+  ],
+  "레버리지비율/단순기본자본비율": [
+    "leverage ratio"
+  ],
+  "leverage ratio": [
+    "레버리지비율/단순기본자본비율"
+  ],
+  "레버리지 효과": [
+    "leverage effect"
+  ],
+  "leverage effect": [
+    "레버리지 효과"
+  ],
+  "로보어드바이저": [
+    "robot",
+    "advisor"
+  ],
+  "robot": [
+    "로보어드바이저"
+  ],
+  "advisor": [
+    "로보어드바이저"
+  ],
+  "리디노미네이션": [
+    "redenomination"
+  ],
+  "redenomination": [
+    "리디노미네이션"
+  ],
+  "리쇼어링/니어쇼어링/프렌드쇼어링": [
+    "offshoring",
+    "reshoring"
+  ],
+  "offshoring": [
+    "리쇼어링/니어쇼어링/프렌드쇼어링"
+  ],
+  "reshoring": [
+    "리쇼어링/니어쇼어링/프렌드쇼어링"
+  ],
+  "Off": [
+    "risk on",
+    "risk off"
+  ],
+  "risk on": [
+    "Off"
+  ],
+  "risk off": [
+    "Off"
+  ],
+  "마샬의": [
+    "marshallian k"
+  ],
+  "marshallian k": [
+    "마샬의"
+  ],
+  "마스트리히트조약": [
+    "treaty on european union",
+    "maastricht treaty",
+    "ec"
+  ],
+  "treaty on european union": [
+    "마스트리히트조약",
+    "EU"
+  ],
+  "maastricht treaty": [
+    "마스트리히트조약"
+  ],
+  "ec": [
+    "마스트리히트조약",
+    "EU"
+  ],
+  "마진콜": [
+    "leverage",
+    "margin",
+    "margin call"
+  ],
+  "leverage": [
+    "마진콜"
+  ],
+  "margin": [
+    "마진콜"
+  ],
+  "margin call": [
+    "마진콜"
+  ],
+  "만기수익률": [
+    "ytm",
+    "yield to maturity"
+  ],
+  "ytm": [
+    "만기수익률"
+  ],
+  "yield to maturity": [
+    "만기수익률"
+  ],
+  "MMF": [
+    "mmf",
+    "money market fund"
+  ],
+  "mmf": [
+    "MMF"
+  ],
+  "money market fund": [
+    "MMF"
+  ],
+  "명목국내총생산/실질국내총생산": [
+    "nominal gdp"
+  ],
+  "nominal gdp": [
+    "명목국내총생산/실질국내총생산"
+  ],
+  "명목소득/실질소득": [
+    "real income",
+    "nominal income"
+  ],
+  "real income": [
+    "명목소득/실질소득"
+  ],
+  "nominal income": [
+    "명목소득/실질소득"
+  ],
+  "모기지대출": [
+    "mortgage loan"
+  ],
+  "mortgage loan": [
+    "모기지대출"
+  ],
+  "KOFR": [
+    "rfr",
+    "kofr"
+  ],
+  "rfr": [
+    "KOFR"
+  ],
+  "kofr": [
+    "KOFR"
+  ],
+  "물가안정목표제": [
+    "intermediate target",
+    "inflation targeting"
+  ],
+  "intermediate target": [
+    "물가안정목표제"
+  ],
+  "inflation targeting": [
+    "물가안정목표제"
+  ],
+  "USMCA": [
+    "usmca",
+    "nafta"
+  ],
+  "usmca": [
+    "USMCA"
+  ],
+  "nafta": [
+    "USMCA"
+  ],
+  "미달러화지수": [
+    "us dollar index"
+  ],
+  "us dollar index": [
+    "미달러화지수"
+  ],
+  "BCBS": [
+    "bankhaus herstatt"
+  ],
+  "bankhaus herstatt": [
+    "BCBS"
+  ],
+  "반대매매": [
+    "reverse trading"
+  ],
+  "reverse trading": [
+    "반대매매"
+  ],
+  "발행시장": [
+    "primary market"
+  ],
+  "primary market": [
+    "발행시장"
+  ],
+  "방카슈랑스": [
+    "bancassurance"
+  ],
+  "bancassurance": [
+    "방카슈랑스"
+  ],
+  "배당할인모형": [
+    "dividend discount model"
+  ],
+  "dividend discount model": [
+    "배당할인모형"
+  ],
+  "범위의 경제": [
+    "economies of scope"
+  ],
+  "economies of scope": [
+    "범위의 경제"
+  ],
+  "법정화폐": [
+    "legal tender"
+  ],
+  "legal tender": [
+    "법정화폐"
+  ],
+  "베버리지곡선": [
+    "beveridge curve"
+  ],
+  "beveridge curve": [
+    "베버리지곡선"
+  ],
+  "FRN": [
+    "frn",
+    "floating rate note"
+  ],
+  "frn": [
+    "FRN"
+  ],
+  "floating rate note": [
+    "FRN"
+  ],
+  "2)": [
+    "bis"
+  ],
+  "복수통화바스켓제도": [
+    "basket"
+  ],
+  "basket": [
+    "복수통화바스켓제도"
+  ],
+  "본드포워드거래": [
+    "bond forward transaction"
+  ],
+  "bond forward transaction": [
+    "본드포워드거래"
+  ],
+  "본원소득": [
+    "nni",
+    "net national income"
+  ],
+  "nni": [
+    "본원소득"
+  ],
+  "net national income": [
+    "본원소득"
+  ],
+  "본원통화": [
+    "rb",
+    "reserve base"
+  ],
+  "rb": [
+    "본원통화"
+  ],
+  "reserve base": [
+    "본원통화"
+  ],
+  "부가가치": [
+    "value added"
+  ],
+  "value added": [
+    "부가가치"
+  ],
+  "TiVA": [
+    "tiva",
+    "trade in value added"
+  ],
+  "tiva": [
+    "TiVA"
+  ],
+  "trade in value added": [
+    "TiVA"
+  ],
+  "부동화/무권화": [
+    "immobilization"
+  ],
+  "immobilization": [
+    "부동화/무권화"
+  ],
+  "CDO": [
+    "clo",
+    "cbo",
+    "collateralized loan obligation",
+    "collateralized debt obligation",
+    "collateralized bond obligation"
+  ],
+  "clo": [
+    "CDO"
+  ],
+  "cbo": [
+    "CDO"
+  ],
+  "collateralized loan obligation": [
+    "CDO"
+  ],
+  "collateralized debt obligation": [
+    "CDO"
+  ],
+  "collateralized bond obligation": [
+    "CDO"
+  ],
+  "분리결제": [
+    "free of payment"
+  ],
+  "free of payment": [
+    "분리결제"
+  ],
+  "분산원장기술": [
+    "dlt",
+    "distributed ledger technology"
+  ],
+  "dlt": [
+    "분산원장기술"
+  ],
+  "distributed ledger technology": [
+    "분산원장기술"
+  ],
+  "분절화": [
+    "globalization",
+    "fragmentation"
+  ],
+  "globalization": [
+    "분절화"
+  ],
+  "fragmentation": [
+    "분절화"
+  ],
+  "Brexit": [
+    "eu",
+    "britain",
+    "exit",
+    "brexit"
+  ],
+  "eu": [
+    "Brexit",
+    "EU",
+    "ECB",
+    "CBAM"
+  ],
+  "britain": [
+    "Brexit"
+  ],
+  "exit": [
+    "Brexit"
+  ],
+  "brexit": [
+    "Brexit"
+  ],
+  "BRICS": [
+    "brazil",
+    "russia",
+    "china",
+    "south africa",
+    "brics",
+    "india"
+  ],
+  "brazil": [
+    "BRICS"
+  ],
+  "russia": [
+    "BRICS"
+  ],
+  "china": [
+    "BRICS"
+  ],
+  "south africa": [
+    "BRICS"
+  ],
+  "brics": [
+    "BRICS"
+  ],
+  "india": [
+    "BRICS"
+  ],
+  "블록체인": [
+    "분산원장",
+    "block",
+    "block chain",
+    "blockchain",
+    "chain"
+  ],
+  "분산원장": [
+    "블록체인"
+  ],
+  "block": [
+    "블록체인"
+  ],
+  "block chain": [
+    "블록체인"
+  ],
+  "blockchain": [
+    "블록체인"
+  ],
+  "chain": [
+    "블록체인"
+  ],
+  "NOE": [
+    "noe",
+    "gdp"
+  ],
+  "noe": [
+    "NOE"
+  ],
+  "bitcoin": [
+    "비트코인"
+  ],
+  "빅데이터": [
+    "big data"
+  ],
+  "big data": [
+    "빅데이터"
+  ],
+  "빅맥지수": [
+    "big mac index",
+    "the economist"
+  ],
+  "big mac index": [
+    "빅맥지수"
+  ],
+  "the economist": [
+    "빅맥지수"
+  ],
+  "빅테크": [
+    "big tech"
+  ],
+  "big tech": [
+    "빅테크"
+  ],
+  "사전담보제": [
+    "collateral requirements"
+  ],
+  "collateral requirements": [
+    "사전담보제"
+  ],
+  "사회보험": [
+    "social insurance"
+  ],
+  "social insurance": [
+    "사회보험"
+  ],
+  "상계관세": [
+    "countervailing duties"
+  ],
+  "countervailing duties": [
+    "상계관세"
+  ],
+  "CFC": [
+    "cfc",
+    "common fund for commodities"
+  ],
+  "cfc": [
+    "CFC"
+  ],
+  "common fund for commodities": [
+    "CFC"
+  ],
+  "상호관세": [
+    "reciprocal tariff"
+  ],
+  "reciprocal tariff": [
+    "상호관세"
+  ],
+  "생산세": [
+    "taxes on production",
+    "sna"
+  ],
+  "taxes on production": [
+    "생산세"
+  ],
+  "sna": [
+    "생산세",
+    "지식재산생산물투자"
+  ],
+  "AI": [
+    "artificial intelligence"
+  ],
+  "artificial intelligence": [
+    "AI"
+  ],
+  "생활물가지수": [
+    "cpi for living necessaries"
+  ],
+  "cpi for living necessaries": [
+    "생활물가지수"
+  ],
+  "선물거래": [
+    "futures transactions"
+  ],
+  "futures transactions": [
+    "선물거래"
+  ],
+  "WGBI": [
+    "wgbi"
+  ],
+  "wgbi": [
+    "WGBI"
+  ],
+  "WTO": [
+    "wto"
+  ],
+  "wto": [
+    "WTO"
+  ],
+  "Bank": [
+    "world bank group",
+    "ida",
+    "ibrd"
+  ],
+  "world bank group": [
+    "Bank"
+  ],
+  "ida": [
+    "Bank"
+  ],
+  "ibrd": [
+    "Bank"
+  ],
+  "CSI": [
+    "bsi",
+    "business survey index"
+  ],
+  "소액지급시스템": [
+    "retail payment system"
+  ],
+  "retail payment system": [
+    "소액지급시스템"
+  ],
+  "SMR": [
+    "small modular reactor"
+  ],
+  "small modular reactor": [
+    "SMR"
+  ],
+  "수요탄력성": [
+    "price elasticity of demand"
+  ],
+  "price elasticity of demand": [
+    "수요탄력성"
+  ],
+  "수익률곡선": [
+    "term structure",
+    "yield curve"
+  ],
+  "term structure": [
+    "수익률곡선"
+  ],
+  "yield curve": [
+    "수익률곡선"
+  ],
+  "수쿠크": [
+    "sukuk",
+    "sharia"
+  ],
+  "sukuk": [
+    "수쿠크"
+  ],
+  "sharia": [
+    "수쿠크"
+  ],
+  "순이체한도제": [
+    "net debit cap"
+  ],
+  "net debit cap": [
+    "순이체한도제"
+  ],
+  "스마트계약": [
+    "smart contract"
+  ],
+  "smart contract": [
+    "스마트계약"
+  ],
+  "스무딩오퍼레이션": [
+    "smoothing operation"
+  ],
+  "smoothing operation": [
+    "스무딩오퍼레이션"
+  ],
+  "스왑": [
+    "swap",
+    "cash flow"
+  ],
+  "swap": [
+    "스왑"
+  ],
+  "cash flow": [
+    "스왑"
+  ],
+  "스왑레이트": [
+    "swap rate",
+    "covered interest rate parity"
+  ],
+  "swap rate": [
+    "스왑레이트"
+  ],
+  "covered interest rate parity": [
+    "스왑레이트"
+  ],
+  "스왑베이시스": [
+    "swap basis",
+    "irs",
+    "crs"
+  ],
+  "swap basis": [
+    "스왑베이시스"
+  ],
+  "crs": [
+    "스왑베이시스"
+  ],
+  "스톡옵션": [
+    "stock option"
+  ],
+  "stock option": [
+    "스톡옵션"
+  ],
+  "스트레스 테스트(위기상황분석)": [
+    "extreme but plausible"
+  ],
+  "extreme but plausible": [
+    "스트레스 테스트(위기상황분석)"
+  ],
+  "시뇨리지": [
+    "seigniorage"
+  ],
+  "seigniorage": [
+    "시뇨리지"
+  ],
+  "시장리스크": [
+    "trading book"
+  ],
+  "trading book": [
+    "시장리스크"
+  ],
+  "CME": [
+    "cme",
+    "chicago mercantile exchange"
+  ],
+  "chicago mercantile exchange": [
+    "CME",
+    "FedWatch"
+  ],
+  "시카고 연준 금융상황지수": [
+    "national financial conditions index"
+  ],
+  "national financial conditions index": [
+    "시카고 연준 금융상황지수"
+  ],
+  "CLN": [
+    "credit linked notes",
+    "cds"
+  ],
+  "credit linked notes": [
+    "CLN"
+  ],
+  "cds": [
+    "CLN",
+    "프리미엄"
+  ],
+  "신용창조": [
+    "credit creation"
+  ],
+  "credit creation": [
+    "신용창조"
+  ],
+  "신용파생상품": [
+    "credit derivative",
+    "credit risk",
+    "underlying asset"
+  ],
+  "credit derivative": [
+    "신용파생상품"
+  ],
+  "credit risk": [
+    "신용파생상품"
+  ],
+  "underlying asset": [
+    "신용파생상품",
+    "파생금융상품"
+  ],
+  "신·재생에너지": [
+    "renewable"
+  ],
+  "renewable": [
+    "신·재생에너지"
+  ],
+  "BW": [
+    "bond with warrant",
+    "warrant"
+  ],
+  "bond with warrant": [
+    "BW"
+  ],
+  "warrant": [
+    "BW"
+  ],
+  "AMRO": [
+    "asean",
+    "cmim",
+    "chiang mai initiative multilateralization"
+  ],
+  "cmim": [
+    "AMRO"
+  ],
+  "chiang mai initiative multilateralization": [
+    "AMRO"
+  ],
+  "ADB": [
+    "adb"
+  ],
+  "adb": [
+    "ADB"
+  ],
+  "애그플레이션": [
+    "inflation"
+  ],
+  "inflation": [
+    "애그플레이션",
+    "인플레이션"
+  ],
+  "CD": [
+    "cd",
+    "negotiable certificate of deposit"
+  ],
+  "cd": [
+    "CD",
+    ")공동망"
+  ],
+  "negotiable certificate of deposit": [
+    "CD"
+  ],
+  "양적완화정책": [
+    "quantitative easing",
+    "qe"
+  ],
+  "quantitative easing": [
+    "양적완화정책"
+  ],
+  "qe": [
+    "양적완화정책",
+    "양적완화"
+  ],
+  "CMA": [
+    "cash management account",
+    "cma"
+  ],
+  "cash management account": [
+    "CMA"
+  ],
+  "cma": [
+    "CMA"
+  ],
+  "에너지 믹스": [
+    "energy mix"
+  ],
+  "energy mix": [
+    "에너지 믹스"
+  ],
+  "역모기지론": [
+    "reverse mortgage loan"
+  ],
+  "reverse mortgage loan": [
+    "역모기지론"
+  ],
+  "역선택": [
+    "adverse selection"
+  ],
+  "adverse selection": [
+    "역선택"
+  ],
+  "역외금융": [
+    "offshore banking"
+  ],
+  "offshore banking": [
+    "역외금융"
+  ],
+  "연구개발(": [
+    "knowledge stock"
+  ],
+  "knowledge stock": [
+    "연구개발("
+  ],
+  "FRB": [
+    "federal reserve system",
+    "frs",
+    "federal reserve act"
+  ],
+  "federal reserve system": [
+    "FRB"
+  ],
+  "frs": [
+    "FRB"
+  ],
+  "federal reserve act": [
+    "FRB"
+  ],
+  "예금토큰": [
+    "tokenized deposit"
+  ],
+  "tokenized deposit": [
+    "예금토큰"
+  ],
+  "오픈뱅킹": [
+    "open banking",
+    "application programming interface"
+  ],
+  "open banking": [
+    "오픈뱅킹"
+  ],
+  "application programming interface": [
+    "오픈뱅킹"
+  ],
+  "옵션": [
+    "option"
+  ],
+  "option": [
+    "옵션"
+  ],
+  "와타나베 부인": [
+    "watanabe"
+  ],
+  "watanabe": [
+    "와타나베 부인"
+  ],
+  "완충자본": [
+    "buffer capital"
+  ],
+  "buffer capital": [
+    "완충자본"
+  ],
+  "외채/대외채권": [
+    "external debt",
+    "imf"
+  ],
+  "external debt": [
+    "외채/대외채권"
+  ],
+  "imf": [
+    "외채/대외채권",
+    "SDR",
+    "스탠드바이협약",
+    "쿼타"
+  ],
+  "PVP": [
+    "payment versus payment",
+    "pvp"
+  ],
+  "payment versus payment": [
+    "PVP"
+  ],
+  "pvp": [
+    "PVP"
+  ],
+  "외환보유액": [
+    "official reserve assets"
+  ],
+  "official reserve assets": [
+    "외환보유액"
+  ],
+  "요소비용 국민소득": [
+    "ni at factor cost",
+    "ni"
+  ],
+  "ni at factor cost": [
+    "요소비용 국민소득"
+  ],
+  "우발전환사채(코코본드)": [
+    "contingent convertible bond"
+  ],
+  "contingent convertible bond": [
+    "우발전환사채(코코본드)"
+  ],
+  "운영리스크": [
+    "external events",
+    "internal process"
+  ],
+  "external events": [
+    "운영리스크"
+  ],
+  "internal process": [
+    "운영리스크"
+  ],
+  "원금리스크": [
+    "principal risk"
+  ],
+  "principal risk": [
+    "원금리스크"
+  ],
+  "STRIPS": [
+    "zero coupon bond"
+  ],
+  "zero coupon bond": [
+    "STRIPS",
+    "Bill"
+  ],
+  "위험회피심리": [
+    "risk aversion"
+  ],
+  "risk aversion": [
+    "위험회피심리"
+  ],
+  "유동성": [
+    "liquidity"
+  ],
+  "liquidity": [
+    "유동성"
+  ],
+  "유동성커버리지비율": [
+    "lcr",
+    "liquidity coverage ratio"
+  ],
+  "lcr": [
+    "유동성커버리지비율"
+  ],
+  "liquidity coverage ratio": [
+    "유동성커버리지비율"
+  ],
+  "유동성 함정": [
+    "liquidity trap"
+  ],
+  "liquidity trap": [
+    "유동성 함정"
+  ],
+  "EBRD": [
+    "european bank for reconstruction and development"
+  ],
+  "european bank for reconstruction and development": [
+    "EBRD"
+  ],
+  "EU": [
+    "treaty on european union",
+    "ec",
+    "eu",
+    "european union"
+  ],
+  "european union": [
+    "EU"
+  ],
+  "ECB": [
+    "emi",
+    "eu"
+  ],
+  "emi": [
+    "ECB"
+  ],
+  "Token": [
+    "platform"
+  ],
+  "platform": [
+    "Token"
+  ],
+  "은행경영공시제도": [
+    "market discipline"
+  ],
+  "market discipline": [
+    "은행경영공시제도"
+  ],
+  "BA": [
+    "accept"
+  ],
+  "accept": [
+    "BA"
+  ],
+  "이슬람금융": [
+    "shariah"
+  ],
+  "shariah": [
+    "이슬람금융"
+  ],
+  "이차전지": [
+    "secondary cell"
+  ],
+  "secondary cell": [
+    "이차전지"
+  ],
+  "이표채": [
+    "discount bond",
+    "coupon bond",
+    "compound interest bond"
+  ],
+  "discount bond": [
+    "이표채"
+  ],
+  "coupon bond": [
+    "이표채"
+  ],
+  "compound interest bond": [
+    "이표채"
+  ],
+  "IRA": [
+    "ira",
+    "inflation reduction act"
+  ],
+  "ira": [
+    "IRA"
+  ],
+  "inflation reduction act": [
+    "IRA"
+  ],
+  "일대일로": [
+    "apec"
+  ],
+  "apec": [
+    "일대일로"
+  ],
+  "제도": [
+    "rp"
+  ],
+  "rp": [
+    "제도"
+  ],
+  "입금이체": [
+    "credit transfer"
+  ],
+  "credit transfer": [
+    "입금이체"
+  ],
+  ")공동망": [
+    "cd"
+  ],
+  "COFIX": [
+    "cost of funds index"
+  ],
+  "cost of funds index": [
+    "COFIX"
+  ],
+  "자본생산성": [
+    "capital productivity"
+  ],
+  "capital productivity": [
+    "자본생산성"
+  ],
+  "자본적정성": [
+    "net worth"
+  ],
+  "net worth": [
+    "자본적정성"
+  ],
+  "자산유동화": [
+    "spv",
+    "abs"
+  ],
+  "spv": [
+    "자산유동화",
+    "SPV"
+  ],
+  "abs": [
+    "자산유동화",
+    "MBS",
+    "SPV"
+  ],
+  "작업증명": [
+    "request"
+  ],
+  "request": [
+    "작업증명"
+  ],
+  "장기금융시장(자본시장)": [
+    "money market",
+    "capital market"
+  ],
+  "capital market": [
+    "장기금융시장(자본시장)"
+  ],
+  "장기침체": [
+    "secular stagnation"
+  ],
+  "secular stagnation": [
+    "장기침체"
+  ],
+  "장외시장": [
+    "otc"
+  ],
+  "otc": [
+    "장외시장"
+  ],
+  "재산소득": [
+    "property income"
+  ],
+  "property income": [
+    "재산소득"
+  ],
+  "전자정보교환제도": [
+    "truncation"
+  ],
+  "truncation": [
+    "전자정보교환제도"
+  ],
+  "PG": [
+    "payment gateway",
+    "pg"
+  ],
+  "payment gateway": [
+    "PG"
+  ],
+  "pg": [
+    "PG"
+  ],
+  "CB": [
+    "convertible bond"
+  ],
+  "정부실패": [
+    "government failure"
+  ],
+  "government failure": [
+    "정부실패"
+  ],
+  "정책시차": [
+    "policy lag"
+  ],
+  "policy lag": [
+    "정책시차"
+  ],
+  "정크본드": [
+    "junk bond"
+  ],
+  "junk bond": [
+    "정크본드"
+  ],
+  "조세부담률": [
+    "gni"
+  ],
+  "PER": [
+    "price earning ratio",
+    "per"
+  ],
+  "price earning ratio": [
+    "PER"
+  ],
+  "per": [
+    "PER"
+  ],
+  "PBR": [
+    "bps",
+    "price to book ratio",
+    "pbr"
+  ],
+  "bps": [
+    "PBR"
+  ],
+  "price to book ratio": [
+    "PBR"
+  ],
+  "pbr": [
+    "PBR"
+  ],
+  "ELS": [
+    "equity linked security",
+    "els"
+  ],
+  "equity linked security": [
+    "ELS"
+  ],
+  "els": [
+    "ELS"
+  ],
+  "주가지수옵션": [
+    "put option",
+    "call option",
+    "stock index options"
+  ],
+  "put option": [
+    "주가지수옵션",
+    "풋옵션"
+  ],
+  "call option": [
+    "주가지수옵션",
+    "콜옵션"
+  ],
+  "stock index options": [
+    "주가지수옵션"
+  ],
+  "EPS": [
+    "eps",
+    "earning per share"
+  ],
+  "eps": [
+    "EPS"
+  ],
+  "earning per share": [
+    "EPS"
+  ],
+  "MBS": [
+    "abs",
+    "mbs"
+  ],
+  "mbs": [
+    "MBS"
+  ],
+  "중앙거래당사자": [
+    "ccp",
+    "central counterparty"
+  ],
+  "ccp": [
+    "중앙거래당사자"
+  ],
+  "central counterparty": [
+    "중앙거래당사자"
+  ],
+  "중앙예탁기관": [
+    "csd",
+    "central securities depository"
+  ],
+  "csd": [
+    "중앙예탁기관"
+  ],
+  "central securities depository": [
+    "중앙예탁기관"
+  ],
+  "CBDC": [
+    "cbdc",
+    "central bank digital currency"
+  ],
+  "cbdc": [
+    "CBDC",
+    "프로젝트 한강"
+  ],
+  "central bank digital currency": [
+    "CBDC"
+  ],
+  "DVP": [
+    "dvp",
+    "delivery versus payment"
+  ],
+  "dvp": [
+    "DVP"
+  ],
+  "delivery versus payment": [
+    "DVP"
+  ],
+  "증권커스터디서비스": [
+    "delivery",
+    "safekeeping",
+    "record keeping"
+  ],
+  "delivery": [
+    "증권커스터디서비스"
+  ],
+  "safekeeping": [
+    "증권커스터디서비스"
+  ],
+  "record keeping": [
+    "증권커스터디서비스"
+  ],
+  "지급": [
+    "payment"
+  ],
+  "payment": [
+    "지급"
+  ],
+  "CPMI": [
+    "committee on payment and settlement systems",
+    "bis",
+    "committee on payments and market infrastructures",
+    "cpss",
+    "cpmi"
+  ],
+  "committee on payment and settlement systems": [
+    "CPMI"
+  ],
+  "committee on payments and market infrastructures": [
+    "CPMI"
+  ],
+  "cpss": [
+    "CPMI"
+  ],
+  "cpmi": [
+    "CPMI"
+  ],
+  "지급결제제도 감시": [
+    "bis",
+    "oversight of payment systems"
+  ],
+  "oversight of payment systems": [
+    "지급결제제도 감시"
+  ],
+  "지급수단": [
+    "payment instruments"
+  ],
+  "payment instruments": [
+    "지급수단"
+  ],
+  "비율": [
+    "solvency margin"
+  ],
+  "solvency margin": [
+    "비율"
+  ],
+  "지니계수": [
+    "gini"
+  ],
+  "gini": [
+    "지니계수"
+  ],
+  "지방은행공동망": [
+    "bankline"
+  ],
+  "bankline": [
+    "지방은행공동망"
+  ],
+  "지식재산권": [
+    "intellectual property rights"
+  ],
+  "intellectual property rights": [
+    "지식재산권"
+  ],
+  "지식재산생산물투자": [
+    "sna",
+    "system of national accounts"
+  ],
+  "system of national accounts": [
+    "지식재산생산물투자"
+  ],
+  "직불카드": [
+    "debit card"
+  ],
+  "debit card": [
+    "직불카드"
+  ],
+  "진성어음/융통어음": [
+    "commercial bill"
+  ],
+  "commercial bill": [
+    "진성어음/융통어음"
+  ],
+  ") 거래": [
+    "fixing rate"
+  ],
+  "fixing rate": [
+    ") 거래"
+  ],
+  "LBO": [
+    "leveraged buy out",
+    "lbo"
+  ],
+  "leveraged buy out": [
+    "LBO"
+  ],
+  "lbo": [
+    "LBO"
+  ],
+  "채권시가평가": [
+    "mark to market"
+  ],
+  "mark to market": [
+    "채권시가평가"
+  ],
+  "채무불이행": [
+    "default"
+  ],
+  "default": [
+    "채무불이행"
+  ],
+  "청산": [
+    "clearing"
+  ],
+  "clearing": [
+    "청산"
+  ],
+  "청산소": [
+    "clearing house"
+  ],
+  "clearing house": [
+    "청산소"
+  ],
+  "총산출": [
+    "gross output"
+  ],
+  "gross output": [
+    "총산출"
+  ],
+  "Swap": [
+    "trs",
+    "total return swap"
+  ],
+  "trs": [
+    "Swap"
+  ],
+  "total return swap": [
+    "Swap"
+  ],
+  "최종대부자 기능": [
+    "lender of last resort"
+  ],
+  "lender of last resort": [
+    "최종대부자 기능"
+  ],
+  "출구전략": [
+    "exit strategy"
+  ],
+  "exit strategy": [
+    "출구전략"
+  ],
+  "출금이체": [
+    "debit transfer"
+  ],
+  "debit transfer": [
+    "출금이체"
+  ],
+  "치킨게임": [
+    "chicken game"
+  ],
+  "chicken game": [
+    "치킨게임"
+  ],
+  "카르텔": [
+    "cartel"
+  ],
+  "cartel": [
+    "카르텔"
+  ],
+  "캐리트레이드": [
+    "trade",
+    "carry"
+  ],
+  "trade": [
+    "캐리트레이드"
+  ],
+  "carry": [
+    "캐리트레이드"
+  ],
+  "Chasm": [
+    "chasm"
+  ],
+  "chasm": [
+    "Chasm"
+  ],
+  "커버드본드(이중상환청구권부 채권)": [
+    "covered bond"
+  ],
+  "covered bond": [
+    "커버드본드(이중상환청구권부 채권)"
+  ],
+  "코리보": [
+    "koribor"
+  ],
+  "koribor": [
+    "코리보"
+  ],
+  "콜론": [
+    "call loan"
+  ],
+  "call loan": [
+    "콜론"
+  ],
+  "콜머니": [
+    "call money"
+  ],
+  "call money": [
+    "콜머니"
+  ],
+  "콜시장": [
+    "call"
+  ],
+  "call": [
+    "콜시장"
+  ],
+  "콜옵션": [
+    "call option"
+  ],
+  "크라우드펀딩": [
+    "crowd funding"
+  ],
+  "CBAM": [
+    "eu"
+  ],
+  "탄소배출권": [
+    "carbon emission permit"
+  ],
+  "carbon emission permit": [
+    "탄소배출권"
+  ],
+  "Tapering": [
+    "great recession"
+  ],
+  "great recession": [
+    "Tapering"
+  ],
+  "Rule": [
+    "john taylor"
+  ],
+  "john taylor": [
+    "Rule"
+  ],
+  "Tax": [
+    "james tobin"
+  ],
+  "james tobin": [
+    "Tax"
+  ],
+  "통화안정계정": [
+    "term deposit"
+  ],
+  "term deposit": [
+    "통화안정계정"
+  ],
+  "통화유통속도": [
+    "velocity of circulation of money"
+  ],
+  "velocity of circulation of money": [
+    "통화유통속도"
+  ],
+  "투자은행": [
+    "commercial bank",
+    "investment bank"
+  ],
+  "commercial bank": [
+    "투자은행"
+  ],
+  "investment bank": [
+    "투자은행"
+  ],
+  "Dilemma": [
+    "robert triffin"
+  ],
+  "robert triffin": [
+    "Dilemma"
+  ],
+  "SDR": [
+    "imf"
+  ],
+  "SPV": [
+    "spv",
+    "abs"
+  ],
+  "파생금융상품": [
+    "financial derivatives",
+    "underlying asset"
+  ],
+  "financial derivatives": [
+    "파생금융상품"
+  ],
+  "펀드": [
+    "fund",
+    "집합투자증권"
+  ],
+  "fund": [
+    "펀드"
+  ],
+  "집합투자증권": [
+    "펀드"
+  ],
+  "페더럴펀드": [
+    "federal funds"
+  ],
+  "federal funds": [
+    "페더럴펀드"
+  ],
+  "평잔/말잔": [
+    "average balance"
+  ],
+  "average balance": [
+    "평잔/말잔"
+  ],
+  "표면금리": [
+    "coupon rate"
+  ],
+  "coupon rate": [
+    "표면금리"
+  ],
+  "풋옵션": [
+    "put option"
+  ],
+  "프로그램매매": [
+    "program trading"
+  ],
+  "program trading": [
+    "프로그램매매"
+  ],
+  "프로젝트 파이낸싱": [
+    "pf",
+    "project financing"
+  ],
+  "pf": [
+    "프로젝트 파이낸싱"
+  ],
+  "project financing": [
+    "프로젝트 파이낸싱",
+    "ABCP"
+  ],
+  "프로젝트 한강": [
+    "cbdc"
+  ],
+  "피셔효과": [
+    "irving fisher",
+    "fisher equation"
+  ],
+  "irving fisher": [
+    "피셔효과"
+  ],
+  "fisher equation": [
+    "피셔효과"
+  ],
+  "핀테크": [
+    "technology",
+    "fintech",
+    "finance"
+  ],
+  "technology": [
+    "핀테크"
+  ],
+  "fintech": [
+    "핀테크"
+  ],
+  "finance": [
+    "핀테크"
+  ],
+  "합계출산율": [
+    "total fertility rate"
+  ],
+  "total fertility rate": [
+    "합계출산율"
+  ],
+  "RFI": [
+    "rfi",
+    "registered foreign institution"
+  ],
+  "rfi": [
+    "RFI"
+  ],
+  "registered foreign institution": [
+    "RFI"
+  ],
+  "RCA": [
+    "revealed comparative advantage index",
+    "rca"
+  ],
+  "revealed comparative advantage index": [
+    "RCA"
+  ],
+  "rca": [
+    "RCA"
+  ],
+  "혼합형결제시스템": [
+    "hybrid settlement system"
+  ],
+  "hybrid settlement system": [
+    "혼합형결제시스템"
+  ],
+  "환경계정": [
+    "system of integrated environmental and economic accounts",
+    "seea"
+  ],
+  "system of integrated environmental and economic accounts": [
+    "환경계정"
+  ],
+  "seea": [
+    "환경계정"
+  ],
+  "환경권": [
+    "environmental rights"
+  ],
+  "environmental rights": [
+    "환경권"
+  ],
+  "자기자본비율": [
+    "bis"
+  ],
+  "프리미엄": [
+    "credit default swap",
+    "cds"
+  ],
+  "credit default swap": [
+    "프리미엄"
+  ],
+  "은행": [
+    "bis"
+  ],
+  "CMO": [
+    "collateralized mortgage obligation"
+  ],
+  "collateralized mortgage obligation": [
+    "CMO"
+  ],
+  "ABC": [
+    "tranche"
+  ],
+  "tranche": [
+    "ABC"
+  ],
+  "경영": [
+    "social",
+    "governance",
+    "environmental"
+  ],
+  "social": [
+    "경영"
+  ],
+  "governance": [
+    "경영"
+  ],
+  "environmental": [
+    "경영"
+  ],
+  "ESTR": [
+    "ecb"
+  ],
+  "ecb": [
+    "ESTR"
+  ],
+  "FedWatch": [
+    "cme",
+    "chicago mercantile exchange"
+  ],
+  "Facility": [
+    "foreign and international monetary authorities repo facility"
+  ],
+  "foreign and international monetary authorities repo facility": [
+    "Facility"
+  ],
+  "현상": [
+    "fear of missing out"
+  ],
+  "fear of missing out": [
+    "현상"
+  ],
+  "카드": [
+    "integrated circuit"
+  ],
+  "integrated circuit": [
+    "카드"
+  ],
+  "스탠드바이협약": [
+    "sba",
+    "imf"
+  ],
+  "sba": [
+    "스탠드바이협약"
+  ],
+  "쿼타": [
+    "sdr",
+    "imf"
+  ],
+  "sdr": [
+    "쿼타"
+  ],
+  "KIKO": [
+    "ki",
+    "barrier",
+    "ko"
+  ],
+  "ki": [
+    "KIKO"
+  ],
+  "barrier": [
+    "KIKO"
+  ],
+  "ko": [
+    "KIKO"
+  ],
+  "스프레드": [
+    "korean paper"
+  ],
+  "korean paper": [
+    "스프레드"
+  ],
+  "MOVE": [
+    "merrill lynch option volatility estimate"
+  ],
+  "merrill lynch option volatility estimate": [
+    "MOVE"
+  ],
+  "지수": [
+    "morgan stanley capital international"
+  ],
+  "morgan stanley capital international": [
+    "지수"
+  ],
+  ") 기술": [
+    "near field communication"
+  ],
+  "near field communication": [
+    ") 기술"
+  ],
+  "Obligation": [
+    "pooling"
+  ],
+  "pooling": [
+    "Obligation"
+  ],
+  "ABCP": [
+    "special purpose company",
+    "project financing",
+    "spc"
+  ],
+  "special purpose company": [
+    "ABCP"
+  ],
+  "spc": [
+    "ABCP"
+  ],
+  "SOFR": [
+    "frb ny",
+    "overnight"
+  ],
+  "frb ny": [
+    "SOFR"
+  ],
+  "overnight": [
+    "SOFR"
+  ],
+  "SWIFT": [
+    "society for worldwide interbank financial telecommunication"
+  ],
+  "society for worldwide interbank financial telecommunication": [
+    "SWIFT"
+  ],
+  "Bill": [
+    "zero coupon bond"
+  ],
+  "Index": [
+    "cboe"
+  ],
+  "cboe": [
+    "Index"
+  ],
+  "기준금리": [
+    "base rate",
+    "policy rate"
+  ],
+  "base rate": [
+    "기준금리"
+  ],
+  "policy rate": [
+    "기준금리"
+  ],
+  "콜금리": [
+    "call rate"
+  ],
+  "call rate": [
+    "콜금리"
+  ],
+  "디플레이션": [
+    "deflation",
+    "물가하락"
+  ],
+  "deflation": [
+    "디플레이션"
+  ],
+  "물가하락": [
+    "디플레이션"
+  ],
+  "인플레이션": [
+    "inflation",
+    "물가상승"
+  ],
+  "물가상승": [
+    "인플레이션",
+    "스태그플레이션"
+  ],
+  "스태그플레이션": [
+    "경기침체",
+    "stagflation",
+    "물가상승"
+  ],
+  "경기침체": [
+    "스태그플레이션"
+  ],
+  "stagflation": [
+    "스태그플레이션"
+  ],
+  "양적완화": [
+    "qe",
+    "돈풀기"
+  ],
+  "돈풀기": [
+    "양적완화"
+  ],
+  "테이퍼링": [
+    "tapering",
+    "양적완화 축소"
+  ],
+  "tapering": [
+    "테이퍼링"
+  ],
+  "양적완화 축소": [
+    "테이퍼링"
+  ],
+  "빅스텝": [
+    "금리인상",
+    "big step"
+  ],
+  "금리인상": [
+    "빅스텝",
+    "자이언트스텝"
+  ],
+  "big step": [
+    "빅스텝"
+  ],
+  "자이언트스텝": [
+    "giant step",
+    "금리인상"
+  ],
+  "giant step": [
+    "자이언트스텝"
+  ],
+  "중앙은행": [
+    "한국은행",
+    "한은",
+    "central bank",
+    "bok"
+  ],
+  "한국은행": [
+    "중앙은행"
+  ],
+  "한은": [
+    "중앙은행"
+  ],
+  "central bank": [
+    "중앙은행"
+  ],
+  "bok": [
+    "중앙은행"
+  ]
+}
