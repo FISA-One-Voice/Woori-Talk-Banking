@@ -69,6 +69,9 @@ _APP_LOGS_MAPPING: dict[str, Any] = {
             "status_code": {"type": "integer"},
             "method":      {"type": "keyword"},
             "path":        {"type": "keyword"},
+            "code":        {"type": "keyword"},
+            "service":     {"type": "keyword"},
+            "status":      {"type": "keyword"},
         }
     },
 }
@@ -86,6 +89,7 @@ _VOICE_PIPELINE_MAPPING: dict[str, Any] = {
             "intent":      {"type": "keyword"},
             "navigate_to": {"type": "keyword"},
             "success":     {"type": "boolean"},
+            "asv_result":  {"type": "keyword"},
         }
     },
 }

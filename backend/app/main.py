@@ -110,7 +110,8 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 
 
 @app.exception_handler(AppError)
-async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
+async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+    from app.core.middleware import _extract_feature
     logger.error(
         "app_error",
         extra={
@@ -118,6 +119,7 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
             "code": exc.code,
             "status_code": exc.status_code,
             "error_message": exc.message,
+            "feature": _extract_feature(request.url.path),
         },
     )
     app_error_total.labels(code=exc.code).inc()
