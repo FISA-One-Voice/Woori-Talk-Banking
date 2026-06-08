@@ -6,6 +6,7 @@ Supervisor 그래프의 MemorySaver를 공유해야 하므로 독립 checkpointe
 
 import json
 import logging
+import re
 import uuid
 
 import openai
@@ -364,7 +365,9 @@ def _transfer_response_rules() -> list[str]:
         "- auto_transfer: 자동이체, 정기 이체, 매월, 매주 요청입니다.",
         "- cancel_auto_transfer: 자동이체 해지 요청입니다.",
         "- add_note/add_auto_transfer_note: 직전 이체·자동이체 메모 추가 요청입니다.",
-        "- amount는 원화 정수 문자열로 추출하십시오.",
+        "- amount는 반드시 원화 정수 문자열로 추출하십시오."
+        " 예: '천원'→'1000', '오만원'→'50000', '1000원'→'1000', '삼십만원'→'300000'."
+        " '천', '오만' 등 단위만 있어도 정수로 변환하십시오.",
         "- recipient는 이름, 별명, 전화번호, 계좌번호를 발화 그대로 추출하십시오.",
         "- cycle은 monthly 또는 weekly만 사용하십시오.",
         "- scheduled_day: 날짜·요일 명시 시만 추출."
@@ -412,6 +415,76 @@ _KOR_DOW_MAP: dict[str, int] = {
     "토": 5, "토요일": 5,
     "일": 6, "일요일": 6,
 }
+
+# STT 발음 유사 오인식 매핑 (천원 → 전원 등)
+_STT_AMOUNT_ALIASES: dict[str, int] = {
+    "전원": 1000,   # "천원" 오인식
+    "천원": 1000,
+    "천": 1000,
+    "만원": 10000,
+    "만": 10000,
+}
+
+
+def _kor_to_int(text: str) -> int | None:
+    """순수 한국어 숫자 문자열을 정수로 변환한다."""
+    _DIGIT = {
+        "일": 1, "이": 2, "삼": 3, "사": 4, "오": 5,
+        "육": 6, "칠": 7, "팔": 8, "구": 9,
+    }
+    _SMALL = {"십": 10, "백": 100, "천": 1000}
+
+    def _below_10000(s: str) -> int:
+        result, current = 0, 0
+        for ch in s:
+            if ch in _DIGIT:
+                current = _DIGIT[ch]
+            elif ch in _SMALL:
+                result += (current or 1) * _SMALL[ch]
+                current = 0
+        return result + current
+
+    total = 0
+    if "억" in text:
+        parts = text.split("억", 1)
+        total += (_below_10000(parts[0]) or 1) * 100_000_000
+        text = parts[1]
+    if "만" in text:
+        parts = text.split("만", 1)
+        total += (_below_10000(parts[0]) or 1) * 10_000
+        text = parts[1]
+    total += _below_10000(text)
+    return total if total > 0 else None
+
+
+def _parse_korean_amount(raw: str) -> str | None:
+    """한국어·STT 오인식 금액 표현을 정수 문자열로 변환한다.
+
+    STT 오인식("전원"→천원), 한국어 숫자("오만원"→50000),
+    숫자+단위("1000원"→1000) 세 경우를 처리한다.
+    변환 불가 시 None을 반환한다.
+    """
+    text = str(raw).strip().replace(" ", "").replace(",", "")
+    if not text:
+        return None
+
+    # STT 오인식 alias
+    if text in _STT_AMOUNT_ALIASES:
+        return str(_STT_AMOUNT_ALIASES[text])
+
+    # "원" suffix 제거 후 alias 재확인 (e.g. "전원" suffix 없는 경우 대비)
+    text_no_won = re.sub(r"원$", "", text)
+
+    # 숫자만 있는 경우
+    try:
+        val = int(text_no_won)
+        return str(val) if val > 0 else None
+    except ValueError:
+        pass
+
+    # 한국어 숫자 파싱
+    val = _kor_to_int(text_no_won)
+    return str(val) if val is not None and val > 0 else None
 
 
 def _normalize_scheduled_day(slots: dict, extracted_slots: dict) -> dict:
@@ -481,6 +554,13 @@ def _merge_slot_update(state: VoiceState, extracted_slots: dict) -> dict:
     ):
         existing.pop("scheduled_day", None)
     updated_slots = _normalize_scheduled_day(existing, allowed_updates)
+
+    # amount 슬롯은 한국어·STT 오인식 표현을 정수 문자열로 보정한다
+    raw_amount = updated_slots.get("amount")
+    if raw_amount is not None:
+        parsed = _parse_korean_amount(str(raw_amount))
+        updated_slots["amount"] = parsed  # 변환 실패 시 None → slot_fill_node 재질문
+
     updates: dict = {"collected_slots": updated_slots, "navigate_to": None}
     if pending == "add_note" and updated_slots.get("memo"):
         updates["execution_ready"] = True
