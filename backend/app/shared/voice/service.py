@@ -7,7 +7,7 @@
       오디오 → STT → LangGraph 에이전트 → TTS → VoiceResponseData
 
   ASV 인증 흐름 (awaiting_asv_audio=True):
-      오디오 → ASV EC2 + anti-spoofing EC2 병렬 호출
+      오디오 → ASV EC2 호출
             → 성공: 상태 업데이트 → 에이전트 실행 → TTS
             → 실패: 재시도 안내 TTS (최대 3회, 초과 시 취소)
 
@@ -22,7 +22,9 @@ import base64
 import io
 import json
 import logging
+import time
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from langchain_core.messages import HumanMessage
@@ -31,6 +33,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exception import ASVError
+from app.core.metrics import asv_verification_total, voice_stage_duration
+from app.core.opensearch_writer import write_voice_pipeline_record_async
+from app.core.request_context import get_request_id
 from app.models.user import User
 from app.shared.agent import build_graph
 from app.shared.agent.slot_schema import SCREEN_MAP
@@ -39,7 +44,7 @@ from app.shared.agent.transfer_clarification import (
     is_clarification_no,
     is_home_request,
 )
-from app.shared.voice.schema import AntiSpoofResult, ASVResult, VoiceResponseData
+from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.message_utils import tts_text_from_messages
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
@@ -182,6 +187,69 @@ async def process_voice_pipeline(
 
 # ── 정상 흐름: STT → 에이전트 → TTS ────────────────────────────────────────────
 
+_NAVIGATE_TO_INTENT: dict[str, str] = {
+    "transfer":           "transfer",
+    "transfer/complete":  "transfer",
+    "transfer/failed":    "transfer",
+    "auto-transfer":      "auto_transfer",
+    "auto-transfer/complete": "auto_transfer",
+    "balance":            "balance",
+    "event":              "event",
+    "home":               "home",
+}
+
+
+def _infer_intent(result: dict) -> str | None:
+    """에이전트 결과에서 인텐트를 추출한다.
+
+    execute_node 실행 후 pending_action이 None으로 리셋되므로,
+    pending_action이 없으면 navigate_to로 역추론한다.
+    """
+    pending = result.get("pending_action")
+    if pending:
+        return pending
+    return _NAVIGATE_TO_INTENT.get(result.get("navigate_to") or "")
+
+
+async def _record_voice_pipeline(
+    user_id: str,
+    stt_ms: int,
+    agent_ms: int,
+    tts_ms: int,
+    total_ms: int,
+    intent: str | None,
+    navigate_to: str | None,
+) -> None:
+    """음성 파이프라인 완료 이벤트를 로그와 OpenSearch에 기록합니다.
+
+    Args:
+        user_id: JWT 사용자 ID.
+        stt_ms: STT 단계 소요 시간 (ms).
+        agent_ms: agent 단계 소요 시간 (ms). LLM + tool + DB 시간 포함.
+        tts_ms: TTS 단계 소요 시간 (ms).
+        total_ms: 파이프라인 전체 소요 시간 (ms).
+        intent: 감지된 인텐트 (pending_action).
+        navigate_to: 에이전트가 설정한 화면 이동 경로.
+    """
+    record: dict = {
+        "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%dT%H:%M:%S+09:00"),
+        "request_id": get_request_id(),
+        "user_id": user_id,
+        "stt_ms": stt_ms,
+        "agent_ms": agent_ms,
+        "tts_ms": tts_ms,
+        "total_ms": total_ms,
+        "intent": intent or "unknown",
+        "navigate_to": navigate_to,
+        "success": True,
+        "error_code": None,
+    }
+    logger.info("voice_pipeline_complete", extra={"event": "voice_pipeline_complete", **record})
+    asyncio.create_task(write_voice_pipeline_record_async(record))
+    voice_stage_duration.labels(stage="stt").observe(stt_ms / 1000)
+    voice_stage_duration.labels(stage="agent").observe(agent_ms / 1000)
+    voice_stage_duration.labels(stage="tts").observe(tts_ms / 1000)
+
 
 async def _handle_normal_flow(
     audio_bytes: bytes,
@@ -201,10 +269,15 @@ async def _handle_normal_flow(
     Returns:
         VoiceResponseData: TTS 오디오 + 에이전트 상태 반영.
     """
-    # 1. STT: 오디오 → 텍스트
-    transcript = await transcribe_audio(audio_bytes, content_type)
+    pipeline_start = time.monotonic()
 
-    # 2. LangGraph 에이전트 호출
+    # 1. STT: 오디오 → 텍스트
+    t0 = time.monotonic()
+    transcript = await transcribe_audio(audio_bytes, content_type)
+    stt_ms = int((time.monotonic() - t0) * 1000)
+
+    # 2. LangGraph 에이전트 호출 (LLM + tool + DB 시간 포함)
+    t0 = time.monotonic()
     result = await graph.ainvoke(
         {
             "messages": [HumanMessage(content=transcript)],
@@ -212,14 +285,28 @@ async def _handle_normal_flow(
         },
         config=config,
     )
+    agent_ms = int((time.monotonic() - t0) * 1000)
 
     response_text = tts_text_from_messages(result["messages"])
 
     # 3. TTS: 텍스트 → MP3
+    t0 = time.monotonic()
     audio_mp3 = await synthesize_speech(response_text)
+    tts_ms = int((time.monotonic() - t0) * 1000)
+    total_ms = int((time.monotonic() - pipeline_start) * 1000)
+
     audio_b64 = base64.b64encode(audio_mp3).decode()
 
     navigate_to = _resolve_navigate_to(result)
+    await _record_voice_pipeline(
+        user_id=user_id,
+        stt_ms=stt_ms,
+        agent_ms=agent_ms,
+        tts_ms=tts_ms,
+        total_ms=total_ms,
+        intent=_infer_intent(result),
+        navigate_to=navigate_to,
+    )
 
     if navigate_to == "home":
         await reset_voice_state(user_id)
@@ -286,7 +373,7 @@ async def _handle_asv_flow(
 ) -> VoiceResponseData:
     """ASV 화자 인증 처리 흐름.
 
-    ASV EC2 서버와 anti-spoofing 서버를 asyncio.gather로 병렬 호출한다.
+    ASV EC2 서버를 호출한다.
     성공 시 aupdate_state()로 execution_ready=True를 설정하고 에이전트를 실행한다.
     실패 시 retry_count를 증가시키고 남은 횟수를 TTS로 안내한다.
     3회 초과 실패 시 작업을 취소하고 상태를 초기화한다.
@@ -348,42 +435,51 @@ async def _handle_asv_flow(
         len(wav_bytes),
     )
 
-    # ASV + anti-spoofing 병렬 호출
-    asv_result, spoof_result = await asyncio.gather(
-        _call_asv_ec2(wav_bytes, reference_embedding),
-        _call_anti_spoofing_ec2(wav_bytes),
-        return_exceptions=True,
-    )
-
-    asv_ok = isinstance(asv_result, ASVResult) and asv_result.verified
-    spoof_ok = isinstance(spoof_result, AntiSpoofResult) and spoof_result.is_real
-
-    # 실패 원인 로깅 (ASV 예외 발생 시 재raise)
-    if isinstance(asv_result, ASVError):
-        raise asv_result
-    if isinstance(asv_result, Exception):
-        logger.error("ASV EC2 호출 중 예기치 못한 오류: %s", asv_result)
+    # ASV 호출
+    try:
+        asv_result = await _call_asv_ec2(wav_bytes, reference_embedding)
+    except ASVError:
+        raise
+    except Exception as e:
+        logger.error("ASV EC2 호출 중 예기치 못한 오류: %s", e)
         raise ASVError(
             code="ASV_SERVER_ERROR",
             message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
             status_code=502,
             user_message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
-        )
+        ) from e
 
-    auth_success = asv_ok and spoof_ok
+    asv_ok = isinstance(asv_result, ASVResult) and asv_result.verified
+    auth_success = asv_ok
 
     if auth_success:
+        asv_verification_total.labels(result="pass").inc()
+        asyncio.create_task(write_voice_pipeline_record_async({
+            "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%dT%H:%M:%S+09:00"),
+            "request_id": get_request_id(),
+            "user_id": user_id,
+            "asv_result": "pass",
+            "success": True,
+        }))
         return await _proceed_after_asv_success(user_id, config, graph)
+
+    asv_verification_total.labels(result="fail").inc()
+    asyncio.create_task(write_voice_pipeline_record_async({
+        "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%dT%H:%M:%S+09:00"),
+        "request_id": get_request_id(),
+        "user_id": user_id,
+        "asv_result": "fail",
+        "success": False,
+    }))
 
     # ── 인증 실패 처리 ─────────────────────────────────────────────────────────
     new_retry = retry_count + 1
     logger.info(
-        "ASV 인증 실패: user_id=%s, retry=%d/%d, asv_ok=%s, spoof_ok=%s",
+        "ASV 인증 실패: user_id=%s, retry=%d/%d, asv_ok=%s",
         user_id,
         new_retry,
         _MAX_ASV_RETRIES,
         asv_ok,
-        spoof_ok,
     )
 
     if new_retry >= _MAX_ASV_RETRIES:
@@ -585,38 +681,3 @@ async def _call_asv_ec2(
         ) from e
 
 
-async def _call_anti_spoofing_ec2(audio_bytes: bytes) -> AntiSpoofResult:
-    """Anti-spoofing EC2 서버(POST /detect)를 호출한다.
-
-    ai/anti-spoofing/이 미구현 상태이므로 settings.USE_ANTI_SPOOFING=False(기본값)이면
-    is_real=True를 즉시 반환하여 바이패스한다.
-
-    Args:
-        audio_bytes: 검사할 오디오 바이트.
-
-    Returns:
-        AntiSpoofResult: is_real(bool) + confidence(float).
-    """
-    if not settings.USE_ANTI_SPOOFING:
-        # anti-spoofing 서버 미구현 — 바이패스 (항상 실제 음성으로 간주)
-        return AntiSpoofResult(is_real=True, confidence=1.0)
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{settings.ANTI_SPOOFING_EC2_URL}/detect",
-                files={"file": ("audio.wav", audio_bytes, "audio/wav")},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return AntiSpoofResult(
-                is_real=data["is_real"],
-                confidence=data.get("confidence", 0.0),
-            )
-    except httpx.HTTPStatusError as e:
-        logger.warning("Anti-spoofing 서버 HTTP 오류 %d: %s", e.response.status_code, e)
-        # anti-spoofing 실패 시 보수적으로 is_real=False 반환
-        return AntiSpoofResult(is_real=False, confidence=0.0)
-    except httpx.TimeoutException as e:
-        logger.warning("Anti-spoofing 서버 타임아웃: %s", e)
-        return AntiSpoofResult(is_real=False, confidence=0.0)

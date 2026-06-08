@@ -36,8 +36,8 @@ export default function DevHubScreen() {
             <Text style={[styles.linkText, { color: '#F87171' }]}>🗑️ 토큰 및 상태 초기화 (로그아웃)</Text>
           </Pressable>
 
-          <Pressable 
-            style={[styles.link, { backgroundColor: COLORS.surfaceLight, borderColor: COLORS.highlightYellow, marginBottom: 16 }]} 
+          <Pressable
+            style={[styles.link, { backgroundColor: COLORS.surfaceLight, borderColor: COLORS.highlightYellow, marginBottom: 16 }]}
             onPress={syncDeviceContactsToBackend}
           >
             <Text style={[styles.linkText, { color: COLORS.textMain }]}>📱 기기 연락처 동기화 테스트</Text>

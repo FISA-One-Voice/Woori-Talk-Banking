@@ -1,12 +1,16 @@
 """이체 에이전트 tool — execute_transfer / add_note."""
 
 import logging
+import time
 import uuid
+from datetime import datetime, timezone
 
 from langchain_core.tools import tool
 
 from app.core.database import get_db
 from app.core.exception import AppError
+from app.core.opensearch_writer import write_transfer_audit_record
+from app.core.request_context import get_request_id
 from app.features.recipients.service import (
     lookup_recipient_for_transfer,
     resolve_by_id,
@@ -32,6 +36,7 @@ def run_execute_transfer(
     """
     db = next(get_db())
     slots = collected_slots or {}
+    start = time.monotonic()
     try:
         user_uuid = uuid.UUID(user_id)
         resolved = None
@@ -54,6 +59,14 @@ def run_execute_transfer(
             )
 
         if resolved is None:
+            write_transfer_audit_record({
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "request_id": get_request_id(),
+                "user_id": user_id,
+                "amount": amount,
+                "status": "failed",
+                "duration_ms": int((time.monotonic() - start) * 1000),
+            })
             return f"{recipient}님을 찾을 수 없습니다. 다시 확인해 주세요.", None
 
         display_name = str(
@@ -70,12 +83,22 @@ def run_execute_transfer(
             recipient_id=str(resolved.recipient_id) if resolved.recipient_id else None,
         )
         tx_id = receipt["txId"]
+        # transfer_service.execute_transfer() already logs event:transfer_executed
+        # which Fluent Bit routes to transfer_audit — no direct write needed here
         return f"{display_name}님께 {amount:,}원 이체가 완료되었습니다.", tx_id
     except AppError as e:
-        logger.warning("execute_transfer AppError: user=%s code=%s", user_id, e.code)
+        write_transfer_audit_record({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "request_id": get_request_id(),
+            "user_id": user_id,
+            "amount": amount,
+            "status": "failed",
+            "duration_ms": int((time.monotonic() - start) * 1000),
+        })
+        logger.warning("execute_transfer_error", extra={"event": "execute_transfer_error", "user_id": user_id, "code": e.code})
         return e.user_message or e.message, None
     except Exception as e:
-        logger.error("execute_transfer 실패: user=%s error=%s", user_id, e)
+        logger.error("execute_transfer_failed", extra={"event": "execute_transfer_failed", "user_id": user_id, "error": str(e)})
         return "이체 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.", None
     finally:
         db.close()
@@ -120,10 +143,10 @@ def add_note(user_id: str, memo: str, tx_id: str) -> str:
         transfer_service.update_memo(db=db, user_id=user_id, tx_id=tx_id, memo=memo)
         return f"'{memo}' 메모가 추가되었습니다."
     except AppError as e:
-        logger.warning("add_note AppError: user=%s code=%s", user_id, e.code)
+        logger.warning("add_note_error", extra={"event": "add_note_error", "user_id": user_id, "code": e.code})
         return e.user_message or e.message
     except Exception as e:
-        logger.error("add_note 실패: user=%s tx_id=%s error=%s", user_id, tx_id, e)
+        logger.error("add_note_failed", extra={"event": "add_note_failed", "user_id": user_id, "tx_id": tx_id, "error": str(e)})
         return "메모 추가 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
     finally:
         db.close()

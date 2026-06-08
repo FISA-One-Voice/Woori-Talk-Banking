@@ -82,3 +82,11 @@ frontend/app/README.md
 
 .cursorrules
 kill_connections.py
+
+# 설계 문서 (로컬 참조용)
+observability-design.md
+observability-dev-plan.md
+observability-changes.md
+
+# 기타 로컬 파일
+*.rev*.json

@@ -35,17 +35,6 @@ class ASVResult(BaseModel):
     score: float
 
 
-class AntiSpoofResult(BaseModel):
-    """Anti-spoofing EC2 서버(POST /detect) 호출 결과.
-
-    Attributes:
-        is_real: True이면 실제 음성 (재생 공격 아님).
-        confidence: 탐지 신뢰도 (0.0 ~ 1.0).
-    """
-
-    is_real: bool
-    confidence: float
-
 
 class ApiResponse(BaseModel):
     success: bool

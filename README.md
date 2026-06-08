@@ -20,7 +20,6 @@
 | STT | Clova Speech API (네이버 클라우드) |
 | TTS | Azure Cognitive Services (koreacentral) |
 | 화자 인증 | CAM++ ASV — 192차원 임베딩, cosine similarity (임계값 0.6404) |
-| 위조음성 탐지 | Anti-spoofing 플레이스홀더 (미구현, 현재 바이패스) |
 | Database | PostgreSQL (Aiven) + pgvector |
 | 검색/RAG | OpenSearch (Aiven) |
 | 전역 상태 | Zustand |
@@ -263,6 +262,4 @@ Woori-Talk-Banking/
     │   ├── model.py                  # ASVModel: 임베딩 추출 + cosine 유사도 계산
     │   ├── config.py                 # ASV_THRESHOLD=0.6404
     │   └── Dockerfile                # CPU-only PyTorch, 모델 사전 다운로드, port 8000
-    └── anti-spoofing/
-        └── .gitkeep                  # 미구현 플레이스홀더
 ```

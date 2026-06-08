@@ -39,7 +39,7 @@ async def voice_pipeline(
     """음성 파이프라인 통합 엔드포인트 (Issue #7).
 
     STT → LangGraph 에이전트 → TTS 흐름을 조율하며,
-    ASV 인증이 필요한 경우 anti-spoofing + ASV EC2 병렬 호출로 분기한다.
+    ASV 인증이 필요한 경우 ASV EC2 호출로 분기한다.
 
     LangGraph MemorySaver 기반 멀티턴 상태(thread_id=user_id)를 유지하므로
     프론트엔드는 별도의 상태 플래그 없이 오디오만 전송하면 된다.
