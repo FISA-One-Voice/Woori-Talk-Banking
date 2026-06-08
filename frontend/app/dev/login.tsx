@@ -4,25 +4,27 @@ import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import { apiClient, ApiResponse } from '@/utils/api';
 import { router } from 'expo-router';
-import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View, Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useState, useEffect } from 'react';
 
 export default function DevLoginScreen() {
-  const savedPhone = useAuthStore((state) => state.phone);
+  const savedToken = useAuthStore((state) => state.token);
   const [phone, setPhone] = useState('');
   const [step, setStep] = useState<'PHONE' | 'PIN' | 'BIOMETRIC'>('PHONE');
 
   useEffect(() => {
-    if (savedPhone) {
-      setPhone(savedPhone);
+    if (savedToken) {
       setStep('BIOMETRIC');
     }
-  }, [savedPhone]);
+  }, [savedToken]);
 
   useEffect(() => {
     if (step === 'BIOMETRIC') {
-      triggerBiometric();
+      const timer = setTimeout(() => {
+        triggerBiometric();
+      }, 500);
+      return () => clearTimeout(timer);
     }
   }, [step]);
 
@@ -86,7 +88,7 @@ export default function DevLoginScreen() {
   const handleLogin = async (pinValue: string) => {
     try {
       const response = await apiClient.post<
-        ApiResponse<{ accessToken: string; refreshToken: string; hasVoiceRegistered: boolean }>
+        ApiResponse<{ accessToken: string; refreshToken: string; hasVoiceRegistered: boolean; ttsSpeed?: number }>
       >('/api/users/login', {
         phone,
         pin: pinValue,
@@ -95,12 +97,12 @@ export default function DevLoginScreen() {
       const result = response.data;
 
       if (result.success && result.data) {
-        useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken, phone);
+        useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken, result.data.hasVoiceRegistered, result.data.ttsSpeed);
 
         if (result.data.hasVoiceRegistered) {
           router.replace('/home');
         } else {
-          router.replace('/dev/voice-register');
+          router.replace('/voice-register');
         }
       } else {
         Alert.alert('로그인 실패 🚫', result.message || '인증에 실패했습니다.');
@@ -127,10 +129,10 @@ export default function DevLoginScreen() {
           {step === 'BIOMETRIC' ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <Text style={{ color: COLORS.highlightYellow, fontSize: 20, fontWeight: '600', marginBottom: 20 }}>
-                Face ID 인증을 진행해주세요.
+                {Platform.OS === 'ios' ? 'Face ID' : '생체'} 인증을 진행해주세요.
               </Text>
-              <Pressable onPress={() => setStep('PIN')} style={{ padding: 16 }}>
-                <Text style={{ color: COLORS.grayMedium, fontSize: 16 }}>PIN 번호로 로그인하기</Text>
+              <Pressable onPress={() => setStep('PHONE')} style={{ padding: 16 }}>
+                <Text style={{ color: COLORS.grayMedium, fontSize: 16 }}>화면에 얼굴을 가까이 가져다주세요.</Text>
               </Pressable>
             </View>
           ) : step === 'PHONE' ? (
