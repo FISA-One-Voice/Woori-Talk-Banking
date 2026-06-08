@@ -207,6 +207,36 @@ async def _handle_normal_flow(
     # 1. STT: 오디오 → 텍스트
     transcript = await transcribe_audio(audio_bytes, content_type)
 
+    # =========================================================================
+    # [임시 인터셉트] 프론트엔드 테스트를 위한 Consultation(이벤트/RAG/금리) 우회 로직
+    # =========================================================================
+    test_keywords = ["뭐야", "알려줘", "어떻게", "금리", "환율", "이벤트", "가상자산", "코인", "비트코인", "dsr", "대출", "예금"]
+    if any(k in transcript.lower() for k in test_keywords):
+        logger.info(f"[Consultation Intercept] 테스트 키워드 감지. rag_graph로 직행: '{transcript}'")
+        from app.shared.agent.subgraphs.consultation import rag_graph
+        from langchain_core.messages import HumanMessage
+        import base64
+        
+        # 진짜 에이전트 래퍼(rag_graph)를 바로 호출! (툴 자동 선택, 요약, navigate_to 포함)
+        agent_result = await rag_graph({"messages": [HumanMessage(content=transcript)]})
+        response_text = agent_result["messages"][-1].content
+        
+        audio_mp3 = await synthesize_speech(response_text)
+        audio_b64 = base64.b64encode(audio_mp3).decode()
+        
+        return VoiceResponseData(
+            audio=audio_b64,
+            navigate_to=agent_result.get("navigate_to"),
+            collected_slots={},
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            awaiting_memo_decision=False,
+            awaiting_transfer_clarification=False,
+            transcript=transcript,
+            pending_action=None,
+        )
+    # =========================================================================
+
     # 2. LangGraph 에이전트 호출
     result = await graph.ainvoke(
         {

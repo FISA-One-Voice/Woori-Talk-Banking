@@ -7,7 +7,7 @@ from app.core.nlp import tokenize_korean
 def fetch_financial_docs(query: str) -> str:
     """사용자의 질문(query)을 기반으로 오픈서치에서 관련 금융 문서를 검색합니다.
     
-    제목(title)에 가중치(^2)를 두어 관련성이 높은 상위 3개 문서를 추출합니다.
+    제목(title)에 가중치(^3)를 두어 관련성이 높은 상위 3개 문서를 추출합니다.
     
     Args:
         query: 사용자가 음성으로 발화한 금융 관련 질문
