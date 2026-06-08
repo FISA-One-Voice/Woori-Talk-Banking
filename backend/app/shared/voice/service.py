@@ -45,6 +45,11 @@ from app.shared.voice.tts_service import synthesize_speech
 
 logger = logging.getLogger(__name__)
 
+# ── 백그라운드 태스크 참조 보관 (GC 방지) ──────────────────────────────────────
+# asyncio.create_task() 결과를 저장하지 않으면 이벤트 루프가 weak reference만 유지해
+# 실행 중에 GC로 수거될 수 있다. 완료 시 자동 제거된다.
+_background_tasks: set[asyncio.Task] = set()
+
 # ── 그래프 싱글턴 (지연 초기화) ────────────────────────────────────────────────
 # 모듈 임포트 시점에 초기화하면 OPENAI_CHAT_API_KEY 미설정 환경(테스트 등)에서
 # AgentError가 발생할 수 있다. 첫 요청 시 빌드하고 이후 재사용한다.
@@ -87,6 +92,8 @@ def _voice_state_reset_payload() -> dict:
         "last_order_id": None,
         "agent_domain": None,
         "analytics_period": None,
+        "pending_consent_tts_text": None,
+        "pending_consent_audio_b64": None,
         "messages": clear_conversation_messages(),
     }
 
@@ -204,6 +211,27 @@ async def _handle_normal_flow(
     Returns:
         VoiceResponseData: TTS 오디오 + 에이전트 상태 반영.
     """
+    # 에이전트 호출 전 현재 state에서 awaiting_confirmation 확인
+    state_before = graph.get_state(config)
+    was_awaiting_confirmation = (
+        state_before.values.get("awaiting_confirmation", False)
+        if state_before.values
+        else False
+    )
+
+    # 4-b: 현재 확인 대기 중이면 사용자 동의 음성을 base64로 임시 저장 (voice-consent-s3)
+    # Plan SC: pending_consent_audio_b64 캡처 — 요청 B에 해당
+    if was_awaiting_confirmation:
+        try:
+            consent_wav = _to_wav_bytes(audio_bytes)
+            await graph.aupdate_state(
+                config,
+                {"pending_consent_audio_b64": base64.b64encode(consent_wav).decode()},
+                as_node="supervisor_node",
+            )
+        except Exception:
+            logger.warning("동의 음성 임시 저장 실패 — 계속 진행", exc_info=True)
+
     # 1. STT: 오디오 → 텍스트
     transcript = await transcribe_audio(audio_bytes, content_type)
 
@@ -217,6 +245,19 @@ async def _handle_normal_flow(
     )
 
     response_text = tts_text_from_messages(result["messages"])
+
+    # 4-a: awaiting_confirmation이 False→True로 전환되면 TTS 텍스트를 임시 저장 (voice-consent-s3)
+    # Plan SC: pending_consent_tts_text 캡처 — 요청 A에 해당
+    now_awaiting_confirmation = result.get("awaiting_confirmation", False)
+    if not was_awaiting_confirmation and now_awaiting_confirmation:
+        try:
+            await graph.aupdate_state(
+                config,
+                {"pending_consent_tts_text": response_text},
+                as_node="supervisor_node",
+            )
+        except Exception:
+            logger.warning("TTS 텍스트 임시 저장 실패 — 계속 진행", exc_info=True)
 
     # 3. TTS: 텍스트 → MP3
     audio_mp3 = await synthesize_speech(response_text)
@@ -403,6 +444,8 @@ async def _handle_asv_flow(
                 "awaiting_memo_decision": False,
                 "navigate_to": "home",
                 "agent_domain": None,
+                "pending_consent_tts_text": None,
+                "pending_consent_audio_b64": None,
             },
             as_node="supervisor_node",
         )
@@ -462,7 +505,21 @@ async def _proceed_after_asv_success(
     Returns:
         VoiceResponseData: 금융 작업 실행 결과 TTS 응답.
     """
+    # 동의 음성 업로드에 필요한 임시 필드를 에이전트 실행 전에 읽어둔다 (voice-consent-s3)
+    state_snapshot = graph.get_state(config)
+    pending_tts_text: str | None = (
+        state_snapshot.values.get("pending_consent_tts_text")
+        if state_snapshot.values
+        else None
+    )
+    pending_audio_b64: str | None = (
+        state_snapshot.values.get("pending_consent_audio_b64")
+        if state_snapshot.values
+        else None
+    )
+
     # execution_ready=True 주입 → intent_node 이후 route_after_intent가 execute_node로 라우팅
+    # pending_consent_* 필드를 함께 초기화하여 다음 세션에 누수되지 않도록 한다
     await graph.aupdate_state(
         config,
         {
@@ -470,6 +527,8 @@ async def _proceed_after_asv_success(
             "execution_ready": True,
             "asv_retry_count": 0,
             "agent_domain": "transfer",
+            "pending_consent_tts_text": None,
+            "pending_consent_audio_b64": None,
         },
         as_node="supervisor_node",
     )
@@ -485,6 +544,40 @@ async def _proceed_after_asv_success(
     )
 
     response_text = tts_text_from_messages(result["messages"])
+
+    # 4-c: ASV 성공 + 동의 필드가 모두 있으면 S3 업로드 task 생성 (voice-consent-s3)
+    # Plan SC: asyncio.create_task로 분리 → 이체 응답은 즉시 반환
+    tx_id: str | None = result.get("last_tx_id") or result.get("last_order_id")
+    logger.info(
+        "[ConsentS3] pending_tts=%s pending_audio=%s tx_id=%s",
+        bool(pending_tts_text),
+        bool(pending_audio_b64),
+        tx_id,
+    )
+    if pending_tts_text and pending_audio_b64 and tx_id:
+        from app.shared.voice import s3_service
+
+        async def _upload_consent_task(
+            _user_id: str,
+            _tx_id: str,
+            _tts_text: str,
+            _audio_b64: str,
+        ) -> None:
+            try:
+                tts_mp3 = await synthesize_speech(_tts_text)
+                tts_wav = s3_service.mp3_to_wav(tts_mp3)
+                consent_wav = base64.b64decode(_audio_b64)
+                combined = s3_service.concat_wav(tts_wav, consent_wav)
+                await s3_service.upload_consent_audio(_user_id, _tx_id, combined)
+            except Exception:
+                logger.error("동의 음성 S3 업로드 실패 (이체 결과 영향 없음)", exc_info=True)
+
+        task = asyncio.create_task(
+            _upload_consent_task(user_id, tx_id, pending_tts_text, pending_audio_b64)
+        )
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+
     audio_mp3 = await synthesize_speech(response_text)
 
     return VoiceResponseData(
