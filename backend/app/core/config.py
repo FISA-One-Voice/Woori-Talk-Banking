@@ -122,13 +122,6 @@ class Settings(BaseSettings):
     #   프로덕션: EC2 인스턴스 주소 (southgiri/asv:1.0 Docker 이미지)
     ASV_SERVER_URL: str = "http://localhost:8000"
 
-    # ── Anti-spoofing 서버 설정 (ai/anti-spoofing/ — 미구현) ─────────────────────
-    # ANTI_SPOOFING_EC2_URL: 재생 공격 탐지 서버 주소 (미구현, 추후 활성화)
-    # USE_ANTI_SPOOFING: False이면 anti-spoofing 호출을 바이패스한다 (기본값).
-    #   anti-spoofing 서버 구현 완료 후 .env에 USE_ANTI_SPOOFING=true 설정.
-    ANTI_SPOOFING_EC2_URL: str = "http://localhost:8003"
-    USE_ANTI_SPOOFING: bool = False
-
     # ── LangSmith 트레이싱 (개발 전용 — 프로덕션에서는 미설정) ────────────────────────
     # .env에 LANGSMITH_* 형식으로 설정한다.
     # LangChain/LangGraph는 os.environ을 직접 읽으므로 model_post_init에서 반영한다.

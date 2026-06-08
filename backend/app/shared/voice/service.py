@@ -7,7 +7,7 @@
       오디오 → STT → LangGraph 에이전트 → TTS → VoiceResponseData
 
   ASV 인증 흐름 (awaiting_asv_audio=True):
-      오디오 → ASV EC2 + anti-spoofing EC2 병렬 호출
+      오디오 → ASV EC2 호출
             → 성공: 상태 업데이트 → 에이전트 실행 → TTS
             → 실패: 재시도 안내 TTS (최대 3회, 초과 시 취소)
 
@@ -44,7 +44,7 @@ from app.shared.agent.transfer_clarification import (
     is_clarification_no,
     is_home_request,
 )
-from app.shared.voice.schema import AntiSpoofResult, ASVResult, VoiceResponseData
+from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.message_utils import tts_text_from_messages
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
@@ -350,7 +350,7 @@ async def _handle_asv_flow(
 ) -> VoiceResponseData:
     """ASV 화자 인증 처리 흐름.
 
-    ASV EC2 서버와 anti-spoofing 서버를 asyncio.gather로 병렬 호출한다.
+    ASV EC2 서버를 호출한다.
     성공 시 aupdate_state()로 execution_ready=True를 설정하고 에이전트를 실행한다.
     실패 시 retry_count를 증가시키고 남은 횟수를 TTS로 안내한다.
     3회 초과 실패 시 작업을 취소하고 상태를 초기화한다.
@@ -412,48 +412,51 @@ async def _handle_asv_flow(
         len(wav_bytes),
     )
 
-    # ASV + anti-spoofing 병렬 호출
-    asv_result, spoof_result = await asyncio.gather(
-        _call_asv_ec2(wav_bytes, reference_embedding),
-        _call_anti_spoofing_ec2(wav_bytes),
-        return_exceptions=True,
-    )
-
-    asv_ok = isinstance(asv_result, ASVResult) and asv_result.verified
-    spoof_ok = isinstance(spoof_result, AntiSpoofResult) and spoof_result.is_real
-
-    # 실패 원인 로깅 (ASV 예외 발생 시 재raise)
-    if isinstance(asv_result, ASVError):
-        raise asv_result
-    if isinstance(asv_result, Exception):
-        logger.error("ASV EC2 호출 중 예기치 못한 오류: %s", asv_result)
+    # ASV 호출
+    try:
+        asv_result = await _call_asv_ec2(wav_bytes, reference_embedding)
+    except ASVError:
+        raise
+    except Exception as e:
+        logger.error("ASV EC2 호출 중 예기치 못한 오류: %s", e)
         raise ASVError(
             code="ASV_SERVER_ERROR",
             message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
             status_code=502,
             user_message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
-        )
+        ) from e
 
-    auth_success = asv_ok and spoof_ok
+    asv_ok = isinstance(asv_result, ASVResult) and asv_result.verified
+    auth_success = asv_ok
 
     if auth_success:
         asv_verification_total.labels(result="pass").inc()
+        asyncio.create_task(write_voice_pipeline_record_async({
+            "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%dT%H:%M:%S+09:00"),
+            "request_id": get_request_id(),
+            "user_id": user_id,
+            "asv_result": "pass",
+            "success": True,
+        }))
         return await _proceed_after_asv_success(user_id, config, graph)
 
-    if not spoof_ok:
-        asv_verification_total.labels(result="spoofing").inc()
-    else:
-        asv_verification_total.labels(result="fail").inc()
+    asv_verification_total.labels(result="fail").inc()
+    asyncio.create_task(write_voice_pipeline_record_async({
+        "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%dT%H:%M:%S+09:00"),
+        "request_id": get_request_id(),
+        "user_id": user_id,
+        "asv_result": "fail",
+        "success": False,
+    }))
 
     # ── 인증 실패 처리 ─────────────────────────────────────────────────────────
     new_retry = retry_count + 1
     logger.info(
-        "ASV 인증 실패: user_id=%s, retry=%d/%d, asv_ok=%s, spoof_ok=%s",
+        "ASV 인증 실패: user_id=%s, retry=%d/%d, asv_ok=%s",
         user_id,
         new_retry,
         _MAX_ASV_RETRIES,
         asv_ok,
-        spoof_ok,
     )
 
     if new_retry >= _MAX_ASV_RETRIES:
@@ -655,38 +658,3 @@ async def _call_asv_ec2(
         ) from e
 
 
-async def _call_anti_spoofing_ec2(audio_bytes: bytes) -> AntiSpoofResult:
-    """Anti-spoofing EC2 서버(POST /detect)를 호출한다.
-
-    ai/anti-spoofing/이 미구현 상태이므로 settings.USE_ANTI_SPOOFING=False(기본값)이면
-    is_real=True를 즉시 반환하여 바이패스한다.
-
-    Args:
-        audio_bytes: 검사할 오디오 바이트.
-
-    Returns:
-        AntiSpoofResult: is_real(bool) + confidence(float).
-    """
-    if not settings.USE_ANTI_SPOOFING:
-        # anti-spoofing 서버 미구현 — 바이패스 (항상 실제 음성으로 간주)
-        return AntiSpoofResult(is_real=True, confidence=1.0)
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{settings.ANTI_SPOOFING_EC2_URL}/detect",
-                files={"file": ("audio.wav", audio_bytes, "audio/wav")},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return AntiSpoofResult(
-                is_real=data["is_real"],
-                confidence=data.get("confidence", 0.0),
-            )
-    except httpx.HTTPStatusError as e:
-        logger.warning("Anti-spoofing 서버 HTTP 오류 %d: %s", e.response.status_code, e)
-        # anti-spoofing 실패 시 보수적으로 is_real=False 반환
-        return AntiSpoofResult(is_real=False, confidence=0.0)
-    except httpx.TimeoutException as e:
-        logger.warning("Anti-spoofing 서버 타임아웃: %s", e)
-        return AntiSpoofResult(is_real=False, confidence=0.0)
