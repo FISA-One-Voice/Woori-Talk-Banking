@@ -10,6 +10,7 @@
 # GET /api/asset/balance/{account_id} → 계좌별 잔액 조회
 # GET /api/asset/history              → 거래 내역 조회 (필터 지원)
 # GET /api/asset/expense-summary      → 지출 요약 조회 (총액 + 카테고리 Top 5)
+# GET /api/asset/compare              → 두 기간 지출 비교 (compare 화면용)
 # =============================================================================
 
 from fastapi import APIRouter, Depends
@@ -118,6 +119,7 @@ def get_transaction_history(
     user_id: str = Depends(get_current_user_id),
     account_id: str | None = None,
     days: int | None = None,
+    period: str | None = None,
     category: str | None = None,
 ) -> dict:
     """거래 내역을 조회합니다.
@@ -126,7 +128,8 @@ def get_transaction_history(
         db: 데이터베이스 세션.
         user_id: JWT에서 추출한 인증 사용자 ID.
         account_id: 특정 계좌로 필터링. None이면 전체 계좌 조회.
-        days: 조회 기간(일수). None이면 전체 기간 조회.
+        days: 조회 기간(일수). period가 있으면 무시.
+        period: "이번달"|"지난달"|"최근7일". 지정 시 정확한 월 범위로 필터.
         category: 거래 카테고리로 필터링. None이면 전체 카테고리 조회.
 
     Returns:
@@ -135,9 +138,15 @@ def get_transaction_history(
     Raises:
         AccountError: 거래 내역을 찾을 수 없는 경우 (TX_NOT_FOUND).
     """
-    transactions = service.get_transaction_history(
-        db, user_id, account_id, days, category
-    )
+    if period:
+        since, until = service.period_to_date_range(period)
+        transactions = service.get_transaction_history(
+            db, user_id, account_id, category=category, since=since, until=until
+        )
+    else:
+        transactions = service.get_transaction_history(
+            db, user_id, account_id, days, category
+        )
 
     data = TransactionListResponse(
         transactions=[
@@ -169,13 +178,15 @@ def get_transaction_history(
 @router.get("/expense-summary")
 def get_expense_summary(
     days: int = 30,
+    period: str | None = None,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ) -> dict:
     """지출 요약을 조회합니다 (총액 및 카테고리 Top 5).
 
     Args:
-        days: 조회 기간(일수). 기본 30일.
+        days: 조회 기간(일수). 기본 30일. period가 있으면 무시.
+        period: "이번달"|"지난달"|"최근7일". 지정 시 정확한 월 범위로 필터.
         db: 데이터베이스 세션.
         user_id: JWT에서 추출한 인증 사용자 ID.
 
@@ -185,7 +196,11 @@ def get_expense_summary(
     Raises:
         HistoryError: 지출 내역이 없는 경우 (TX_NOT_FOUND).
     """
-    summary = service.get_expense_summary(db, user_id, days)
+    if period:
+        since, until = service.period_to_date_range(period)
+        summary = service.get_expense_summary(db, user_id, since=since, until=until)
+    else:
+        summary = service.get_expense_summary(db, user_id, days)
 
     data = ExpenseSummaryResponse(
         total=summary["total"],
@@ -201,3 +216,27 @@ def get_expense_summary(
         "data": data,
         "message": f"최근 {days}일 지출 요약입니다.",
     }
+
+
+@router.get("/compare")
+def get_compare(
+    period: str = "이번달",
+    compare_period: str = "지난달",
+    category: str | None = None,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+) -> dict:
+    """두 기간의 지출을 비교합니다. (compare 화면 전용)
+
+    Args:
+        period: 기준 기간. 기본 "이번달".
+        compare_period: 비교 기간. 기본 "지난달".
+        category: 카테고리 필터. None이면 전체 지출 비교.
+        db: 데이터베이스 세션.
+        user_id: JWT에서 추출한 인증 사용자 ID.
+
+    Returns:
+        period_amount, compare_amount, diff 를 포함한 성공 응답 dict.
+    """
+    data = service.get_compare_data(db, user_id, period, compare_period, category)
+    return {"success": True, "data": data, "message": "비교 결과입니다."}
