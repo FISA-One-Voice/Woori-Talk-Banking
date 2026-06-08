@@ -16,8 +16,8 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
   // TypeScript 타입 서명은 Blob을 요구하므로 unknown을 경유해 캐스팅합니다.
   formData.append('audio', {
     uri: audioUri,
-    type: 'audio/wav',
-    name: 'recording.wav',
+    type: 'audio/m4a',
+    name: 'recording.m4a',
   } as unknown as Blob);
 
   const { data } = await apiClient.post<ApiResponse<VoiceResponseData>>(
@@ -29,52 +29,18 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
     },
   );
 
-  if (__DEV__) {
-    console.log('[Voice] 응답 success:', data.success, '| code:', data.code ?? '-');
-  }
-
-  // success: false + data present → AppError with TTS audio; forward to handleResponse
-  if (!data.success) {
-    if (__DEV__) console.log('[Voice] 에러 응답:', data.code, data.message);
-    if (data.data) return data.data;
+  if (!data.success || !data.data) {
     throw new Error(data.code ?? 'VOICE_PROCESSING_ERROR');
-  }
-
-  if (!data.data) {
-    if (__DEV__) console.log('[Voice] data 없음');
-    throw new Error('VOICE_PROCESSING_ERROR');
   }
 
   if (__DEV__) {
     console.log('[STT]', data.data.transcript ?? '(인식 결과 없음)');
-    console.log('[Agent]', {
-      navigate_to: data.data.navigate_to,
-      pending_action: data.data.pending_action,
-      slots: data.data.collected_slots,
-      awaiting_confirmation: data.data.awaiting_confirmation,
-      awaiting_asv_audio: data.data.awaiting_asv_audio,
-      awaiting_transfer_clarification: data.data.awaiting_transfer_clarification ?? false,
-    });
+    console.log(
+      '[Agent] navigate_to=%s slots=%o',
+      data.data.navigate_to,
+      data.data.collected_slots,
+    );
   }
 
   return data.data;
-}
-
-/**
- * 텍스트를 Azure TTS로 변환해 base64 MP3를 반환합니다.
- *
- * @param text  - 읽어줄 텍스트
- * @param speed - 재생 속도 (기본 1.0)
- * @returns base64 인코딩된 MP3 문자열
- * @throws Error('TTS_SERVICE_UNAVAILABLE') — Azure TTS 장애 시
- */
-export async function fetchTtsAudio(text: string, speed = 1.0): Promise<string> {
-  const { data } = await apiClient.post<ApiResponse<{ audio_base64: string }>>('/api/voice/tts', {
-    text,
-    speed,
-  });
-  if (!data.success || !data.data?.audio_base64) {
-    throw new Error('TTS_SERVICE_UNAVAILABLE');
-  }
-  return data.data.audio_base64;
 }

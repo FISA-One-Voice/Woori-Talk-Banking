@@ -220,7 +220,7 @@ export default function RootLayout() {
 
       if (data.audio && !isFailedNav) {
         await stopAllTts();
-        playBase64Audio(data.audio).catch(() => undefined);
+        await playBase64Audio(data.audio).catch(() => undefined);
       }
 
       if (needsYesNoVoicePrompt(data) && !data.audio) {
@@ -250,9 +250,6 @@ export default function RootLayout() {
   return (
     <Pressable
       style={styles.root}
-      onLongPress={hasVoiceRegistered ? handleLongPress : undefined}
-      onPressOut={hasVoiceRegistered ? handlePressOut : undefined}
-      delayLongPress={500}
       onTouchStart={hasVoiceRegistered ? handleTouchStart : undefined}
       onTouchMove={hasVoiceRegistered ? handleTouchMove : undefined}
       onTouchEnd={hasVoiceRegistered ? handleTouchEnd : undefined}

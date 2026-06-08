@@ -8,9 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import axios from 'axios';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
-import { getTtsMessage } from '@/utils/errorHandler';
+import { extractApiErrorMessage } from '@/utils/errorHandler';
 import { fetchExpenseSummary, fetchTransactionHistory, CategoryItem, TransactionItem } from '@/services/assetService';
 import { speakText, stopAllTts } from '@/utils/ttsManager';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
@@ -76,10 +77,10 @@ export default function HistoryScreen() {
     setLoading(true);
     fetchTransactionHistory(days)
       .then(setTransactions)
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         // 거래 내역 없음(404)은 정상 케이스 — 빈 목록으로 처리
-        if (err?.response?.status !== 404) {
-          Alert.alert('안내', getTtsMessage(err.message));
+        if (!axios.isAxiosError(err) || err.response?.status !== 404) {
+          Alert.alert('안내', extractApiErrorMessage(err));
         }
         setTransactions([]);
       })

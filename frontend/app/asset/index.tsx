@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
-import { getTtsMessage } from '@/utils/errorHandler';
+import { extractApiErrorMessage } from '@/utils/errorHandler';
 import { fetchAssetSummary, AccountItem } from '@/services/assetService';
 import { speakText, stopAllTts } from '@/utils/ttsManager';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
@@ -58,7 +58,7 @@ export default function AssetScreen() {
           speakText(tts_text);
         }
       })
-      .catch((err: Error) => Alert.alert('안내', getTtsMessage(err.message)))
+      .catch((err: unknown) => Alert.alert('안내', extractApiErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
 

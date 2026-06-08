@@ -1,7 +1,5 @@
 import { getTtsRate, registerSound } from '@/utils/ttsManager';
 import { Audio } from 'expo-av';
-import React from 'react';
-
 /**
  * base64 MP3를 재생하고 재생 완료 시 resolve 합니다.
  *
@@ -11,7 +9,7 @@ import React from 'react';
  */
 export async function playBase64Audio(
   base64: string,
-  soundRef?: React.MutableRefObject<Audio.Sound | null>,
+  soundRef?: { current: Audio.Sound | null },
 ): Promise<void> {
   const { sound } = await Audio.Sound.createAsync({
     uri: `data:audio/mpeg;base64,${base64}`,
