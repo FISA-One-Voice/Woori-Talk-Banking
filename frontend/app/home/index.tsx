@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppScreenHeader, TabBar } from '@/components/layout';
 import { VoiceQuickMenuGrid } from '@/components/display';
 import { TtsBubble } from '@/components/feedback';
@@ -34,10 +33,9 @@ function HomeMainContent() {
 
 export default function HomeScreen() {
   const [tab, setTab] = useState<HomeTab>('home');
-  const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.root}>
       <View style={styles.body}>
         <ScrollView
           style={styles.scroll}
@@ -54,7 +52,7 @@ export default function HomeScreen() {
         </ScrollView>
         <TabBar activeTab={tab} onTabChange={setTab} />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
