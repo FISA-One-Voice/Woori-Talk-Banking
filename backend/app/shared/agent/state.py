@@ -49,6 +49,12 @@ class VoiceState(TypedDict):
         analytics_period: AssetAgent용 분석 기간 힌트.
             ("이번달" | "지난달" | "3개월") AssetAgent가 설정하며,
             후속 발화에서 기간을 재지정하지 않으면 이 값이 유지된다.
+        pending_consent_tts_text: 이체 확인 단계 TTS 텍스트 임시 보관.
+            awaiting_confirmation=True 응답 생성 시 저장.
+            ASV 성공 후 None으로 초기화. (voice-consent-s3)
+        pending_consent_audio_b64: 사용자 "네" 동의 음성 base64 임시 보관.
+            awaiting_confirmation=True 상태에서 사용자 응답 수신 시 저장.
+            ASV 성공 후 None으로 초기화. (voice-consent-s3)
     """
 
     messages: Annotated[list, add_messages]
@@ -69,3 +75,5 @@ class VoiceState(TypedDict):
     agent_domain: str | None
     analytics_period: str | None
     remaining_steps: int
+    pending_consent_tts_text: str | None
+    pending_consent_audio_b64: str | None

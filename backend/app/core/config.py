@@ -127,6 +127,15 @@ class Settings(BaseSettings):
     # ── 한국은행 API 키 ─────────────────────
     BOK_ECOS_API_KEY: str = ""
 
+    # ── AWS S3 동의 음성 저장 (voice-consent-s3) ──────────────────────────────────
+    # AWS_S3_BUCKET: 업로드 대상 버킷. 빈 문자열이면 업로드를 스킵한다.
+    # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY: 비어있으면 EC2 IAM Role 자동 인식.
+    # AWS_REGION: 버킷이 위치한 리전 (기본: 서울).
+    AWS_S3_BUCKET: str = ""
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_REGION: str = "ap-northeast-2"
+
     # ── LangSmith 트레이싱 (개발 전용 — 프로덕션에서는 미설정) ────────────────────────
     # .env에 LANGSMITH_* 형식으로 설정한다.
     # LangChain/LangGraph는 os.environ을 직접 읽으므로 model_post_init에서 반영한다.
