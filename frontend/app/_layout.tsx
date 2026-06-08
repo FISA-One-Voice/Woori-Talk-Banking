@@ -108,24 +108,50 @@ export default function RootLayout() {
   }, [segments]);
 
   const touchPts = useRef<Array<{ x: number; y: number }>>([]);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isLongPressActiveRef = useRef(false);
 
   function handleTouchStart(e: GestureResponderEvent): void {
-    touchPts.current = [
-      {
-        x: e.nativeEvent.locationX,
-        y: e.nativeEvent.locationY,
-      },
-    ];
+    const x = e.nativeEvent.locationX;
+    const y = e.nativeEvent.locationY;
+    touchPts.current = [{ x, y }];
+
+    longPressTouchStartRef.current = { x, y };
+    isLongPressActiveRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null;
+      isLongPressActiveRef.current = true;
+      handleLongPress();
+    }, 500);
   }
 
   function handleTouchMove(e: GestureResponderEvent): void {
-    touchPts.current.push({
-      x: e.nativeEvent.locationX,
-      y: e.nativeEvent.locationY,
-    });
+    const x = e.nativeEvent.locationX;
+    const y = e.nativeEvent.locationY;
+    touchPts.current.push({ x, y });
+
+    if (longPressTimerRef.current && longPressTouchStartRef.current) {
+      const dx = Math.abs(x - longPressTouchStartRef.current.x);
+      const dy = Math.abs(y - longPressTouchStartRef.current.y);
+      if (dx > 15 || dy > 15) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
   }
 
   function handleTouchEnd(): void {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    if (isLongPressActiveRef.current) {
+      isLongPressActiveRef.current = false;
+      handlePressOut();
+    }
+
     const pts = touchPts.current;
     touchPts.current = [];
     if (isVGesture(pts)) {
@@ -225,9 +251,6 @@ export default function RootLayout() {
   return (
     <Pressable
       style={styles.root}
-      onLongPress={hasVoiceRegistered ? handleLongPress : undefined}
-      onPressOut={hasVoiceRegistered ? handlePressOut : undefined}
-      delayLongPress={500}
       onTouchStart={hasVoiceRegistered ? handleTouchStart : undefined}
       onTouchMove={hasVoiceRegistered ? handleTouchMove : undefined}
       onTouchEnd={hasVoiceRegistered ? handleTouchEnd : undefined}
