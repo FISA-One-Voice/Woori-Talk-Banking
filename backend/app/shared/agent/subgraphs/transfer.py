@@ -124,8 +124,7 @@ def validate_transfer_delta(delta: dict) -> dict:
             code="AGENT_CONTRACT_VIOLATION",
             message="TransferAgent가 허용되지 않은 상태 필드를 반환했습니다.",
             status_code=500,
-            # user_message="이체 처리 중 일시적인 오류가 발생했습니다.",
-            user_message="허용되지않은 상태필드 반환 오류",
+            user_message="이체 처리 중 일시적인 오류가 발생했습니다.",
         )
 
     if "navigate_to" in delta and delta["navigate_to"] not in TRANSFER_NAVIGATE_VALUES:
@@ -133,8 +132,7 @@ def validate_transfer_delta(delta: dict) -> dict:
             code="AGENT_CONTRACT_VIOLATION",
             message="TransferAgent가 허용되지 않은 화면 이동 값을 반환했습니다.",
             status_code=500,
-            user_message="화면이동 오류",
-            # user_message="이체 처리 중 일시적인 오류가 발생했습니다.",
+            user_message="이체 처리 중 일시적인 오류가 발생했습니다.",
         )
     return delta
 
@@ -974,8 +972,7 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
             code="TRANSFER_TOOL_FAILED",
             message="TransferAgent tool 호출에 실패했습니다.",
             status_code=500,
-            user_message="tool 오류입니다",
-            # user_message="이체 처리 중 일시적인 오류가 발생했습니다.",
+            user_message="이체 처리 중 일시적인 오류가 발생했습니다.",
         ) from exc
 
     if pending == "transfer":
