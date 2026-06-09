@@ -20,15 +20,6 @@ logger = logging.getLogger(__name__)
 from app.core.config import settings
 from app.shared.agent.ROUTING_CONSTANTS import ASSET_NAVIGATE_VALUES
 from app.shared.agent.state import VoiceState
-from app.shared.agent.tools.asset import (
-    query_balance,
-    query_category,
-    query_compare,
-    query_history,
-    query_spending_report,
-    query_top_category,
-    query_transaction_list,
-)
 
 ASSET_DOMAIN_ACTIONS: frozenset[str] = frozenset({
     "balance", "history", "category", "top_category",
@@ -114,7 +105,6 @@ def _fast_classify(user_text: str) -> str | None:
     return None
 
 
-
 def _has_period_keyword(user_text: str) -> bool:
     """발화에 기간 키워드가 명시되어 있는지 확인."""
     if any(kw in user_text for kw in ("이번달", "이번 달", "이달", "지난달", "저번달", "전달", "지난 달", "저번 달")):
@@ -141,138 +131,136 @@ def _fast_period(user_text: str) -> str:
     return "이번달"
 
 
-async def asset_node(state: VoiceState) -> dict:
-    """발화를 분류하고 해당 tool을 실행해 응답을 반환합니다.
+def build_asset_graph(tools: list):
+    """AssetAgent 서브그래프를 빌드한다. tools는 외부(supervisor)에서 주입된다."""
+    tool_registry: dict[str, object] = {tool.name: tool for tool in tools}
 
-    query + execute를 단일 노드로 처리해 VoiceState 임시 필드 오염을 방지합니다.
+    async def asset_node(state: VoiceState) -> dict:
+        """발화를 분류하고 해당 tool을 실행해 응답을 반환합니다.
 
-    Args:
-        state: VoiceState. messages, user_id, analytics_period을 읽습니다.
+        query + execute를 단일 노드로 처리해 VoiceState 임시 필드 오염을 방지합니다.
 
-    Returns:
-        messages, navigate_to, analytics_period delta dict.
-    """
-    user_text = _last_user_text(state["messages"])
-    user_id = state["user_id"]
-    prev_period = state.get("analytics_period") or "이번달"
+        Args:
+            state: VoiceState. messages, user_id, analytics_period을 읽습니다.
 
-    # ── 1. action 결정 (패스트패스 우선) ────────────────────────────────────────
-    prev_slots = state.get("collected_slots") or {}
-    pending_action = prev_slots.get("action") if isinstance(prev_slots, dict) else None
+        Returns:
+            messages, navigate_to, analytics_period delta dict.
+        """
+        user_text = _last_user_text(state["messages"])
+        user_id = state["user_id"]
+        prev_period = state.get("analytics_period") or "이번달"
 
-    compare_period: str | None = None
+        # ── 1. action 결정 (패스트패스 우선) ────────────────────────────────────────
+        prev_slots = state.get("collected_slots") or {}
+        pending_action = prev_slots.get("action") if isinstance(prev_slots, dict) else None
 
-    fast = _fast_classify(user_text)
-    if fast == "balance":
-        action, period, category, filter_type = "balance", None, None, None
-    elif fast is not None:
-        action = fast
-        period = _fast_period(user_text)
-        category, filter_type = None, None
-    elif pending_action and pending_action != "balance" and _has_period_keyword(user_text) and not _fast_classify(user_text):
-        # 직전 되묻기("어느 기간?") 이후 기간만 답한 경우 — 이전 action 이어받기
-        action = pending_action
-        period = _fast_period(user_text)
-        category = prev_slots.get("category")
-        filter_type = prev_slots.get("filter_type")
-        if action == "compare":
-            compare_period = prev_slots.get("compare_period") or "지난달"
-    else:
-        llm = _get_llm()
-        response = await llm.ainvoke([
-            {"role": "system", "content": _QUERY_SYSTEM_PROMPT},
-            {"role": "user", "content": user_text},
-        ])
-        parsed = _parse_llm_action(response.content)
-        action = parsed.get("action") or "balance"
-        period = parsed.get("period") or prev_period or "이번달"
-        category = parsed.get("category")
-        filter_type = parsed.get("filter_type")
-        if action == "compare":
-            compare_period = parsed.get("compare_period") or "지난달"
+        compare_period: str | None = None
 
-    # ── 2. service TTS 실행 ───────────────────────────────────────────────────────
-    # history 인데 발화에 기간 키워드가 없으면 → 되묻기 (DB 조회 없음)
-    if action == "history" and not _has_period_keyword(user_text):
-        navigate_to = "asset/history"
+        fast = _fast_classify(user_text)
+        if fast == "balance":
+            action, period, category, filter_type = "balance", None, None, None
+        elif fast is not None:
+            action = fast
+            period = _fast_period(user_text)
+            category, filter_type = None, None
+        elif pending_action and pending_action != "balance" and _has_period_keyword(user_text) and not _fast_classify(user_text):
+            # 직전 되묻기("어느 기간?") 이후 기간만 답한 경우 — 이전 action 이어받기
+            action = pending_action
+            period = _fast_period(user_text)
+            category = prev_slots.get("category")
+            filter_type = prev_slots.get("filter_type")
+            if action == "compare":
+                compare_period = prev_slots.get("compare_period") or "지난달"
+        else:
+            llm = _get_llm()
+            response = await llm.ainvoke([
+                {"role": "system", "content": _QUERY_SYSTEM_PROMPT},
+                {"role": "user", "content": user_text},
+            ])
+            parsed = _parse_llm_action(response.content)
+            action = parsed.get("action") or "balance"
+            period = parsed.get("period") or prev_period or "이번달"
+            category = parsed.get("category")
+            filter_type = parsed.get("filter_type")
+            if action == "compare":
+                compare_period = parsed.get("compare_period") or "지난달"
+
+        # ── 2. service TTS 실행 ───────────────────────────────────────────────────────
+        # history 인데 발화에 기간 키워드가 없으면 → 되묻기 (DB 조회 없음)
+        if action == "history" and not _has_period_keyword(user_text):
+            return {
+                "messages": [AIMessage(content="어느 기간을 알려드릴까요?")],
+                "navigate_to": "asset/history",
+                "analytics_period": None,
+                "collected_slots": {"action": "history"},
+            }
+
+        tts_result = "죄송합니다. 잠시 후 다시 시도해 주세요."
+
+        if action == "balance":
+            tts_result = tool_registry["query_balance"].invoke({"user_id": user_id})
+        elif action == "compare":
+            tts_result = tool_registry["query_compare"].invoke({
+                "user_id": user_id,
+                "period": period or "이번달",
+                "compare_period": compare_period or "지난달",
+                "category": category,
+            })
+        elif action == "spending_analysis":
+            tts_result = tool_registry["query_spending_report"].invoke({
+                "user_id": user_id,
+                "period": period or "이번달",
+            })
+        elif action == "category":
+            tts_result = tool_registry["query_category"].invoke({
+                "user_id": user_id,
+                "period": period or "이번달",
+                "category": category,
+            })
+        elif action == "top_category":
+            tts_result = tool_registry["query_top_category"].invoke({
+                "user_id": user_id,
+                "period": period or "이번달",
+            })
+        elif action == "transaction_list":
+            tts_result = tool_registry["query_transaction_list"].invoke({
+                "user_id": user_id,
+                "period": period or "이번달",
+            })
+        else:  # history
+            tts_result = tool_registry["query_history"].invoke({
+                "user_id": user_id,
+                "period": period or "이번달",
+                "filter_type": filter_type,
+            })
+
+        # ── 3. navigate_to 결정 ───────────────────────────────────────────────────────
+        navigate_to = _NAVIGATE_MAP.get(action, "asset")
+        # "asset/compare"는 ROUTING_CONSTANTS에 미등록 상태 — Dev-A가 ASSET_NAVIGATE_VALUES에 추가하면 아래 예외 조건 제거 가능
+        if navigate_to not in ASSET_NAVIGATE_VALUES and navigate_to != "asset/compare":
+            logger.error("AssetAgent navigate_to 계약 위반: %s", navigate_to)
+            navigate_to = "asset"
+
+        # 프론트가 period/action/category를 읽을 수 있도록 collected_slots에 담는다
+        asset_slots: dict = {"action": action}
+        if period:
+            asset_slots["period"] = period
+        if compare_period:
+            asset_slots["compare_period"] = compare_period
+        if category:
+            asset_slots["category"] = category
+        if filter_type:
+            asset_slots["filter_type"] = filter_type
+
         return {
-            "messages": [AIMessage(content="어느 기간을 알려드릴까요?")],
+            "messages": [AIMessage(content=tts_result)],
             "navigate_to": navigate_to,
-            "analytics_period": None,
-            "collected_slots": {"action": "history"},
+            "analytics_period": period if action != "balance" else None,
+            "collected_slots": asset_slots,
         }
 
-    tts_result = "죄송합니다. 잠시 후 다시 시도해 주세요."
-
-    if action == "balance":
-        tts_result = query_balance.invoke({"user_id": user_id})
-    elif action == "compare":
-        tts_result = query_compare.invoke({
-            "user_id": user_id,
-            "period": period or "이번달",
-            "compare_period": compare_period or "지난달",
-            "category": category,
-        })
-    elif action == "spending_analysis":
-        tts_result = query_spending_report.invoke({
-            "user_id": user_id,
-            "period": period or "이번달",
-        })
-    elif action == "category":
-        tts_result = query_category.invoke({
-            "user_id": user_id,
-            "period": period or "이번달",
-            "category": category,
-        })
-    elif action == "top_category":
-        tts_result = query_top_category.invoke({
-            "user_id": user_id,
-            "period": period or "이번달",
-        })
-    elif action == "transaction_list":
-        tts_result = query_transaction_list.invoke({
-            "user_id": user_id,
-            "period": period or "이번달",
-        })
-    else:  # history
-        tts_result = query_history.invoke({
-            "user_id": user_id,
-            "period": period or "이번달",
-            "filter_type": filter_type,
-        })
-
-    # ── 3. navigate_to 결정 ───────────────────────────────────────────────────────
-    navigate_to = _NAVIGATE_MAP.get(action, "asset")
-    # "asset/compare"는 ROUTING_CONSTANTS에 미등록 상태 — Dev-A가 ASSET_NAVIGATE_VALUES에 추가하면 아래 예외 조건 제거 가능
-    if navigate_to not in ASSET_NAVIGATE_VALUES and navigate_to != "asset/compare":
-        logger.error("AssetAgent navigate_to 계약 위반: %s", navigate_to)
-        navigate_to = "asset"
-
-    # 프론트가 period/action/category를 읽을 수 있도록 collected_slots에 담는다
-    asset_slots: dict = {"action": action}
-    if period:
-        asset_slots["period"] = period
-    if compare_period:
-        asset_slots["compare_period"] = compare_period
-    if category:
-        asset_slots["category"] = category
-    if filter_type:
-        asset_slots["filter_type"] = filter_type
-
-    return {
-        "messages": [AIMessage(content=tts_result)],
-        "navigate_to": navigate_to,
-        "analytics_period": period if action != "balance" else None,
-        "collected_slots": asset_slots,
-    }
-
-
-def _build_asset_graph() -> StateGraph:
     builder = StateGraph(VoiceState)
     builder.add_node("asset_node", asset_node)
     builder.set_entry_point("asset_node")
     builder.add_edge("asset_node", END)
     return builder.compile(checkpointer=None)
-
-
-asset_graph = _build_asset_graph()
