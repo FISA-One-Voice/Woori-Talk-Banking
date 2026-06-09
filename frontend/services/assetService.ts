@@ -37,9 +37,9 @@ export interface TransactionItem {
   tts_text: string;
 }
 
-export async function fetchTransactionHistory(days: number): Promise<TransactionItem[]> {
+export async function fetchTransactionHistory(period: string): Promise<TransactionItem[]> {
   const res = await apiClient.get<ApiResponse<{ transactions: TransactionItem[] }>>(
-    `/api/asset/history?days=${days}`
+    `/api/asset/history?period=${encodeURIComponent(period)}`
   );
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.code ?? 'INTERNAL_ERROR');
@@ -58,10 +58,33 @@ export interface ExpenseSummary {
   top_categories: CategoryItem[];
 }
 
-export async function fetchExpenseSummary(days = 30): Promise<ExpenseSummary> {
+export async function fetchExpenseSummary(period = '이번달'): Promise<ExpenseSummary> {
   const res = await apiClient.get<ApiResponse<ExpenseSummary>>(
-    `/api/asset/expense-summary?days=${days}`
+    `/api/asset/expense-summary?period=${encodeURIComponent(period)}`
   );
+  if (!res.data.success || !res.data.data) {
+    throw new Error(res.data.code ?? 'INTERNAL_ERROR');
+  }
+  return res.data.data;
+}
+
+export interface CompareResult {
+  period: string;
+  compare_period: string;
+  category: string | null;
+  period_amount: number;
+  compare_amount: number;
+  diff: number;
+}
+
+export async function fetchExpenseCompare(
+  period = '이번달',
+  comparePeriod = '지난달',
+  category?: string,
+): Promise<CompareResult> {
+  const params = new URLSearchParams({ period, compare_period: comparePeriod });
+  if (category) params.append('category', category);
+  const res = await apiClient.get<ApiResponse<CompareResult>>(`/api/asset/compare?${params}`);
   if (!res.data.success || !res.data.data) {
     throw new Error(res.data.code ?? 'INTERNAL_ERROR');
   }

@@ -43,7 +43,7 @@ class User(Base):
     )
     # 전맹 / 저시력 / 후천성 전맹 중 하나
     disability_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    tts_speed: Mapped[float] = mapped_column(Float, default=1.7, nullable=False)
+    tts_speed: Mapped[float] = mapped_column(Float, default=1.7, server_default="1.7", nullable=False)
     pin_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     # 로그인 후 음성을 등록할 수 있으므로 nullable=True 로 변경
     embedding_vector: Mapped[list | None] = mapped_column(Vector(192), nullable=True)

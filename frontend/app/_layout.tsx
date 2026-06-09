@@ -220,15 +220,15 @@ export default function RootLayout() {
 
       if (data.audio && !isFailedNav) {
         await stopAllTts();
-        await playBase64Audio(data.audio).catch(() => undefined);
-      }
-
-      if (needsYesNoVoicePrompt(data) && !data.audio) {
-        speakText(YES_NO_CONFIRM_INSTRUCTION);
+        playBase64Audio(data.audio).catch(() => undefined); // 재생 시작, await 안 함
       }
 
       if (data.navigate_to && !isCompleteNav && !isAutoCompleteNav && !isFailedNav) {
         navigateFromAgent(router, data.navigate_to, currentPathRef);
+      }
+
+      if (needsYesNoVoicePrompt(data) && !data.audio) {
+        speakText(YES_NO_CONFIRM_INSTRUCTION);
       }
     },
     [router],

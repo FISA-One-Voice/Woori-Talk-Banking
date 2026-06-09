@@ -23,4 +23,4 @@ class JwtTokenResponse(BaseModel):
     refresh_token: Optional[str] = Field(default=None, alias="refreshToken")
     user_id: str = Field(alias="userId")
     has_voice_registered: bool = Field(default=False, alias="hasVoiceRegistered")
-    tts_speed: float = Field(default=1.0, alias="ttsSpeed")
+    tts_speed: float = Field(default=1.7, alias="ttsSpeed")

@@ -18,34 +18,35 @@ import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 
 type Step = 'slot' | 'result' | 'history' | 'error';
 
-function periodToDays(period: string): number {
-  if (period === '이번달') return 30;
-  if (period === '지난달') return 60;
-  if (period === '최근 7일' || period === '최근7일') return 7;
-  return 30;
-}
-
 function normalizePeriod(period: string): string {
   if (period === '최근7일') return '최근 7일';
   return period;
 }
+
 
 export default function HistoryScreen() {
   const router = useRouter();
   const { type, period: rawInitialPeriod } = useLocalSearchParams<{ type: string; period: string }>();
   const initialPeriod = rawInitialPeriod ? normalizePeriod(rawInitialPeriod) : '';
 
-  // 음성 명령으로 진입한 경우 슬롯에서 period 추출
+  // type URL 파라미터가 명시된 경우 = 수동(터치) 진입 → voiceStore 무시
+  const isManualNavigation = type === 'expense' || type === 'history';
+
+  // 초기화용 (mount 시 1회)
   const lastResponse = useVoiceResponseStore.getState().lastResponse;
   const voiceSlots = lastResponse?.collected_slots as Record<string, string> | undefined;
-  const voicePeriod = voiceSlots?.period ? normalizePeriod(voiceSlots.period) : '';
-  const isVoiceNavigation = !!lastResponse?.audio &&
+  const voicePeriod = (!isManualNavigation && voiceSlots?.period) ? normalizePeriod(voiceSlots.period) : '';
+  const voiceAction = (!isManualNavigation && voiceSlots?.action) ? voiceSlots.action : '';
+  const isVoiceNavigation = !isManualNavigation && !!lastResponse?.audio &&
     (lastResponse?.navigate_to === 'asset/history' || lastResponse?.navigate_to?.startsWith('asset/history'));
 
   const resolvedPeriod = initialPeriod || (isVoiceNavigation ? voicePeriod : '');
 
+  const isTransactionList =
+    type === 'history' || (isVoiceNavigation && voiceAction === 'transaction_list');
+
   const [step, setStep] = useState<Step>(
-    type === 'history' ? 'history' : (resolvedPeriod ? 'result' : 'slot')
+    isTransactionList ? 'history' : (resolvedPeriod ? 'result' : 'slot')
   );
   const [period, setPeriod] = useState(resolvedPeriod || '이번달');
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
@@ -54,6 +55,9 @@ export default function HistoryScreen() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const announcedRef = useRef(false);
   const pressInTimeRef = useRef<number>(0);
+  // 같은 화면에서 새 음성 명령 처리 — navigate_to 중복 차단으로 재마운트 안 될 때 대응
+  const liveLastResponse = useVoiceResponseStore((state) => state.lastResponse);
+  const lastAudioRef = useRef<string | undefined>(lastResponse?.audio);
   const [resultAnnounceText, setResultAnnounceText] = useState('');
   const [historyAnnounceText, setHistoryAnnounceText] = useState('');
 
@@ -73,9 +77,9 @@ export default function HistoryScreen() {
     return `최근 거래내역 ${txs.length}건입니다. ` + txText;
   };
 
-  const fetchHistory = async (days: number) => {
+  const fetchHistory = async (p: string) => {
     setLoading(true);
-    fetchTransactionHistory(days)
+    fetchTransactionHistory(p)
       .then(setTransactions)
       .catch((err: unknown) => {
         // 거래 내역 없음(404)은 정상 케이스 — 빈 목록으로 처리
@@ -91,20 +95,51 @@ export default function HistoryScreen() {
   useEffect(() => {
     const activePeriod = initialPeriod || (isVoiceNavigation ? voicePeriod : '');
     if (!activePeriod) return;
-    const days = periodToDays(activePeriod);
     announcedRef.current = false;
-    fetchHistory(days);
+    fetchHistory(activePeriod);
     setCategoriesLoading(true);
-    fetchExpenseSummary(days)
+    fetchExpenseSummary(activePeriod)
       .then((s) => setTopCategories(s.top_categories))
       .catch(() => setTopCategories([]))
       .finally(() => setCategoriesLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 같은 화면에서 새 음성 명령이 왔을 때 step/period 갱신
+  useEffect(() => {
+    if (!liveLastResponse?.audio) return;
+    if (liveLastResponse.navigate_to !== 'asset/history') return;
+    if (isManualNavigation) return;
+    if (liveLastResponse.audio === lastAudioRef.current) return;
+    lastAudioRef.current = liveLastResponse.audio;
+
+    const slots = liveLastResponse.collected_slots as Record<string, string> | undefined;
+    const newPeriod = slots?.period ? normalizePeriod(slots.period) : '';
+    const newAction = slots?.action ?? '';
+    announcedRef.current = false;
+
+    if (newAction === 'transaction_list') {
+      const p = newPeriod || '이번달';
+      setPeriod(p);
+      setStep('history');
+      fetchHistory(p);
+    } else if (newPeriod) {
+      setPeriod(newPeriod);
+      setStep('result');
+      fetchHistory(newPeriod);
+      setCategoriesLoading(true);
+      fetchExpenseSummary(newPeriod)
+        .then((s) => setTopCategories(s.top_categories))
+        .catch(() => setTopCategories([]))
+        .finally(() => setCategoriesLoading(false));
+    } else {
+      setStep('slot');
+    }
+  }, [liveLastResponse]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 화면 진입 시 데이터 로드 (자동 TTS 제거 — 에이전트 TTS만 재생)
   useEffect(() => {
     if (step === 'history') {
-      fetchHistory(30);
+      fetchHistory(period);
     }
   }, [step]);
 
@@ -140,7 +175,9 @@ export default function HistoryScreen() {
               <Text style={styles.backIcon}>←</Text>
             </TouchableOpacity>
             <Text style={styles.screenTitle}>지출·수입</Text>
-            <View style={styles.headerRight} />
+            <TouchableOpacity onPress={() => router.push('/report')} style={styles.analysisBtn}>
+              <Text style={styles.analysisBtnText}>지출 분석</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.ttsBubble}>
@@ -163,9 +200,9 @@ export default function HistoryScreen() {
                 stopAllTts();
                 setPeriod(p);
                 announcedRef.current = false;
-                fetchHistory(periodToDays(p));
+                fetchHistory(p);
                 setCategoriesLoading(true);
-                fetchExpenseSummary(periodToDays(p))
+                fetchExpenseSummary(p)
                   .then((s) => setTopCategories(s.top_categories))
                   .catch(() => setTopCategories([]))
                   .finally(() => setCategoriesLoading(false));
@@ -177,6 +214,7 @@ export default function HistoryScreen() {
               </Text>
             </TouchableOpacity>
           ))}
+
         </View>
       </SafeAreaView>
     );
@@ -191,7 +229,9 @@ export default function HistoryScreen() {
               <Text style={styles.backIcon}>←</Text>
             </TouchableOpacity>
             <Text style={styles.screenTitle}>지출·수입</Text>
-            <View style={styles.headerRight} />
+            <TouchableOpacity onPress={() => router.push('/report')} style={styles.analysisBtn}>
+              <Text style={styles.analysisBtnText}>지출 분석</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -250,7 +290,9 @@ export default function HistoryScreen() {
               <Text style={styles.backIcon}>←</Text>
             </TouchableOpacity>
             <Text style={styles.screenTitle}>거래내역</Text>
-            <View style={styles.headerRight} />
+            <TouchableOpacity onPress={() => router.push('/report')} style={styles.analysisBtn}>
+              <Text style={styles.analysisBtnText}>지출 분석</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -326,6 +368,8 @@ const styles = StyleSheet.create({
   backBtn: { width: 40 },
   backIcon: { fontSize: FONT_SIZES.button, color: COLORS.textMain },
   headerRight: { width: 40 },
+  analysisBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: COLORS.yellowBg, borderWidth: 1, borderColor: COLORS.highlightYellow },
+  analysisBtnText: { fontSize: FONT_SIZES.caption, color: COLORS.highlightYellow, fontWeight: 'bold' },
   screenTitle: {
     fontSize: FONT_SIZES.button, color: COLORS.textMain,
     fontWeight: 'bold', textAlign: 'center', flex: 1,

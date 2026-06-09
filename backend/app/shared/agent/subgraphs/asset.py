@@ -8,11 +8,14 @@
 """
 
 import json
+import logging
 import re
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -20,6 +23,7 @@ from app.core.exception import AppError
 from app.features.asset.service import (
     query_balance_tts,
     query_category_tts,
+    query_compare_tts,
     query_history_tts,
     query_top_category_tts,
     query_transaction_list_tts,
@@ -29,14 +33,9 @@ from app.shared.agent.state import VoiceState
 from app.shared.agent.tools.spending_analysis import get_monthly_spending_report
 
 ASSET_DOMAIN_ACTIONS: frozenset[str] = frozenset({
-    "balance", "history", "spending_analysis", "monthly_report",
+    "balance", "history", "category", "top_category",
+    "transaction_list", "spending_analysis", "compare",
 })
-
-_PERIOD_TO_DAYS: dict[str, int] = {
-    "이번달": 30,
-    "지난달": 60,
-    "3개월": 90,
-}
 
 _NAVIGATE_MAP: dict[str, str] = {
     "balance": "asset",
@@ -45,11 +44,14 @@ _NAVIGATE_MAP: dict[str, str] = {
     "top_category": "asset/history",
     "transaction_list": "asset/history",
     "spending_analysis": "report",
+    "compare": "report",
 }
 
 _BALANCE_KEYWORDS = frozenset({"잔액", "얼마 있", "돈 얼마", "통장"})
-_HISTORY_KEYWORDS = frozenset({"거래내역", "거래 내역", "내역", "내용", "소비 내역", "거래 내용"})
+_TRANSACTION_LIST_KEYWORDS = frozenset({"거래내역", "거래 내역", "거래 내용"})
+_HISTORY_KEYWORDS = frozenset({"소비 내역"})
 _ANALYSIS_KEYWORDS = frozenset({"분석", "리포트", "소비 분석", "지출 분석"})
+_COMPARE_KEYWORDS = frozenset({"비교", "vs", "대비", "차이"})
 
 _QUERY_SYSTEM_PROMPT = """너는 자산 조회 전문 에이전트야.
 사용자 발화를 보고 아래 중 하나를 결정해:
@@ -60,12 +62,14 @@ _QUERY_SYSTEM_PROMPT = """너는 자산 조회 전문 에이전트야.
 - top_category: 가장 많이 쓴 카테고리 ("어디에 제일 많이 썼어")
 - transaction_list: 거래 내역 목록 ("거래내역 보여줘", "최근 내역 알려줘")
 - spending_analysis: 지출 분석 리포트 ("지출 분석", "소비 분석", "리포트")
+- compare: 두 기간 지출 비교 ("이번달 vs 지난달", "지난달이랑 비교해줘", "이번달 식비 비교")
 
 다음 JSON만 반환해. 설명 없이:
-{"action": "<balance|history|category|top_category|transaction_list|spending_analysis>", "period": "<이번달|지난달|최근7일|null>", "category": "<카테고리명|null>", "filter_type": "<income|expense|both|null>"}
+{"action": "<balance|history|category|top_category|transaction_list|spending_analysis|compare>", "period": "<이번달|지난달|최근N일(예:최근3일)|N월(예:5월)|null>", "compare_period": "<이번달|지난달|최근N일|null>", "category": "<카테고리명|null>", "filter_type": "<income|expense|both|null>"}
 
-period가 발화에 없으면 "이번달"로 기본값 사용.
-category는 "식비", "교통", "쇼핑", "의료비", "문화생활" 중 언급된 것만 채워.
+period가 발화에 없으면 "이번달"로 기본값 사용. "최근 N일"→"최근N일", "N월달"→"N월" 형식(숫자 그대로)으로 반환해.
+compare_period는 action=compare일 때만 채워. 언급 없으면 "지난달"로 기본값.
+category는 "식비", "교통", "쇼핑", "의료비", "문화생활", "생활비", "가족", "기타", "수입" 중 언급된 것만 채워. 없으면 반드시 JSON null(따옴표 없음)로 반환해.
 filter_type은 action=history일 때만: income=수입만, expense=지출만, both=둘다."""
 
 
@@ -88,21 +92,73 @@ def _parse_llm_action(raw: str) -> dict[str, str | None]:
     match = re.search(r"\{.*\}", raw, re.DOTALL)
     if match:
         try:
-            return json.loads(match.group())
+            parsed = json.loads(match.group())
+            # LLM이 null 대신 문자열 "null"을 반환하는 경우 방어
+            for key in ("category", "filter_type", "period"):
+                if parsed.get(key) == "null":
+                    parsed[key] = None
+            return parsed
         except json.JSONDecodeError:
             pass
     return {"action": "balance", "period": "이번달", "category": None, "filter_type": None}
 
 
+_KNOWN_CATEGORIES = frozenset({"식비", "교통", "쇼핑", "의료비", "문화생활", "생활비", "가족", "기타"})
+
+
+def _fast_category(user_text: str) -> str | None:
+    """발화에서 카테고리 키워드 추출."""
+    for cat in _KNOWN_CATEGORIES:
+        if cat in user_text:
+            return cat
+    return None
+
+
 def _fast_classify(user_text: str) -> str | None:
     """키워드 패스트패스 — LLM 없이 action 결정. 불명확하면 None 반환."""
+    if any(kw in user_text for kw in _COMPARE_KEYWORDS):
+        return "compare"
     if any(kw in user_text for kw in _BALANCE_KEYWORDS):
         return "balance"
     if any(kw in user_text for kw in _ANALYSIS_KEYWORDS):
         return "spending_analysis"
+    if any(kw in user_text for kw in _TRANSACTION_LIST_KEYWORDS):
+        return "transaction_list"
     if any(kw in user_text for kw in _HISTORY_KEYWORDS):
         return "history"
     return None
+
+
+def _has_period_keyword(user_text: str) -> bool:
+    """발화에 기간 키워드가 명시되어 있는지 확인."""
+    if any(kw in user_text for kw in ("이번달", "이번 달", "이달", "지난달", "저번달", "전달", "지난 달", "저번 달")):
+        return True
+    if any(kw in user_text for kw in ("이번주", "이번 주", "지난주", "저번주", "전주", "지난 주")):
+        return True
+    if re.search(r'최근\s*\d+\s*일', user_text):
+        return True
+    if re.search(r'\d+\s*월', user_text):
+        return True
+    return False
+
+
+def _fast_period(user_text: str) -> str:
+    """발화에서 기간 키워드를 추출. 언급 없으면 "이번달" 기본값 사용."""
+    if any(kw in user_text for kw in ("지난달", "저번달", "전달", "지난 달", "저번 달")):
+        return "지난달"
+    if any(kw in user_text for kw in ("지난주", "저번주", "전주", "지난 주")):
+        return "지난주"
+    if any(kw in user_text for kw in ("이번주", "이번 주")):
+        return "이번주"
+    m = re.search(r'최근\s*(\d+)\s*일', user_text)
+    if m:
+        return f"최근{m.group(1)}일"
+    m = re.search(r'(\d+)\s*월', user_text)
+    if m:
+        return f"{m.group(1)}월"
+    if any(kw in user_text for kw in ("이번달", "이번 달", "이달")):
+        return "이번달"
+    return "이번달"
 
 
 async def asset_node(state: VoiceState) -> dict:
@@ -122,10 +178,19 @@ async def asset_node(state: VoiceState) -> dict:
 
     # ── 1. action 결정 (패스트패스 우선) ────────────────────────────────────────
     fast = _fast_classify(user_text)
+    compare_period: str | None = None
     if fast == "balance":
         action, period, category, filter_type = "balance", None, None, None
+    elif fast == "compare":
+        action = "compare"
+        period = _fast_period(user_text)
+        _pair = {"이번달": "지난달", "지난달": "이번달", "이번주": "지난주", "지난주": "이번주"}
+        compare_period = _pair.get(period, "지난달")
+        category, filter_type = _fast_category(user_text), None
     elif fast is not None:
-        action, period, category, filter_type = fast, prev_period, None, None
+        action = fast
+        period = _fast_period(user_text)
+        category, filter_type = None, None
     else:
         llm = _get_llm()
         response = await llm.ainvoke([
@@ -134,11 +199,22 @@ async def asset_node(state: VoiceState) -> dict:
         ])
         parsed = _parse_llm_action(response.content)
         action = parsed.get("action") or "balance"
-        period = parsed.get("period") or prev_period
+        period = parsed.get("period") or prev_period or "이번달"
+        compare_period = parsed.get("compare_period") or "지난달"
         category = parsed.get("category")
         filter_type = parsed.get("filter_type")
 
     # ── 2. service TTS 실행 ───────────────────────────────────────────────────────
+    # history 인데 발화에 기간 키워드가 없으면 → 되묻기 (DB 조회 없음)
+    if action == "history" and not _has_period_keyword(user_text):
+        navigate_to = "asset/history"
+        return {
+            "messages": [AIMessage(content="어느 기간을 알려드릴까요?")],
+            "navigate_to": navigate_to,
+            "analytics_period": None,
+            "collected_slots": {"action": "history"},
+        }
+
     db = next(get_db())
     try:
         if action == "balance":
@@ -146,6 +222,13 @@ async def asset_node(state: VoiceState) -> dict:
         elif action == "spending_analysis":
             tts_result = get_monthly_spending_report.invoke(
                 {"user_id": user_id, "period": period or "이번달"}
+            )
+        elif action == "compare":
+            tts_result = query_compare_tts(
+                db, user_id,
+                period or "이번달",
+                compare_period or "지난달",
+                category,
             )
         elif action == "category":
             tts_result = query_category_tts(db, user_id, period, category)
@@ -170,6 +253,8 @@ async def asset_node(state: VoiceState) -> dict:
     asset_slots: dict = {"action": action}
     if period:
         asset_slots["period"] = period
+    if compare_period and action == "compare":
+        asset_slots["compare_period"] = compare_period
     if category:
         asset_slots["category"] = category
     if filter_type:

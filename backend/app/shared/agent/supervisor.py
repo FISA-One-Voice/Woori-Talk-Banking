@@ -40,6 +40,11 @@ CANCEL_KEYWORDS: frozenset[str] = frozenset(
     }
 )
 
+ASSET_KEYWORDS: frozenset[str] = frozenset({
+    "잔액", "잔고", "내역", "거래내역", "지출", "소비", "자산", "분석", "리포트",
+    "카드값", "출금", "입금", "수입",
+})
+
 NAVIGATION_KEYWORDS: frozenset[str] = frozenset(
     {
         "홈으로",
@@ -134,9 +139,9 @@ async def _decide_domain(text: str, state: VoiceState) -> str:
     """
     active_session = _has_active_session(state)
 
-    # 1. (취소 OR 홈 이동) + 활성 세션 → cancel (세션 포기로 취소와 동일 처리)
-    is_exit = _is_cancel_utterance(text) or _is_navigation_utterance(text)
-    if is_exit and active_session:
+    # 1. 취소·홈 이동 키워드 → 세션 유무 관계없이 항상 cancel
+    #    plan §1: "취소는 active_session 여부와 관계없이 cancel_node가 처리한다"
+    if _is_cancel_utterance(text) or _is_navigation_utterance(text):
         return "cancel"
 
     # 2. 활성 세션 → transfer 유지 (pending_action / awaiting_* / execution_ready 포함)
@@ -147,23 +152,16 @@ async def _decide_domain(text: str, state: VoiceState) -> str:
     if state.get("agent_domain") == "asset" and not _is_domain_switch_utterance(text):
         return "asset"
 
-    # 4. 이체 키워드 패스트패스 — 명시적 이체 키워드가 있으면 즉시 "transfer"
-    #    슬롯(금액·수취인) 유무와 무관하게 라우팅한다.
-    #    슬롯 추출은 subgraph(intent_node)의 책임이므로 supervisor는 도메인만 결정한다.
+    # 5. 이체 키워드 패스트패스
     if is_plain_transfer_start(text):
         return "transfer"
 
-    # ── 계획: asset / rag fast-path (Phase 2 이후) ────────────────────────────
-    # asset: 잔액·잔고·내역 키워드 → LLM 없이 즉시 "asset"
-    #   예) kws = ("잔액", "잔고", "내역", "출금")
-    #       if any(kw in _normalize(text) for kw in kws): return "asset"
-    # rag  : 이벤트·금리·환율 키워드 → LLM 없이 즉시 "rag"
-    #   예) kws = ("이벤트", "금리", "환율", "영업시간")
-    #       if any(kw in _normalize(text) for kw in kws): return "rag"
-    # 주의: 키워드가 복합 문장 맥락에서 오분류될 수 있으므로 LLM 폴백 비율을 측정 후 도입.
-    # ─────────────────────────────────────────────────────────────────────────
+    # 6. asset 키워드 패스트패스 — LLM 없이 즉시 분류
+    normalized = text.replace(" ", "")
+    if any(kw in normalized for kw in ASSET_KEYWORDS):
+        return "asset"
 
-    # 5. gpt-4o-mini LLM 분류 (폴백: "unknown")
+    # 7. gpt-4o-mini LLM 분류 (폴백: "unknown")
     return await _llm_classify_domain(text)
 
 
@@ -186,13 +184,16 @@ async def supervisor_node(state: VoiceState) -> dict:
     if domain == "unknown":
         return {
             "agent_domain": None,
+            "navigate_to": None,  # 이전 턴 stale 값 초기화
             "messages": [
                 AIMessage(content="이해하지 못했습니다. 다시 한번 말씀해 주세요.")
             ],
         }
 
     # cancel / transfer / asset / rag → route_after_supervisor로 라우팅
-    return {"agent_domain": domain}
+    # navigate_to는 cancel_node/asset_node/rag_node에서 덮어쓴다.
+    # transfer → END(미구현)처럼 아무 노드도 실행되지 않는 경우를 위해 여기서 초기화.
+    return {"agent_domain": domain, "navigate_to": None}
 
 
 async def cancel_node(state: VoiceState) -> dict:
@@ -236,14 +237,13 @@ def route_after_supervisor(state: VoiceState) -> str:
     domain = state.get("agent_domain")
     if domain == "cancel":
         return "cancel_node"
-    # Phase 2: 서브그래프 노드 추가 후 아래 주석 해제
     # if domain == "transfer":
     #     return "transfer"
-    # if domain == "asset":
-    #     return "asset"
+    if domain == "asset":
+        return "asset"
     # if domain == "rag":
     #     return "rag"
-    return END  # navigate / unknown / transfer / asset / rag (Phase 1 임시)
+    return END
 
 
 # ── 그래프 빌드 ──────────────────────────────────────────────────────────────────
@@ -257,21 +257,21 @@ def build_supervisor():
 
     Phase 2: Dev-B/C/D 서브그래프 PR 머지 후 주석 해제.
     """
-    # Phase 2 서브그래프 import (Dev-B/C/D PR 머지 후 주석 해제)
+    # Phase 2 서브그래프 import
     # from app.shared.agent.subgraphs.transfer import transfer_graph
-    # from app.shared.agent.subgraphs.asset import asset_graph
+    from app.shared.agent.subgraphs.asset import asset_graph
     # from app.shared.agent.subgraphs.consultation import rag_graph
 
     builder = StateGraph(VoiceState)
     builder.add_node("supervisor_node", supervisor_node)
     builder.add_node("cancel_node", cancel_node)
 
-    # Phase 2 활성화 (subgraph import 해제 후 아래 6줄 주석 해제)
+    # Phase 2 활성화
     # builder.add_node("transfer", transfer_graph)
-    # builder.add_node("asset", asset_graph)
+    builder.add_node("asset", asset_graph)
     # builder.add_node("rag", rag_graph)
     # builder.add_edge("transfer", END)
-    # builder.add_edge("asset", END)
+    builder.add_edge("asset", END)
     # builder.add_edge("rag", END)
 
     builder.set_entry_point("supervisor_node")

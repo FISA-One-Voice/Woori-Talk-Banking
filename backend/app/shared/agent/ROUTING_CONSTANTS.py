@@ -35,6 +35,7 @@ TRANSFER_NAVIGATE_VALUES: frozenset[str | None] = frozenset({
 })
 
 ASSET_NAVIGATE_VALUES: frozenset[str | None] = frozenset({
+    # "asset", "asset/history" — Dev-C 추가 (잔액·거래내역 화면 이동용)
     "asset", "asset/history", "balance", "report", None,
 })
 

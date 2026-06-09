@@ -32,9 +32,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exception import ASVError
 from app.models.user import User
-from app.shared.agent import build_graph
+from app.shared.agent.supervisor import build_supervisor
 from app.shared.agent.slot_schema import SCREEN_MAP
-from app.shared.agent.tools import ALL_TOOLS
 from app.shared.agent.transfer_clarification import (
     is_clarification_no,
     is_home_request,
@@ -57,7 +56,7 @@ def _get_graph():
     """LangGraph 그래프 싱글턴을 반환한다. 최초 호출 시 build_graph()를 실행한다."""
     global _graph
     if _graph is None:
-        _graph = build_graph(ALL_TOOLS)
+        _graph = build_supervisor()
     return _graph
 
 
@@ -121,7 +120,7 @@ async def reset_voice_state(user_id: str) -> None:
     await graph.aupdate_state(
         config,
         _voice_state_reset_payload(),
-        as_node="intent_node",
+        as_node="supervisor_node",
     )
 
 
@@ -209,6 +208,7 @@ async def _handle_normal_flow(
         {
             "messages": [HumanMessage(content=transcript)],
             "user_id": user_id,
+            "navigate_to": None,  # 이전 턴 stale 값 초기화
         },
         config=config,
     )
@@ -400,7 +400,7 @@ async def _handle_asv_flow(
                 "awaiting_memo_decision": False,
                 "navigate_to": "home",
             },
-            as_node="intent_node",
+            as_node="supervisor_node",
         )
         tts_text = (
             "본인 확인에 세 번 실패하여 작업이 취소되었습니다. 홈 화면으로 이동합니다."
@@ -413,7 +413,7 @@ async def _handle_asv_flow(
         await graph.aupdate_state(
             config,
             {"asv_retry_count": new_retry},
-            as_node="intent_node",
+            as_node="supervisor_node",
         )
         tts_text = (
             f"본인 확인에 실패했습니다. {remaining}번 더 시도하실 수 있습니다. "
@@ -466,7 +466,7 @@ async def _proceed_after_asv_success(
             "execution_ready": True,
             "asv_retry_count": 0,
         },
-        as_node="intent_node",
+        as_node="supervisor_node",
     )
 
     # intent_node는 LLM을 호출하지만 execution_ready=True가 보존되어
