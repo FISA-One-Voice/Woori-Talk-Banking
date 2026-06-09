@@ -177,8 +177,7 @@ export default function RootLayout() {
 
       if (isFailedNav) {
         const mergedSlots = { ...prevSlots, ...(data.collected_slots ?? {}) };
-        const errorMessage =
-          (mergedSlots.transfer_error_message as string) ?? '';
+        const errorMessage = (mergedSlots.transfer_error_message as string) ?? '';
         transferStore.getState().setTxReceipt(null);
         transferStore.getState().setTransferFailure({
           message: errorMessage || FALLBACK_MESSAGE,
@@ -221,7 +220,7 @@ export default function RootLayout() {
 
       if (data.audio && !isFailedNav) {
         await stopAllTts();
-        await playBase64Audio(data.audio).catch(() => undefined);
+        playBase64Audio(data.audio).catch(() => undefined); // 음성과 함께 이동
       }
 
       if (needsYesNoVoicePrompt(data) && !data.audio) {

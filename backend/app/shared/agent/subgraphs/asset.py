@@ -8,6 +8,7 @@
 """
 
 import logging
+from datetime import datetime, timedelta, timezone
 
 from langchain_core.messages import AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -16,6 +17,8 @@ from langgraph.prebuilt import create_react_agent
 from app.core.config import settings
 from app.shared.agent.ROUTING_CONSTANTS import ASSET_NAVIGATE_VALUES
 from app.shared.agent.state import VoiceState
+
+KST = timezone(timedelta(hours=9))
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +35,7 @@ _NAVIGATE_MAP: dict[str, str] = {
 _ASSET_SYSTEM_PROMPT = """\
 당신은 자산 조회 전용 에이전트입니다.
 현재 사용자 ID: {user_id}
+오늘 날짜: {today}
 모든 tool 호출 시 반드시 user_id="{user_id}"를 전달하세요.
 
 [tool 선택 기준]
@@ -39,19 +43,24 @@ _ASSET_SYSTEM_PROMPT = """\
 - query_history          : 수입/지출 요약 ("이번달 지출 얼마야", "수입 얼마야")
 - query_category         : 카테고리별 지출 ("식비 얼마야", "교통비 알려줘")
 - query_top_category     : 최다 지출 카테고리 ("어디에 제일 많이 썼어")
-- query_transaction_list : 거래 내역 목록 ("거래내역 보여줘", "최근 내역")
+- query_transaction_list : 거래 내역 목록 ("거래내역 보여줘", "최근 내역", "오늘 거래내역", "N월 M일 거래내역")
 - query_spending_report  : 지출 분석 리포트 ("지출 분석", "소비 분석", "리포트")
-- query_compare          : 두 기간 지출 비교 ("이번달 지난달 비교", "이번주 지난주 대비")
+- query_compare          : 두 기간 지출 비교 ("이번달 지난달 비교", "이번주 지난주 대비", "오늘 어제 비교")
 
 [기간 처리 규칙]
 - query_history 요청인데 기간이 명시되지 않았으면:
   tool을 호출하지 말고 "어느 기간을 알려드릴까요?" 라고만 답하세요.
 - 그 외 모든 tool은 기간이 없으면 "이번달"을 기본값으로 사용해 tool을 호출하세요.
+- "오늘" 거래내역 → period="오늘"
+- "어제" 거래내역/지출 → period="어제"
+- "오늘 어제 비교" → query_compare(period="오늘", compare_period="어제")
+- "N월 M일" 특정 날짜 거래내역 → date_range="YYYY-MM-DD" (연도는 오늘 날짜 기준으로 추론, 미래면 전년도)
+  예: 오늘이 2026-06-09이고 "6월 4일" → date_range="2026-06-04"
+  예: 오늘이 2026-01-10이고 "12월 25일" → date_range="2025-12-25"
 
 [응답 규칙]
 - tool 반환값을 그대로 사용자에게 전달하세요. 내용 추가·요약·수정 금지.
 - 마크다운·이모지 사용 금지. 음성(TTS)으로 전달됩니다.
-- 숫자는 한국어로 읽히도록 작성하세요. (예: "오십만 원")
 """
 
 
@@ -77,7 +86,8 @@ def build_asset_graph(tools: list):
         user_id = state["user_id"]
 
         # user_id를 시스템 프롬프트에 주입 — create_react_agent prompt는 정적이므로 여기서 prepend
-        system_msg = SystemMessage(content=_ASSET_SYSTEM_PROMPT.format(user_id=user_id))
+        today_str = datetime.now(KST).strftime("%Y-%m-%d")
+        system_msg = SystemMessage(content=_ASSET_SYSTEM_PROMPT.format(user_id=user_id, today=today_str))
         result = await agent.ainvoke({
             **state,
             "messages": [system_msg, *state["messages"]],
@@ -104,6 +114,7 @@ def build_asset_graph(tools: list):
             if tool_args.get("compare_period"): slots["compare_period"] = tool_args["compare_period"]
             if tool_args.get("category"):       slots["category"] = tool_args["category"]
             if tool_args.get("filter_type"):    slots["filter_type"] = tool_args["filter_type"]
+            if tool_args.get("date_range"):     slots["date_range"] = tool_args["date_range"]
         else:
             # 되묻기: 이전 collected_slots 유지 (다음 턴에서 action 기억)
             slots = state.get("collected_slots") or {}

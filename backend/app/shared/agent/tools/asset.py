@@ -114,18 +114,23 @@ def query_top_category(user_id: str, period: str = "이번달") -> str:
 
 
 @tool
-def query_transaction_list(user_id: str, period: str = "이번달") -> str:
+def query_transaction_list(
+    user_id: str,
+    period: str = "이번달",
+    date_range: str | None = None,
+) -> str:
     """거래 내역 목록을 조회합니다 (최대 10건).
 
-    "거래내역 보여줘", "최근 내역 알려줘" 발화에 사용합니다.
+    "거래내역 보여줘", "최근 내역 알려줘", "오늘 거래내역", "6월 8일 거래내역" 발화에 사용합니다.
 
     Args:
         user_id: JWT에서 추출한 사용자 ID.
-        period: 조회 기간.
+        period: 조회 기간. "이번달" | "지난달" | "이번주" | "지난주" | "오늘" | "최근N일" | "N월".
+        date_range: 특정 날짜 조회 시 "YYYY-MM-DD" 형식. 예: "2026-06-08". period보다 우선 적용됩니다.
     """
     db = next(get_db())
     try:
-        return query_transaction_list_tts(db, user_id, period, None)
+        return query_transaction_list_tts(db, user_id, period, date_range)
     except AppError as e:
         logger.warning("query_transaction_list AppError: user=%s code=%s", user_id, e.code)
         return e.user_message or e.message
