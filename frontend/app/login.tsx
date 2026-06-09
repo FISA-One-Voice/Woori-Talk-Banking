@@ -3,10 +3,10 @@ import { TopBar } from '@/components/layout';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import { apiClient, ApiResponse } from '@/utils/api';
-import { router } from 'expo-router';
-import { Alert, Pressable, SafeAreaView, StyleSheet, Text, View, Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { useState, useEffect } from 'react';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 export default function DevLoginScreen() {
   const savedToken = useAuthStore((state) => state.token);
@@ -34,25 +34,28 @@ export default function DevLoginScreen() {
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
       if (hasHardware && isEnrolled) {
         const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: Platform.OS === 'ios' ? 'Face ID로 앱을 잠금 해제합니다' : '지문/얼굴 등 생체 인증으로 잠금 해제합니다',
+          promptMessage:
+            Platform.OS === 'ios'
+              ? 'Face ID로 앱을 잠금 해제합니다'
+              : '지문/얼굴 등 생체 인증으로 잠금 해제합니다',
           cancelLabel: '취소',
           disableDeviceFallback: true,
         });
         if (result.success) {
-          router.replace('/home'); 
+          router.replace('/home');
         } else {
           // TS의 엄격한 타입 검사를 피하기 위해 any로 캐스팅하여 에러 코드를 확인합니다.
           const errorCode = (result as any).error;
           if (errorCode === 'missing_usage_description' || errorCode === 'not_available') {
             Alert.alert(
-              Platform.OS === 'ios' ? 'Face ID 시뮬레이션 (Expo Go)' : '생체 인증 시뮬레이션 (Expo Go)',
+              Platform.OS === 'ios'
+                ? 'Face ID 시뮬레이션 (Expo Go)'
+                : '생체 인증 시뮬레이션 (Expo Go)',
               '현재 사용 중인 Expo Go 앱은 애플 정책상 Face ID 테스트를 제한하고 있습니다.\n테스트를 위해 Face ID 인증을 통과한 것으로 처리합니다!',
-              [
-                { text: '확인', onPress: () => router.replace('/home') }
-              ]
+              [{ text: '확인', onPress: () => router.replace('/home') }],
             );
           } else {
-            setStep('PHONE'); 
+            setStep('PHONE');
           }
         }
       } else {
@@ -60,9 +63,7 @@ export default function DevLoginScreen() {
         Alert.alert(
           'Face ID 시뮬레이션',
           '생체 인증 기기가 아닙니다. 테스트를 위해 통과 처리합니다.',
-          [
-            { text: '확인', onPress: () => router.replace('/home') }
-          ]
+          [{ text: '확인', onPress: () => router.replace('/home') }],
         );
       }
     } catch (e: any) {
@@ -82,7 +83,12 @@ export default function DevLoginScreen() {
   const handleLogin = async (pinValue: string) => {
     try {
       const response = await apiClient.post<
-        ApiResponse<{ accessToken: string; refreshToken: string; hasVoiceRegistered: boolean; ttsSpeed?: number }>
+        ApiResponse<{
+          accessToken: string;
+          refreshToken: string;
+          hasVoiceRegistered: boolean;
+          ttsSpeed?: number;
+        }>
       >('/api/users/login', {
         phone,
         pin: pinValue,
@@ -91,7 +97,14 @@ export default function DevLoginScreen() {
       const result = response.data;
 
       if (result.success && result.data) {
-        useAuthStore.getState().setTokens(result.data.accessToken, result.data.refreshToken, result.data.hasVoiceRegistered, result.data.ttsSpeed);
+        useAuthStore
+          .getState()
+          .setTokens(
+            result.data.accessToken,
+            result.data.refreshToken,
+            result.data.hasVoiceRegistered,
+            result.data.ttsSpeed,
+          );
 
         if (result.data.hasVoiceRegistered) {
           router.replace('/home');
@@ -117,16 +130,25 @@ export default function DevLoginScreen() {
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.pad}>
-        <TopBar variant="back" title="로그인 화면 테스트" onBack={() => router.back()} />
+        <TopBar variant="title" title="로그인" />
 
         <View style={styles.form}>
           {step === 'BIOMETRIC' ? (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ color: COLORS.highlightYellow, fontSize: 20, fontWeight: '600', marginBottom: 20 }}>
+              <Text
+                style={{
+                  color: COLORS.highlightYellow,
+                  fontSize: 20,
+                  fontWeight: '600',
+                  marginBottom: 20,
+                }}
+              >
                 {Platform.OS === 'ios' ? 'Face ID' : '생체'} 인증을 진행해주세요.
               </Text>
               <Pressable onPress={() => setStep('PHONE')} style={{ padding: 16 }}>
-                <Text style={{ color: COLORS.grayMedium, fontSize: 16 }}>화면에 얼굴을 가까이 가져다주세요.</Text>
+                <Text style={{ color: COLORS.grayMedium, fontSize: 16 }}>
+                  화면에 얼굴을 가까이 가져다주세요.
+                </Text>
               </Pressable>
             </View>
           ) : step === 'PHONE' ? (
