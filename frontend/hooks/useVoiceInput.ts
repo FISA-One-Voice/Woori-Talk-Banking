@@ -81,10 +81,10 @@ export function useVoiceInput(
       // [버그] 네트워크 오류 등으로 catch에 떨어지면 audio session이 recording 모드로 남아
       // 다음 녹음 시도 시 prepareToRecordAsync가 실패해 마이크 꾹 누르기가 안 됨.
       // 수정 방법: 아래 코드를 catch 블록에 추가
-      // await Audio.setAudioModeAsync({
-      //   allowsRecordingIOS: false,
-      //   playsInSilentModeIOS: true,
-      // }).catch(() => undefined);
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      }).catch(() => undefined);
       onError(extractApiErrorMessage(err));
     }
   }, [onError, onResponse, setVoiceState]);
