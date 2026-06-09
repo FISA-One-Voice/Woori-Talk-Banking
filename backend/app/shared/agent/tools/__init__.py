@@ -10,12 +10,13 @@
       예: features/balance/ → tools/balance.py
 """
 
+# -- Dev-B (TransferAgent tools) ──────────────────────────────────────────────
+from app.shared.agent.tools.transfer import add_note, execute_transfer
+from app.shared.agent.tools.lookup_recipient import lookup_recipient
 from app.shared.agent.tools.auto_transfer import add_auto_transfer_note
+from app.shared.agent.tools.execute_auto_transfer import execute_auto_transfer
 from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
 from app.shared.agent.tools.event import get_event_list
-from app.shared.agent.tools.execute_auto_transfer import execute_auto_transfer
-from app.shared.agent.tools.lookup_recipient import lookup_recipient
-from app.shared.agent.tools.transfer import add_note, execute_transfer
 
 # ── Dev-C (AssetAgent tools) ──────────────────────────────────────────────────
 from app.shared.agent.tools.asset import (
