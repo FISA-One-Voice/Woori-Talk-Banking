@@ -18,19 +18,17 @@ from langgraph.graph import END, StateGraph
 logger = logging.getLogger(__name__)
 
 from app.core.config import settings
-from app.core.database import get_db
-from app.core.exception import AppError
-from app.features.asset.service import (
-    query_balance_tts,
-    query_category_tts,
-    query_compare_tts,
-    query_history_tts,
-    query_top_category_tts,
-    query_transaction_list_tts,
-)
 from app.shared.agent.ROUTING_CONSTANTS import ASSET_NAVIGATE_VALUES
 from app.shared.agent.state import VoiceState
-from app.shared.agent.tools.spending_analysis import get_monthly_spending_report
+from app.shared.agent.tools.asset import (
+    query_balance,
+    query_category,
+    query_compare,
+    query_history,
+    query_spending_report,
+    query_top_category,
+    query_transaction_list,
+)
 
 ASSET_DOMAIN_ACTIONS: frozenset[str] = frozenset({
     "balance", "history", "category", "top_category",
@@ -51,7 +49,6 @@ _BALANCE_KEYWORDS = frozenset({"잔액", "얼마 있", "돈 얼마", "통장"})
 _TRANSACTION_LIST_KEYWORDS = frozenset({"거래내역", "거래 내역", "거래 내용"})
 _HISTORY_KEYWORDS = frozenset({"소비 내역"})
 _ANALYSIS_KEYWORDS = frozenset({"분석", "리포트", "소비 분석", "지출 분석"})
-_COMPARE_KEYWORDS = frozenset({"비교", "대비", "차이", "얼마나 늘었", "얼마나 줄었"})
 
 _QUERY_SYSTEM_PROMPT = """너는 자산 조회 전문 에이전트야.
 사용자 발화를 보고 아래 중 하나를 결정해:
@@ -94,7 +91,7 @@ def _parse_llm_action(raw: str) -> dict[str, str | None]:
         try:
             parsed = json.loads(match.group())
             # LLM이 null 대신 문자열 "null"을 반환하는 경우 방어
-            for key in ("category", "filter_type", "period"):
+            for key in ("category", "filter_type", "period", "compare_period"):
                 if parsed.get(key) == "null":
                     parsed[key] = None
             return parsed
@@ -116,19 +113,6 @@ def _fast_classify(user_text: str) -> str | None:
         return "history"
     return None
 
-
-def _extract_compare_periods(user_text: str) -> list[str]:
-    """비교 발화에서 기간 2개를 순서대로 추출. [기준, 비교] 순."""
-    found = []
-    pairs = [
-        ("이번주", "지난주"),
-        ("이번달", "지난달"),
-    ]
-    for current, prev in pairs:
-        if current in user_text or prev in user_text:
-            found = [current, prev]
-            break
-    return found
 
 
 def _has_period_keyword(user_text: str) -> bool:
@@ -218,28 +202,44 @@ async def asset_node(state: VoiceState) -> dict:
             "collected_slots": {"action": "history"},
         }
 
-    db = next(get_db())
-    try:
-        if action == "balance":
-            tts_result = query_balance_tts(db, user_id)
-        elif action == "compare":
-            tts_result = query_compare_tts(db, user_id, period, compare_period, category)
-        elif action == "spending_analysis":
-            tts_result = get_monthly_spending_report.invoke(
-                {"user_id": user_id, "period": period or "이번달"}
-            )
-        elif action == "category":
-            tts_result = query_category_tts(db, user_id, period, category)
-        elif action == "top_category":
-            tts_result = query_top_category_tts(db, user_id, period)
-        elif action == "transaction_list":
-            tts_result = query_transaction_list_tts(db, user_id, period, None)
-        else:  # history
-            tts_result = query_history_tts(db, user_id, period, None, filter_type)
-    except AppError as e:
-        tts_result = e.user_message or e.message
-    finally:
-        db.close()
+    tts_result = "죄송합니다. 잠시 후 다시 시도해 주세요."
+
+    if action == "balance":
+        tts_result = query_balance.invoke({"user_id": user_id})
+    elif action == "compare":
+        tts_result = query_compare.invoke({
+            "user_id": user_id,
+            "period": period or "이번달",
+            "compare_period": compare_period or "지난달",
+            "category": category,
+        })
+    elif action == "spending_analysis":
+        tts_result = query_spending_report.invoke({
+            "user_id": user_id,
+            "period": period or "이번달",
+        })
+    elif action == "category":
+        tts_result = query_category.invoke({
+            "user_id": user_id,
+            "period": period or "이번달",
+            "category": category,
+        })
+    elif action == "top_category":
+        tts_result = query_top_category.invoke({
+            "user_id": user_id,
+            "period": period or "이번달",
+        })
+    elif action == "transaction_list":
+        tts_result = query_transaction_list.invoke({
+            "user_id": user_id,
+            "period": period or "이번달",
+        })
+    else:  # history
+        tts_result = query_history.invoke({
+            "user_id": user_id,
+            "period": period or "이번달",
+            "filter_type": filter_type,
+        })
 
     # ── 3. navigate_to 결정 ───────────────────────────────────────────────────────
     navigate_to = _NAVIGATE_MAP.get(action, "asset")

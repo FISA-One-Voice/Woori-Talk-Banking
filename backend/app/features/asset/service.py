@@ -13,7 +13,7 @@ from app.models.transaction import Transaction
 logger = logging.getLogger(__name__)
 
 # 슬롯에서 허용되는 기간 값 (STT 정규화 후 이 셋 중 하나여야 유효)
-VALID_PERIODS: frozenset[str] = frozenset({"이번달", "지난달", "최근7일"})
+VALID_PERIODS: frozenset[str] = frozenset({"이번달", "지난달", "이번주", "지난주"})
 
 
 # ── DB 조회 ──────────────────────────────────────────────────────────────────
@@ -352,7 +352,12 @@ def query_transaction_list_tts(
     """거래내역 목록을 TTS 문자열로 반환한다 (최대 10건 읽어줌)."""
     period = normalize_period(period)
     if period and period not in VALID_PERIODS and not re.match(r'최근\d+일$', period) and not re.match(r'^\d+월$', period):
-        return "조회할 수 없는 기간입니다. 이번달, 지난달, 최근 N일, N월 형식으로 말씀해 주세요."
+        raise HistoryError(
+            code="INVALID_PERIOD",
+            message="유효하지 않은 조회 기간입니다.",
+            status_code=400,
+            user_message="조회할 수 없는 거래내역 기간입니다. 이번달, 지난달, 최근 N일, N월 형식으로 말씀해 주세요.",
+        )
 
     custom_since = date_range_to_since(date_range)
     if custom_since:
@@ -409,7 +414,12 @@ def query_history_tts(
     """
     period = normalize_period(period)
     if period and period not in VALID_PERIODS and not re.match(r'최근\d+일$', period) and not re.match(r'^\d+월$', period):
-        return "조회할 수 없는 기간입니다. 이번달, 지난달, 최근 N일, N월 형식으로 말씀해 주세요."
+        raise HistoryError(
+            code="INVALID_PERIOD",
+            message="유효하지 않은 조회 기간입니다.",
+            status_code=400,
+            user_message="조회할 수 없는 요약 기간입니다. 이번달, 지난달, 최근 N일, N월 형식으로 말씀해 주세요.",
+        )
 
     custom_since = date_range_to_since(date_range)
     if custom_since:
@@ -467,7 +477,12 @@ def query_category_tts(
 ) -> str:
     """카테고리별 지출을 TTS 문자열로 반환한다."""
     if not category:
-        return "어떤 카테고리를 조회할까요? 예: 식비, 교통, 문화생활."
+        raise HistoryError(
+            code="MISSING_CATEGORY",
+            message="카테고리가 지정되지 않았습니다.",
+            status_code=400,
+            user_message="어떤 카테고리를 조회할까요? 예: 식비, 교통, 문화생활.",
+        )
     since, until = period_to_date_range(period)
     label = normalize_period(period) or "이번달"
     txs = get_transaction_history(db, user_id, since=since, until=until, category=category)
@@ -564,7 +579,12 @@ def query_top_category_tts(db: Session, user_id: str, period: str | None) -> str
     summary = get_expense_summary(db, user_id, since=since, until=until)
     top = summary["top_categories"]
     if not top:
-        return f"{label} 지출 내역이 없습니다."
+        raise HistoryError(
+            code="TX_NOT_FOUND",
+            message="해당 기간에 지출 내역이 없습니다.",
+            status_code=404,
+            user_message=f"{label} 지출 내역이 없습니다.",
+        )
     top_cat = top[0]
     return (
         f"{label} 지출 순위 알려드리겠습니다. "

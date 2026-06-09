@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.core.exception import HistoryError
 from app.features.asset.service import get_expense_summary
 from app.features.analytics.schema import CategorySpending, MonthlyAnalyticsResponse
 
@@ -50,4 +51,25 @@ def get_monthly_analytics(
         total_spending=total,
         categories=categories,
         top_category=top_category,
+    )
+
+
+def query_spending_analysis_tts(db: Session, user_id: str, period: str = "이번달") -> str:
+    """지출 분석 리포트를 TTS 문자열로 반환한다.
+
+    Raises:
+        HistoryError: 해당 기간에 지출 내역이 없는 경우 (TX_NOT_FOUND).
+    """
+    result = get_monthly_analytics(db, user_id, period)
+    top = result.categories[0] if result.categories else None
+    if not top:
+        raise HistoryError(
+            code="TX_NOT_FOUND",
+            message="해당 기간에 지출 내역이 없습니다.",
+            status_code=404,
+            user_message=f"{period} 지출 내역이 없습니다.",
+        )
+    return (
+        f"{period} 총 지출은 {result.total_spending:,}원이고, "
+        f"가장 많이 쓴 카테고리는 {top.category} {top.amount:,}원입니다."
     )
