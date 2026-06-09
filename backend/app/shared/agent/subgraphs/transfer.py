@@ -141,24 +141,6 @@ def _clean_transfer_delta(delta: dict) -> dict:
     return validate_transfer_delta(cleaned)
 
 
-def _is_transfer_restart_utterance(text: str) -> bool:
-    """홈 등에서 새 송금을 시작하는 발화인지."""
-    return is_plain_transfer_start(text)
-
-
-def _should_restart_transfer_flow(
-    intent: str | None,
-    pending: str | None,
-    user_text: str,
-    state: dict,
-) -> bool:
-    """이전 transfer 세션이 남아 있어도 동일 intent로 새 송금을 시작한다."""
-    if intent != "transfer" or pending != "transfer":
-        return False
-    if state.get("awaiting_confirmation") or state.get("awaiting_asv_audio"):
-        return False
-    return _is_transfer_restart_utterance(user_text)
-
 
 def _all_slots_filled(pending_action: str, collected_slots: dict) -> bool:
     """pending_action에 필요한 슬롯이 모두 수집되었는지 확인한다."""
@@ -626,7 +608,7 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             )
 
         user_text = last_user_text(state.get("messages", []))
-        if should_use_bare_transfer_fast_start(user_text):
+        if not state.get("pending_action") and should_use_bare_transfer_fast_start(user_text):
             return _clean_transfer_delta(_build_bare_transfer_start_update(user_text))
 
         if should_offer_transfer_clarification(
@@ -868,15 +850,12 @@ def _build_intent_update(
         }
 
     pending = state.get("pending_action")
-    restart_transfer = _should_restart_transfer_flow(
-        result.intent, pending, user_text, state
-    )
     if (
         result.intent
         and result.intent in TRANSFER_DOMAIN_ACTIONS
         and not state.get("awaiting_confirmation")
         and not state.get("awaiting_asv_audio")
-        and (result.intent != pending or restart_transfer)
+        and not pending
     ):
         return _build_new_intent_update(result, user_text)
 
