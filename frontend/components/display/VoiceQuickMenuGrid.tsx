@@ -1,5 +1,5 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export interface VoiceQuickMenuItem {
   icon: string;
@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   card: {
-    width: '47%',
+    width: '48.8%',
     backgroundColor: COLORS.surface,
     borderWidth: 0.5,
     borderColor: COLORS.grayDeep,

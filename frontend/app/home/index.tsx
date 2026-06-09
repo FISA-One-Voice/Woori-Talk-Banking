@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { AppScreenHeader, TabBar } from '@/components/layout';
 import { VoiceQuickMenuGrid } from '@/components/display';
 import { TtsBubble } from '@/components/feedback';
@@ -7,11 +7,10 @@ import { HomeVoiceSection } from '@/components/input';
 import {
   HOME_MENU_ITEMS,
   HOME_TTS_MESSAGE,
-  TAB_PLACEHOLDER,
-  type HomeTab,
 } from '@/constants/homeMenu';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { navigateHomeMenu } from '@/utils/navigateHomeMenu';
+import { useAuthStore } from '@/store/authStore';
 
 function HomeMainContent() {
   return (
@@ -32,7 +31,13 @@ function HomeMainContent() {
 }
 
 export default function HomeScreen() {
-  const [tab, setTab] = useState<HomeTab>('home');
+  const router = useRouter();
+  const clearTokens = useAuthStore((s) => s.clearTokens);
+
+  function handleLogout() {
+    clearTokens();
+    router.replace('/login');
+  }
 
   return (
     <SafeAreaView style={styles.root}>
@@ -42,15 +47,9 @@ export default function HomeScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {tab === 'home' ? (
-            <HomeMainContent />
-          ) : (
-            <View style={styles.placeholder}>
-              <Text style={styles.placeholderText}>{TAB_PLACEHOLDER[tab]}</Text>
-            </View>
-          )}
+          <HomeMainContent />
         </ScrollView>
-        <TabBar activeTab={tab} onTabChange={setTab} />
+        <TabBar onLogout={handleLogout} />
       </View>
     </SafeAreaView>
   );
