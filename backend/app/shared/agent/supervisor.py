@@ -277,8 +277,8 @@ def route_after_supervisor(state: VoiceState) -> str:
         return "cancel_node"
     if domain == "transfer":
         return "transfer"
-    # if domain == "asset":
-    #     return "asset"
+    if domain == "asset":
+        return "asset"
     if domain == "rag":
         return "rag"
     if domain == "event":

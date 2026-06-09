@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.core.exception import AgentError
 from app.features.recipients.schema import ResolvedRecipient
 from app.features.recipients.service import (
+    classify_recipient_input,
     enrich_slots_from_resolved,
     find_recipient_by_voice,
 )
