@@ -69,8 +69,9 @@ def execute_auto_transfer(
         "transfer_note": transfer_note,
     }
 
-    db = SessionLocal()
+    db = None
     try:
+        db = SessionLocal()
         user_uuid = uuid.UUID(user_id)
 
         # ── 슬롯 값 정규화 ──────────────────────────────────────────────────────────
@@ -192,4 +193,5 @@ def execute_auto_transfer(
             ensure_ascii=False,
         )
     finally:
-        db.close()
+        if db is not None:
+            db.close()

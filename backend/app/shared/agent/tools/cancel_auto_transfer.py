@@ -30,8 +30,9 @@ def cancel_auto_transfer(user_id: str, recipient: str) -> str:
     Returns:
         성공/실패 결과 TTS 텍스트.
     """
-    db = SessionLocal()
+    db = None
     try:
+        db = SessionLocal()
         user_uuid = uuid.UUID(user_id)
 
         resolved = lookup_recipient_by_voice(db, user_uuid, recipient)
@@ -64,14 +65,17 @@ def cancel_auto_transfer(user_id: str, recipient: str) -> str:
         return f"{name}에게 설정된 자동이체 {count}건이 모두 해지되었습니다."
 
     except AppError as e:
-        db.rollback()
+        if db is not None:
+            db.rollback()
         return e.user_message or e.message
     except Exception as e:
-        db.rollback()
+        if db is not None:
+            db.rollback()
         logger.error(
             "cancel_auto_transfer 실패: user=%s recipient=%s error=%s",
             user_id, recipient, e,
         )
         return "자동이체 해지 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
     finally:
-        db.close()
+        if db is not None:
+            db.close()

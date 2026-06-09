@@ -14,6 +14,7 @@ from app.shared.agent.tools.auto_transfer import add_auto_transfer_note
 from app.shared.agent.tools.balance import get_account_balance_by_id, get_total_balance
 from app.shared.agent.tools.cancel_auto_transfer import cancel_auto_transfer
 from app.shared.agent.tools.execute_auto_transfer import execute_auto_transfer
+from app.shared.agent.tools.list_auto_transfer import list_auto_transfer
 from app.shared.agent.tools.history import (
     get_category_history,
     get_monthly_expense,
@@ -41,6 +42,7 @@ TRANSFER_TOOLS: list = [
     add_auto_transfer_note,
     cancel_auto_transfer,
     lookup_recipient,
+    list_auto_transfer,
 ]
 
 # 전체 단일 graph용 tool 목록 (build_graph / voice pipeline)
@@ -56,4 +58,5 @@ ALL_TOOLS: list = [
     execute_auto_transfer,
     cancel_auto_transfer,
     add_auto_transfer_note,
+    list_auto_transfer,
 ]
