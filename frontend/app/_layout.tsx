@@ -109,29 +109,54 @@ export default function RootLayout() {
   }, [segments]);
 
   const touchPts = useRef<Array<{ x: number; y: number }>>([]);
+  // Long press 타이머 (카드 위에서도 동작하도록 onTouchStart 기반으로 구현)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchOrigin = useRef<{ x: number; y: number } | null>(null);
 
   function handleTouchStart(e: GestureResponderEvent): void {
-    touchPts.current = [
-      {
-        x: e.nativeEvent.locationX,
-        y: e.nativeEvent.locationY,
-      },
-    ];
+    const { locationX: x, locationY: y } = e.nativeEvent;
+    touchPts.current = [{ x, y }];
+    touchOrigin.current = { x, y };
+
+    // 500ms 유지하면 녹음 시작 — onLongPress 대신 사용해 자식 컴포넌트 위에서도 동작
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
+      handleLongPress();
+    }, 500);
   }
 
   function handleTouchMove(e: GestureResponderEvent): void {
-    touchPts.current.push({
-      x: e.nativeEvent.locationX,
-      y: e.nativeEvent.locationY,
-    });
+    const { locationX: x, locationY: y } = e.nativeEvent;
+    touchPts.current.push({ x, y });
+
+    // 15px 이상 움직이면 long press 취소 (V 제스처 or 스크롤)
+    if (longPressTimer.current && touchOrigin.current) {
+      const dx = Math.abs(x - touchOrigin.current.x);
+      const dy = Math.abs(y - touchOrigin.current.y);
+      if (dx > 15 || dy > 15) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    }
   }
 
   function handleTouchEnd(): void {
+    // Long press 타이머가 아직 살아있으면 취소 (short tap)
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    touchOrigin.current = null;
+
+    // V 제스처 감지
     const pts = touchPts.current;
     touchPts.current = [];
     if (isVGesture(pts)) {
       stopAllTts();
     }
+
+    // 녹음 중이면 종료 (내부에서 recording 유무 확인하므로 항상 호출 가능)
+    handlePressOut();
   }
 
   // ── 음성 응답 처리 ──────────────────────────────────────────────────────────
@@ -196,7 +221,7 @@ export default function RootLayout() {
 
       if (data.audio && !isFailedNav) {
         await stopAllTts();
-        playBase64Audio(data.audio).catch(() => undefined);
+        await playBase64Audio(data.audio).catch(() => undefined);
       }
 
       if (needsYesNoVoicePrompt(data) && !data.audio) {
@@ -232,9 +257,6 @@ export default function RootLayout() {
   return (
     <Pressable
       style={styles.root}
-      onLongPress={hasVoiceRegistered ? handleLongPress : undefined}
-      onPressOut={hasVoiceRegistered ? handlePressOut : undefined}
-      delayLongPress={500}
       onTouchStart={hasVoiceRegistered ? handleTouchStart : undefined}
       onTouchMove={hasVoiceRegistered ? handleTouchMove : undefined}
       onTouchEnd={hasVoiceRegistered ? handleTouchEnd : undefined}

@@ -35,7 +35,7 @@ TRANSFER_NAVIGATE_VALUES: frozenset[str | None] = frozenset({
 })
 
 ASSET_NAVIGATE_VALUES: frozenset[str | None] = frozenset({
-    "balance", "report", None,
+    "asset", "asset/history", "balance", "report", None,
 })
 
 RAG_NAVIGATE_VALUES: frozenset[str | None] = frozenset({None})
