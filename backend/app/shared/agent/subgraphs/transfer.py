@@ -22,6 +22,7 @@ from app.features.recipients.service import (
     enrich_slots_from_resolved,
     find_recipient_by_voice,
 )
+from app.features.transfer.service import _mask_account
 from app.features.transfer.service import format_confirm_message
 from app.shared.agent.ROUTING_CONSTANTS import (
     TRANSFER_NAVIGATE_VALUES,
@@ -32,6 +33,9 @@ from app.shared.agent.memo_decision import (
     last_user_text,
 )
 from app.shared.agent.prompts import SYSTEM_PROMPT, TRANSFER_INTENT_PROMPT
+from app.shared.agent.ROUTING_CONSTANTS import (
+    TRANSFER_NAVIGATE_VALUES,
+)
 from app.shared.agent.session_reset import clear_conversation_messages
 from app.shared.agent.slot_schema import (
     ACTION_LABELS,
@@ -66,30 +70,35 @@ from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 
 logger = logging.getLogger(__name__)
 
-TRANSFER_DOMAIN_ACTIONS: frozenset[str] = frozenset({
-    "transfer",
-    "auto_transfer",
-    "cancel_auto_transfer",
-    "add_note",
-    "add_auto_transfer_note",
-})
+TRANSFER_DOMAIN_ACTIONS: frozenset[str] = frozenset(
+    {
+        "transfer",
+        "auto_transfer",
+        "cancel_auto_transfer",
+        "list_auto_transfer",
+        "add_note",
+        "add_auto_transfer_note",
+    }
+)
 
-TRANSFER_WRITE: frozenset[str] = frozenset({
-    "messages",
-    "navigate_to",
-    "pending_action",
-    "collected_slots",
-    "awaiting_confirmation",
-    "awaiting_asv_audio",
-    "execution_ready",
-    "recipient_validated",
-    "asv_retry_count",
-    "awaiting_memo_decision",
-    "awaiting_transfer_clarification",
-    "draft_recipient",
-    "last_tx_id",
-    "last_order_id",
-})
+TRANSFER_WRITE: frozenset[str] = frozenset(
+    {
+        "messages",
+        "navigate_to",
+        "pending_action",
+        "collected_slots",
+        "awaiting_confirmation",
+        "awaiting_asv_audio",
+        "execution_ready",
+        "recipient_validated",
+        "asv_retry_count",
+        "awaiting_memo_decision",
+        "awaiting_transfer_clarification",
+        "draft_recipient",
+        "last_tx_id",
+        "last_order_id",
+    }
+)
 
 
 class IntentResult(BaseModel):
@@ -167,7 +176,12 @@ def _build_bare_transfer_start_update(user_text: str) -> dict:
 
 def _build_system_content(state: VoiceState) -> str:
     """TransferAgent intent LLM에 전달할 시스템 프롬프트를 만든다."""
-    context_lines = [SYSTEM_PROMPT, TRANSFER_INTENT_PROMPT, "", "=== 현재 대화 상태 ==="]
+    context_lines = [
+        SYSTEM_PROMPT,
+        TRANSFER_INTENT_PROMPT,
+        "",
+        "=== 현재 대화 상태 ===",
+    ]
     pending = state.get("pending_action")
     slots = state.get("collected_slots", {})
 
@@ -210,7 +224,8 @@ def _transfer_response_rules() -> list[str]:
         "- intent는 진행 중인 액션이 없을 때만 설정하십시오.",
         "- transfer: 일회성 이체, 송금, 보내줘 요청입니다.",
         "- auto_transfer: 자동이체, 정기 이체, 매월, 매주 요청입니다.",
-        "- cancel_auto_transfer: 자동이체 해지 요청입니다.",
+        "- cancel_auto_transfer: 자동이체 해지·삭제·취소 요청입니다. (예: '자동이체 삭제할래', '자동이체 해지할게', '자동이체 끊을래', '자동이체 없애줘')",
+        "- list_auto_transfer: 자동이체 목록 조회·확인 요청입니다. (예: '자동이체 확인할게', '자동이체 목록 볼게', '자동이체 보여줘', '자동이체 조회해줘')",
         "- add_note/add_auto_transfer_note: 직전 이체·자동이체 메모 추가 요청입니다.",
         "- amount는 반드시 원화 정수 문자열로 추출하십시오."
         " 예: '천원'→'1000', '오만원'→'50000', '1000원'→'1000', '삼십만원'→'300000'."
@@ -233,6 +248,140 @@ def _chat_messages_for_llm(state: VoiceState, system_content: str) -> list[dict]
             chat_messages.append({"role": role, "content": message.content})
     return chat_messages
 
+
+def _find_tool_for_action(
+    action: str, tool_registry: dict[str, object]
+) -> object | None:
+    """액션 이름에 해당하는 tool을 registry에서 찾는다."""
+    candidates = [
+        action,
+        f"mock_execute_{action}",
+        f"mock_register_{action}",
+        f"execute_{action}",
+        f"register_{action}",
+        f"{action}_tool",
+    ]
+    for name in candidates:
+        if name in tool_registry:
+            return tool_registry[name]
+    for name, tool_obj in tool_registry.items():
+        if action in name:
+            return tool_obj
+    return None
+
+
+_KOR_DOW_MAP: dict[str, int] = {
+    "월": 0,
+    "월요일": 0,
+    "화": 1,
+    "화요일": 1,
+    "수": 2,
+    "수요일": 2,
+    "목": 3,
+    "목요일": 3,
+    "금": 4,
+    "금요일": 4,
+    "토": 5,
+    "토요일": 5,
+    "일": 6,
+    "일요일": 6,
+}
+
+# STT 발음 유사 오인식 매핑 (천원 → 전원 등)
+_STT_AMOUNT_ALIASES: dict[str, int] = {
+    "전원": 1000,  # "천원" 오인식
+    "천원": 1000,
+    "천": 1000,
+    "만원": 10000,
+    "만": 10000,
+}
+
+
+def _kor_to_int(text: str) -> int | None:
+    """순수 한국어 숫자 문자열을 정수로 변환한다."""
+    _DIGIT = {
+        "일": 1,
+        "이": 2,
+        "삼": 3,
+        "사": 4,
+        "오": 5,
+        "육": 6,
+        "칠": 7,
+        "팔": 8,
+        "구": 9,
+    }
+    _SMALL = {"십": 10, "백": 100, "천": 1000}
+
+    def _below_10000(s: str) -> int:
+        result, current = 0, 0
+        for ch in s:
+            if ch in _DIGIT:
+                current = _DIGIT[ch]
+            elif ch in _SMALL:
+                result += (current or 1) * _SMALL[ch]
+                current = 0
+        return result + current
+
+    total = 0
+    if "억" in text:
+        parts = text.split("억", 1)
+        total += (_below_10000(parts[0]) or 1) * 100_000_000
+        text = parts[1]
+    if "만" in text:
+        parts = text.split("만", 1)
+        total += (_below_10000(parts[0]) or 1) * 10_000
+        text = parts[1]
+    total += _below_10000(text)
+    return total if total > 0 else None
+
+
+def _parse_korean_amount(raw: str) -> str | None:
+    """한국어·STT 오인식 금액 표현을 정수 문자열로 변환한다.
+
+    STT 오인식("전원"→천원), 한국어 숫자("오만원"→50000),
+    숫자+단위("1000원"→1000) 세 경우를 처리한다.
+    변환 불가 시 None을 반환한다.
+    """
+    text = str(raw).strip().replace(" ", "").replace(",", "")
+    if not text:
+        return None
+
+    # STT 오인식 alias
+    if text in _STT_AMOUNT_ALIASES:
+        return str(_STT_AMOUNT_ALIASES[text])
+
+    # "원" suffix 제거 후 alias 재확인 (e.g. "전원" suffix 없는 경우 대비)
+    text_no_won = re.sub(r"원$", "", text)
+
+    # 숫자만 있는 경우
+    try:
+        val = int(text_no_won)
+        return str(val) if val > 0 else None
+    except ValueError:
+        pass
+
+    # 한국어 숫자 파싱
+    val = _kor_to_int(text_no_won)
+    return str(val) if val is not None and val > 0 else None
+
+
+def _normalize_scheduled_day(slots: dict, extracted_slots: dict) -> dict:
+    """STT 오류 보정 및 한글 요일명 → 정수 변환."""
+    normalized = dict(slots)
+    for key, value in extracted_slots.items():
+        if key == "scheduled_day" and value is not None:
+            kor_key = str(value).replace(" ", "")
+            if kor_key in _KOR_DOW_MAP:
+                value = _KOR_DOW_MAP[kor_key]
+            else:
+                try:
+                    day_int = int(value)
+                except (TypeError, ValueError):
+                    day_int = None
+                if day_int is not None and 32 <= day_int <= 91 and day_int % 10 == 1:
+                    value = day_int // 10
+        normalized[key] = value
+    return normalized
 
 
 def _build_new_intent_update(result: IntentResult, user_text: str) -> dict:
@@ -342,7 +491,9 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             return _clean_transfer_delta(delta)
 
         if state.get("pending_action") == "add_note":
-            delta = build_memo_decision_update(last_user_text(state.get("messages", [])))
+            delta = build_memo_decision_update(
+                last_user_text(state.get("messages", []))
+            )
             return _clean_transfer_delta(delta)
 
         if state.get("awaiting_transfer_clarification"):
@@ -387,9 +538,13 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             if slot_name in action_questions:
                 question = action_questions[slot_name]
             elif slot_name == "scheduled_day" and slots.get("cycle") == "weekly":
-                question = "매주 무슨 요일에 이체할까요? 월요일부터 일요일 중 말씀해 주세요."
+                question = (
+                    "매주 무슨 요일에 이체할까요? 월요일부터 일요일 중 말씀해 주세요."
+                )
             else:
-                question = SLOT_QUESTIONS.get(slot_name, f"{slot_name}을 말씀해 주세요.")
+                question = SLOT_QUESTIONS.get(
+                    slot_name, f"{slot_name}을 말씀해 주세요."
+                )
         else:
             question = "정보가 모두 수집되었습니다."
 
@@ -401,11 +556,13 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         confirm_message = format_confirm_message(
             pending, state.get("collected_slots", {})
         )
-        return _clean_transfer_delta({
-            "awaiting_confirmation": True,
-            "navigate_to": SCREEN_MAP.get(pending),
-            "messages": [AIMessage(content=confirm_message)],
-        })
+        return _clean_transfer_delta(
+            {
+                "awaiting_confirmation": True,
+                "navigate_to": SCREEN_MAP.get(pending),
+                "messages": [AIMessage(content=confirm_message)],
+            }
+        )
 
     def resolve_node(state: VoiceState) -> dict:
         """recipient 슬롯을 등록 수취인 또는 직접 계좌 정보로 검증한다."""
@@ -428,42 +585,48 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             })
 
         if kind == "account" and not bank_name:
-            return _clean_transfer_delta({
-                "collected_slots": slots,
-                "recipient_validated": False,
-                "navigate_to": None,
-            })
+            return _clean_transfer_delta(
+                {
+                    "collected_slots": slots,
+                    "recipient_validated": False,
+                    "navigate_to": None,
+                }
+            )
 
         if kind in ("phone", "account"):
-            return _clean_transfer_delta({
-                "collected_slots": slots,
-                "recipient_validated": False,
-                "navigate_to": None,
-                "messages": [
-                    AIMessage(
-                        content=(
-                            f"'{recipient_input}'은(는) 등록된 수취인이 아닙니다. "
-                            "수신인 이름이나 별명, 계좌번호를 다시 말씀해 주세요."
+            return _clean_transfer_delta(
+                {
+                    "collected_slots": slots,
+                    "recipient_validated": False,
+                    "navigate_to": None,
+                    "messages": [
+                        AIMessage(
+                            content=(
+                                f"'{recipient_input}'은(는) 등록된 수취인이 아닙니다. "
+                                "수신인 이름이나 별명, 계좌번호를 다시 말씀해 주세요."
+                            )
                         )
-                    )
-                ],
-            })
+                    ],
+                }
+            )
 
         pending_action = state.get("pending_action", "transfer")
         slots["recipient"] = None
-        return _clean_transfer_delta({
-            "collected_slots": slots,
-            "recipient_validated": False,
-            "navigate_to": SCREEN_MAP.get(pending_action),
-            "messages": [
-                AIMessage(
-                    content=(
-                        f"'{recipient_input}'은(는) 등록되지 않은 수취인입니다. "
-                        "누구에게 보낼까요?"
+        return _clean_transfer_delta(
+            {
+                "collected_slots": slots,
+                "recipient_validated": False,
+                "navigate_to": SCREEN_MAP.get(pending_action),
+                "messages": [
+                    AIMessage(
+                        content=(
+                            f"'{recipient_input}'은(는) 등록되지 않은 수취인입니다. "
+                            "누구에게 보낼까요?"
+                        )
                     )
-                )
-            ],
-        })
+                ],
+            }
+        )
 
     def execute_node(state: VoiceState) -> dict:
         """수집된 슬롯으로 Transfer 도메인 tool을 호출한다."""
@@ -610,11 +773,17 @@ def _build_intent_update(
         return _merge_slot_update(state, result.extracted_slots)
 
     if result.direct_response:
-        return {"messages": [AIMessage(content=result.direct_response)], "navigate_to": None}
+        return {
+            "messages": [AIMessage(content=result.direct_response)],
+            "navigate_to": None,
+        }
 
     pending_after = pending or result.intent
     if not pending_after and not is_plain_transfer_start(user_text):
-        return {"messages": [AIMessage(content=_DEFAULT_TTS_FALLBACK)], "navigate_to": None}
+        return {
+            "messages": [AIMessage(content=_DEFAULT_TTS_FALLBACK)],
+            "navigate_to": None,
+        }
     return {"navigate_to": None}
 
 
@@ -715,14 +884,18 @@ def _invoke_tool_by_action(
     elif pending == "auto_transfer":
         result_raw = tool_obj.invoke(invoke_args)
         result_data = json.loads(result_raw) if isinstance(result_raw, str) else {}
-        response_text = result_data.get("tts_text", "자동이체 등록 중 오류가 발생했습니다.")
+        response_text = result_data.get(
+            "tts_text", "자동이체 등록 중 오류가 발생했습니다."
+        )
         if result_data.get("success"):
             order_id = result_data.get("order_id")
     elif pending == "add_note":
         response_text = _invoke_add_note(tool_obj, invoke_args, slots, state)
         note_consumed = "추가되었습니다" in response_text
     elif pending == "add_auto_transfer_note":
-        response_text = _invoke_add_auto_transfer_note(tool_obj, invoke_args, slots, state)
+        response_text = _invoke_add_auto_transfer_note(
+            tool_obj, invoke_args, slots, state
+        )
         note_consumed = "추가되었습니다" in response_text
     else:
         response_text = tool_obj.invoke(invoke_args)
@@ -739,11 +912,13 @@ def _invoke_add_note(
     tx_id = slots.get("tx_id") or state.get("last_tx_id")
     if not tx_id:
         return "메모를 추가할 이체 내역을 찾을 수 없습니다. 이체를 먼저 완료해 주세요."
-    return tool_obj.invoke({
-        "user_id": invoke_args["user_id"],
-        "memo": str(invoke_args.get("memo", "")),
-        "tx_id": str(tx_id),
-    })
+    return tool_obj.invoke(
+        {
+            "user_id": invoke_args["user_id"],
+            "memo": str(invoke_args.get("memo", "")),
+            "tx_id": str(tx_id),
+        }
+    )
 
 
 def _invoke_add_auto_transfer_note(
@@ -756,8 +931,10 @@ def _invoke_add_auto_transfer_note(
     order_id = slots.get("order_id") or state.get("last_order_id")
     if not order_id:
         return "메모를 추가할 자동이체 내역을 찾을 수 없습니다. 자동이체 등록을 먼저 완료해 주세요."
-    return tool_obj.invoke({
-        "user_id": invoke_args["user_id"],
-        "memo": str(invoke_args.get("memo", "")),
-        "order_id": str(order_id),
-    })
+    return tool_obj.invoke(
+        {
+            "user_id": invoke_args["user_id"],
+            "memo": str(invoke_args.get("memo", "")),
+            "order_id": str(order_id),
+        }
+    )

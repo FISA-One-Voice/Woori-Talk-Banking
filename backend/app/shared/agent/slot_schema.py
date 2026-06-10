@@ -12,6 +12,7 @@ from app.features.recipients.service import classify_recipient_input
 SLOT_SCHEMA: dict[str, list[str]] = {
     "transfer": ["recipient", "amount"],
     "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
+    "cancel_auto_transfer": ["recipient"],
     "add_note": ["memo"],
 }
 
@@ -29,6 +30,7 @@ SCREEN_MAP: dict[str, str] = {
     "event": "event",
     "home": "home",
     "cancel_auto_transfer": "auto-transfer",
+    "list_auto_transfer": "auto-transfer",
 }
 
 # ── 수취인 검증이 필요한 액션 ────────────────────────────────────────────────────
@@ -79,6 +81,7 @@ COMPLETE_SCREEN_MAP: dict[str, str] = {
     "transfer": "transfer/complete",
     "auto_transfer": "auto-transfer/complete",
     "cancel_auto_transfer": "auto-transfer",
+    "list_auto_transfer": "auto-transfer",
 }
 
 # execute_node 이체 실패 시 프론트엔드 실패 화면 (SCR004-F08)
@@ -104,6 +107,7 @@ ACTION_LABELS: dict[str, str] = {
     "transfer": "이체",
     "auto_transfer": "자동이체 등록",
     "cancel_auto_transfer": "자동이체 해지",
+    "list_auto_transfer": "자동이체 조회",
 }
 
 # ── 화면 전환 전용 인텐트 ─────────────────────────────────────────────────────────

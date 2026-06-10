@@ -2,17 +2,42 @@ import { AppScreenHeader, StepIndicator } from '@/components/layout';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { apiClient } from '@/utils/api';
-import { useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import {
   CANCEL_STEP_TOTAL,
   formatAmount,
   formatSchedule,
+  resolveAutoTransferPhase,
   resolveAutoTransferStep,
   STEP_INDEX,
   STEP_TOTAL,
 } from './stepResolver';
+
+interface AutoTransferListItem {
+  orderId: string;
+  toName: string | null;
+  bankName: string;
+  accountMasked: string;
+  amount: number;
+  cycle: string;
+  scheduledDay: number | null;
+  scheduledDow: number | null;
+  nextExecutionAt: string | null;
+  status: string;
+}
+
+const _DOW = ['월', '화', '수', '목', '금', '토', '일'];
+
+function scheduleLabel(item: AutoTransferListItem): string {
+  if (item.cycle === 'monthly' && item.scheduledDay != null)
+    return `매월 ${item.scheduledDay}일`;
+  if (item.cycle === 'weekly' && item.scheduledDow != null)
+    return `매주 ${_DOW[item.scheduledDow]}요일`;
+  return item.cycle;
+}
 
 // ── 공통 컴포넌트 ─────────────────────────────────────────────────────────────
 
@@ -105,34 +130,94 @@ function CancelConfirmView({ slots }: { slots: Record<string, unknown> }) {
   );
 }
 
+// ── Phase: 자동이체 조회 목록 ─────────────────────────────────────────────────
+
+function ListAutoTransferView({
+  items,
+  loading,
+}: {
+  items: AutoTransferListItem[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return <ActivityIndicator style={styles.loader} color={COLORS.highlightYellow} />;
+  }
+  if (items.length === 0) {
+    return (
+      <View style={styles.emptyBox}>
+        <Text style={styles.emptyText}>등록된 자동이체가 없습니다.</Text>
+      </View>
+    );
+  }
+  return (
+    <>
+      {items.map((item) => (
+        <View key={item.orderId} style={styles.listCard}>
+          <View style={styles.listCardRow}>
+            <Text style={styles.listCardName}>{item.toName ?? '알 수 없음'}</Text>
+            <Text style={styles.listCardAmount}>{item.amount.toLocaleString()}원</Text>
+          </View>
+          <View style={styles.listCardRow}>
+            <Text style={styles.listCardSub}>{scheduleLabel(item)}</Text>
+            {item.nextExecutionAt != null && (
+              <Text style={styles.listCardSub}>다음 {item.nextExecutionAt}</Text>
+            )}
+          </View>
+          <Text style={styles.listCardAccount}>
+            {item.bankName} {item.accountMasked}
+          </Text>
+        </View>
+      ))}
+    </>
+  );
+}
+
 // ── 메인 화면 ─────────────────────────────────────────────────────────────────
 
 export default function AutoTransferScreen() {
   const lastResponse = useVoiceResponseStore((s) => s.lastResponse);
+  const router = useRouter();
 
-  useEffect(() => {
-    const pending = useVoiceResponseStore.getState().lastResponse?.pending_action;
-    if (!pending) {
-      apiClient.post('/api/voice/reset-state').catch(() => undefined);
-    }
-  }, []);
+  const [listItems, setListItems] = useState<AutoTransferListItem[]>([]);
+  const [listLoading, setListLoading] = useState(false);
 
   const slots = lastResponse?.collected_slots ?? {};
   const awaitingAsv = lastResponse?.awaiting_asv_audio ?? false;
   const pendingAction = lastResponse?.pending_action ?? null;
   const hasSlots = Object.keys(slots).length > 0;
 
+  const phase = resolveAutoTransferPhase(pendingAction, hasSlots, awaitingAsv);
   const isCancel = pendingAction === 'cancel_auto_transfer';
 
-  // 현재 페이즈 결정
-  type Phase = 'voice-guide' | 'slot-filling';
-  const phase: Phase = !hasSlots && !awaitingAsv ? 'voice-guide' : 'slot-filling';
+  const fetchList = useCallback(async () => {
+    setListLoading(true);
+    try {
+      const res = await apiClient.get<{ success: boolean; data: AutoTransferListItem[] }>(
+        '/api/auto-transfer?status=active',
+      );
+      setListItems(res.data.data ?? []);
+    } catch {
+      setListItems([]);
+    } finally {
+      setListLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'list-view') {
+      apiClient.post('/api/voice/reset-state').catch(() => undefined);
+    }
+    if (phase === 'list-view' || isCancel) {
+      fetchList();
+    }
+  }, [phase, isCancel, fetchList]);
 
   const step =
     phase === 'slot-filling' ? resolveAutoTransferStep(slots, awaitingAsv, pendingAction) : null;
 
   const stepTotal = isCancel ? CANCEL_STEP_TOTAL : STEP_TOTAL;
-  const title = isCancel ? '자동이체 해지' : '자동이체 설정';
+  const title =
+    phase === 'list-view' ? '자동이체 조회' : isCancel ? '자동이체 해지' : '자동이체 설정';
 
   return (
     <SafeAreaView style={styles.root}>
@@ -148,6 +233,10 @@ export default function AutoTransferScreen() {
           {step !== null && <StepIndicator total={stepTotal} current={STEP_INDEX[step]} />}
         </View>
 
+        {(phase === 'list-view' || isCancel) && (
+          <ListAutoTransferView items={listItems} loading={listLoading} />
+        )}
+
         {phase === 'voice-guide' && <VoiceGuidePhase />}
 
         {phase === 'slot-filling' && step === 'asv-pending' && <AsvPendingView slots={slots} />}
@@ -161,6 +250,15 @@ export default function AutoTransferScreen() {
         )}
         {phase === 'slot-filling' && step === 'cancel-confirm' && (
           <CancelConfirmView slots={slots} />
+        )}
+
+        {phase === 'list-view' && (
+          <Text
+            style={styles.homeLink}
+            onPress={() => router.replace('/home')}
+          >
+            홈으로 돌아가기
+          </Text>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -201,4 +299,32 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   asvBadgeText: { fontSize: FONT_SIZES.caption, color: COLORS.highlightYellow, fontWeight: '600' },
+
+  loader: { marginTop: 40 },
+  emptyBox: { alignItems: 'center', marginTop: 40 },
+  emptyText: { fontSize: FONT_SIZES.body, color: COLORS.grayLight },
+
+  listCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: LAYOUT.borderRadius,
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 12,
+    gap: 6,
+  },
+  listCardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  listCardName: { fontSize: FONT_SIZES.body, fontWeight: '600', color: COLORS.textMain },
+  listCardAmount: { fontSize: FONT_SIZES.body, fontWeight: '700', color: COLORS.highlightYellow },
+  listCardSub: { fontSize: FONT_SIZES.caption, color: COLORS.grayLight },
+  listCardAccount: { fontSize: FONT_SIZES.caption, color: COLORS.grayMedium },
+
+  homeLink: {
+    marginTop: 24,
+    textAlign: 'center',
+    fontSize: FONT_SIZES.body,
+    color: COLORS.grayLight,
+    textDecorationLine: 'underline',
+  },
 });
