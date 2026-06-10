@@ -166,7 +166,6 @@ Rules:
 | 에러 코드 | 설명 |
 |-----------|------|
 | `VOICE_AUTH_FAILED` | 음성 인증 실패 (종합) |
-| `VOICE_SPOOF_DETECTED` | Anti-spoofing 감지 |
 | `STT_FAILED` | STT 변환 자체 실패 (타임아웃 외) |
 | `VOICE_PROFILE_ALREADY_EXISTS` | 음성 프로필 중복 등록 시도 — `unique` 제약 위반 (user_id 1:1) |
 | `VOICE_AUDIO_TOO_LONG` | 음성 파일 길이 초과 — CLOVA STT 60초 제한 |
