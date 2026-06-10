@@ -25,7 +25,6 @@ from app.shared.agent.tools.history import (
 
 # -- Dev-B (TransferAgent tools) ──────────────────────────────────────────────
 from app.shared.agent.tools.transfer import add_note, execute_transfer
-from app.shared.agent.tools.lookup_recipient import lookup_recipient
 from app.shared.agent.tools.event import get_event_list
 
 # ── Dev-C (AssetAgent tools) ──────────────────────────────────────────────────
@@ -56,7 +55,6 @@ TRANSFER_TOOLS: list = [
     execute_auto_transfer,
     add_auto_transfer_note,
     cancel_auto_transfer,
-    lookup_recipient,
     list_auto_transfer,
 ]
 
@@ -78,7 +76,6 @@ ALL_TOOLS: list = [
     # Dev-B: Transfer
     get_event_list,
     execute_transfer,
-    lookup_recipient,
     add_note,
     execute_auto_transfer,
     cancel_auto_transfer,

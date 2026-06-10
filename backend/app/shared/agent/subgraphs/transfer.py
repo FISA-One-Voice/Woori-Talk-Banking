@@ -16,18 +16,12 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exception import AgentError
-from app.features.recipients.schema import ResolvedRecipient
 from app.features.recipients.service import (
     classify_recipient_input,
     enrich_slots_from_resolved,
     find_recipient_by_voice,
 )
-from app.features.transfer.service import _mask_account
 from app.features.transfer.service import format_confirm_message
-from app.shared.agent.ROUTING_CONSTANTS import (
-    TRANSFER_NAVIGATE_VALUES,
-    TRANSFER_READ,
-)
 from app.shared.agent.memo_decision import (
     build_memo_decision_update,
     last_user_text,
@@ -38,22 +32,20 @@ from app.shared.agent.ROUTING_CONSTANTS import (
 )
 from app.shared.agent.session_reset import clear_conversation_messages
 from app.shared.agent.slot_schema import (
-    ACTION_LABELS,
-    ACTIONS_WITH_YES_NO_CONFIRM,
     ASV_REQUIRED_ACTIONS,
     COMPLETE_SCREEN_MAP,
     CONFIRM_YES_NO_SUFFIX,
     FAILED_SCREEN_MAP,
     MEMO_OFFER_SUFFIX,
-    missing_slots,
-    normalize_scheduled_day,
-    parse_korean_amount,
     RECIPIENT_REQUIRED_ACTIONS,
     SCREEN_MAP,
     SLOT_QUESTIONS,
     SLOT_QUESTIONS_BY_ACTION,
     SLOT_SCHEMA,
     TRANSFER_FAILED_HOME_SUFFIX,
+    missing_slots,
+    normalize_scheduled_day,
+    parse_korean_amount,
 )
 from app.shared.agent.state import VoiceState
 from app.shared.agent.transfer_clarification import (
@@ -150,9 +142,6 @@ def _clean_transfer_delta(delta: dict) -> dict:
     return validate_transfer_delta(cleaned)
 
 
-
-
-
 def _build_bare_transfer_start_update(user_text: str) -> dict:
     """수취인·금액 없는 송금 시작 발화를 transfer 상태로 변환한다."""
     return {
@@ -247,141 +236,6 @@ def _chat_messages_for_llm(state: VoiceState, system_content: str) -> list[dict]
             role = "user" if message.type == "human" else "assistant"
             chat_messages.append({"role": role, "content": message.content})
     return chat_messages
-
-
-def _find_tool_for_action(
-    action: str, tool_registry: dict[str, object]
-) -> object | None:
-    """액션 이름에 해당하는 tool을 registry에서 찾는다."""
-    candidates = [
-        action,
-        f"mock_execute_{action}",
-        f"mock_register_{action}",
-        f"execute_{action}",
-        f"register_{action}",
-        f"{action}_tool",
-    ]
-    for name in candidates:
-        if name in tool_registry:
-            return tool_registry[name]
-    for name, tool_obj in tool_registry.items():
-        if action in name:
-            return tool_obj
-    return None
-
-
-_KOR_DOW_MAP: dict[str, int] = {
-    "월": 0,
-    "월요일": 0,
-    "화": 1,
-    "화요일": 1,
-    "수": 2,
-    "수요일": 2,
-    "목": 3,
-    "목요일": 3,
-    "금": 4,
-    "금요일": 4,
-    "토": 5,
-    "토요일": 5,
-    "일": 6,
-    "일요일": 6,
-}
-
-# STT 발음 유사 오인식 매핑 (천원 → 전원 등)
-_STT_AMOUNT_ALIASES: dict[str, int] = {
-    "전원": 1000,  # "천원" 오인식
-    "천원": 1000,
-    "천": 1000,
-    "만원": 10000,
-    "만": 10000,
-}
-
-
-def _kor_to_int(text: str) -> int | None:
-    """순수 한국어 숫자 문자열을 정수로 변환한다."""
-    _DIGIT = {
-        "일": 1,
-        "이": 2,
-        "삼": 3,
-        "사": 4,
-        "오": 5,
-        "육": 6,
-        "칠": 7,
-        "팔": 8,
-        "구": 9,
-    }
-    _SMALL = {"십": 10, "백": 100, "천": 1000}
-
-    def _below_10000(s: str) -> int:
-        result, current = 0, 0
-        for ch in s:
-            if ch in _DIGIT:
-                current = _DIGIT[ch]
-            elif ch in _SMALL:
-                result += (current or 1) * _SMALL[ch]
-                current = 0
-        return result + current
-
-    total = 0
-    if "억" in text:
-        parts = text.split("억", 1)
-        total += (_below_10000(parts[0]) or 1) * 100_000_000
-        text = parts[1]
-    if "만" in text:
-        parts = text.split("만", 1)
-        total += (_below_10000(parts[0]) or 1) * 10_000
-        text = parts[1]
-    total += _below_10000(text)
-    return total if total > 0 else None
-
-
-def _parse_korean_amount(raw: str) -> str | None:
-    """한국어·STT 오인식 금액 표현을 정수 문자열로 변환한다.
-
-    STT 오인식("전원"→천원), 한국어 숫자("오만원"→50000),
-    숫자+단위("1000원"→1000) 세 경우를 처리한다.
-    변환 불가 시 None을 반환한다.
-    """
-    text = str(raw).strip().replace(" ", "").replace(",", "")
-    if not text:
-        return None
-
-    # STT 오인식 alias
-    if text in _STT_AMOUNT_ALIASES:
-        return str(_STT_AMOUNT_ALIASES[text])
-
-    # "원" suffix 제거 후 alias 재확인 (e.g. "전원" suffix 없는 경우 대비)
-    text_no_won = re.sub(r"원$", "", text)
-
-    # 숫자만 있는 경우
-    try:
-        val = int(text_no_won)
-        return str(val) if val > 0 else None
-    except ValueError:
-        pass
-
-    # 한국어 숫자 파싱
-    val = _kor_to_int(text_no_won)
-    return str(val) if val is not None and val > 0 else None
-
-
-def _normalize_scheduled_day(slots: dict, extracted_slots: dict) -> dict:
-    """STT 오류 보정 및 한글 요일명 → 정수 변환."""
-    normalized = dict(slots)
-    for key, value in extracted_slots.items():
-        if key == "scheduled_day" and value is not None:
-            kor_key = str(value).replace(" ", "")
-            if kor_key in _KOR_DOW_MAP:
-                value = _KOR_DOW_MAP[kor_key]
-            else:
-                try:
-                    day_int = int(value)
-                except (TypeError, ValueError):
-                    day_int = None
-                if day_int is not None and 32 <= day_int <= 91 and day_int % 10 == 1:
-                    value = day_int // 10
-        normalized[key] = value
-    return normalized
 
 
 def _build_new_intent_update(result: IntentResult, user_text: str) -> dict:
@@ -506,7 +360,9 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             )
 
         user_text = last_user_text(state.get("messages", []))
-        if not state.get("pending_action") and should_use_bare_transfer_fast_start(user_text):
+        if not state.get("pending_action") and should_use_bare_transfer_fast_start(
+            user_text
+        ):
             return _clean_transfer_delta(_build_bare_transfer_start_update(user_text))
 
         if should_offer_transfer_clarification(
@@ -579,10 +435,12 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         )
         if resolved is not None:
             enrich_slots_from_resolved(slots, resolved, recipient_input, user_id)
-            return _clean_transfer_delta({
-                "collected_slots": slots,
-                "recipient_validated": True,
-            })
+            return _clean_transfer_delta(
+                {
+                    "collected_slots": slots,
+                    "recipient_validated": True,
+                }
+            )
 
         if kind == "account" and not bank_name:
             return _clean_transfer_delta(
@@ -632,6 +490,13 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         """수집된 슬롯으로 Transfer 도메인 tool을 호출한다."""
         pending = state.get("pending_action", "")
         slots = dict(state.get("collected_slots", {}))
+
+        # 메모 액션은 세션 ID를 슬롯에 주입해 tool.invoke가 직접 받을 수 있게 한다.
+        if pending == "add_note" and not slots.get("tx_id"):
+            slots["tx_id"] = state.get("last_tx_id")
+        elif pending == "add_auto_transfer_note" and not slots.get("order_id"):
+            slots["order_id"] = state.get("last_order_id")
+
         tool_obj = tool_registry.get(pending) or tool_registry.get(f"execute_{pending}")
         if tool_obj is None:
             raise AgentError(
@@ -787,33 +652,49 @@ def _build_intent_update(
     return {"navigate_to": None}
 
 
-def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> dict:
-    """pending_action에 맞는 tool을 호출하고 완료 delta를 만든다."""
-    from app.shared.agent.tools.transfer import run_execute_transfer
+def _parse_tool_response(
+    raw: str | object,
+) -> tuple[str, str | None, str | None, bool]:
+    """Tool 응답을 (tts_text, tx_id, order_id, note_consumed) tuple로 변환한다.
 
+    execute_transfer / execute_auto_transfer 는 JSON 반환,
+    나머지 tool 은 plain string 반환 — json.loads 실패 시 string 그대로 사용한다.
+    """
+    try:
+        result_data = json.loads(raw) if isinstance(raw, str) else {}
+    except (json.JSONDecodeError, TypeError):
+        result_data = {}
+
+    if result_data:
+        response_text = result_data.get("tts_text", str(raw))
+        tx_id = result_data.get("tx_id")
+        order_id = result_data.get("order_id")
+    else:
+        response_text = str(raw)
+        tx_id = None
+        order_id = None
+
+    note_consumed = "추가되었습니다" in response_text
+    return response_text, tx_id, order_id, note_consumed
+
+
+def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> dict:
+    """tool_obj.invoke로 tool을 실행하고 완료 delta를 만든다.
+
+    모든 Transfer 도메인 액션을 동일한 경로로 실행한다.
+    execute_transfer / execute_auto_transfer 는 JSON 응답을 _parse_tool_response로
+    파싱하고, 나머지 tool 은 plain string 응답을 그대로 사용한다.
+    """
     pending = state.get("pending_action", "")
     invoke_args = {"user_id": state.get("user_id", ""), **slots}
     last_tx_id: str | None = state.get("last_tx_id")
     last_order_id: str | None = state.get("last_order_id")
     completed_slots: dict = {}
-    note_consumed = False
     awaiting_memo_next = False
     post_execute_navigate: str | None = None
 
     try:
-        if pending == "transfer":
-            response_text, tx_id = run_execute_transfer(
-                user_id=invoke_args["user_id"],
-                recipient=str(invoke_args.get("recipient", "")),
-                amount=int(invoke_args.get("amount", 0)),
-                collected_slots=slots,
-            )
-            order_id = None
-            note_consumed = False
-        else:
-            response_text, tx_id, order_id, note_consumed = _invoke_tool_by_action(
-                pending, tool_obj, invoke_args, slots, state
-            )
+        raw = tool_obj.invoke(invoke_args)
     except Exception as exc:
         raise AgentError(
             code="TRANSFER_TOOL_FAILED",
@@ -821,6 +702,8 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
             status_code=500,
             user_message="이체 처리 중 일시적인 오류가 발생했습니다.",
         ) from exc
+
+    response_text, tx_id, order_id, note_consumed = _parse_tool_response(raw)
 
     if pending == "transfer":
         if tx_id:
@@ -864,77 +747,3 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
     elif pending in COMPLETE_SCREEN_MAP:
         updates["navigate_to"] = COMPLETE_SCREEN_MAP[pending]
     return updates
-
-
-def _invoke_tool_by_action(
-    pending: str,
-    tool_obj: object,
-    invoke_args: dict,
-    slots: dict,
-    state: VoiceState,
-) -> tuple[str, str | None, str | None, bool]:
-    """액션별 tool 호출 결과를 표준 tuple로 반환한다."""
-    response_text = ""
-    tx_id: str | None = None
-    order_id: str | None = None
-    note_consumed = False
-
-    if pending == "transfer":
-        response_text = tool_obj.invoke(invoke_args)
-    elif pending == "auto_transfer":
-        result_raw = tool_obj.invoke(invoke_args)
-        result_data = json.loads(result_raw) if isinstance(result_raw, str) else {}
-        response_text = result_data.get(
-            "tts_text", "자동이체 등록 중 오류가 발생했습니다."
-        )
-        if result_data.get("success"):
-            order_id = result_data.get("order_id")
-    elif pending == "add_note":
-        response_text = _invoke_add_note(tool_obj, invoke_args, slots, state)
-        note_consumed = "추가되었습니다" in response_text
-    elif pending == "add_auto_transfer_note":
-        response_text = _invoke_add_auto_transfer_note(
-            tool_obj, invoke_args, slots, state
-        )
-        note_consumed = "추가되었습니다" in response_text
-    else:
-        response_text = tool_obj.invoke(invoke_args)
-    return response_text, tx_id, order_id, note_consumed
-
-
-def _invoke_add_note(
-    tool_obj: object,
-    invoke_args: dict,
-    slots: dict,
-    state: VoiceState,
-) -> str:
-    """직전 이체 거래에 메모를 추가한다."""
-    tx_id = slots.get("tx_id") or state.get("last_tx_id")
-    if not tx_id:
-        return "메모를 추가할 이체 내역을 찾을 수 없습니다. 이체를 먼저 완료해 주세요."
-    return tool_obj.invoke(
-        {
-            "user_id": invoke_args["user_id"],
-            "memo": str(invoke_args.get("memo", "")),
-            "tx_id": str(tx_id),
-        }
-    )
-
-
-def _invoke_add_auto_transfer_note(
-    tool_obj: object,
-    invoke_args: dict,
-    slots: dict,
-    state: VoiceState,
-) -> str:
-    """직전 자동이체 주문에 메모를 추가한다."""
-    order_id = slots.get("order_id") or state.get("last_order_id")
-    if not order_id:
-        return "메모를 추가할 자동이체 내역을 찾을 수 없습니다. 자동이체 등록을 먼저 완료해 주세요."
-    return tool_obj.invoke(
-        {
-            "user_id": invoke_args["user_id"],
-            "memo": str(invoke_args.get("memo", "")),
-            "order_id": str(order_id),
-        }
-    )

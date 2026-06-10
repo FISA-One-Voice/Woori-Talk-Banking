@@ -295,10 +295,10 @@ def build_supervisor():
     MemorySaver는 이 레벨에만 설정한다. 서브그래프는 checkpointer 없이
     builder.compile()만 호출해야 세션 상태가 분리되지 않는다.
     """
-    from app.shared.agent.subgraphs.transfer import build_transfer_graph
-    from app.shared.agent.subgraphs.consultation import build_rag_graph
     from app.shared.agent.subgraphs.asset import build_asset_graph
-    from app.shared.agent.tools import TRANSFER_TOOLS, RAG_TOOLS, ASSET_TOOLS
+    from app.shared.agent.subgraphs.consultation import build_rag_graph
+    from app.shared.agent.subgraphs.transfer import build_transfer_graph
+    from app.shared.agent.tools import ASSET_TOOLS, RAG_TOOLS, TRANSFER_TOOLS
 
     transfer_graph = build_transfer_graph(TRANSFER_TOOLS)
     rag_graph = build_rag_graph(RAG_TOOLS)
