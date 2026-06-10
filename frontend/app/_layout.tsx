@@ -1,6 +1,7 @@
 import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay';
 import { needsYesNoVoicePrompt, YES_NO_CONFIRM_INSTRUCTION } from '@/constants/voicePrompts';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { proceedTransfer } from '@/services/voiceService';
 import { useAuthStore } from '@/store/authStore';
 import { useTransferStore as transferStore } from '@/store/transferStore';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
@@ -113,6 +114,9 @@ export default function RootLayout() {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchOrigin = useRef<{ x: number; y: number } | null>(null);
 
+  // execution_pending 재귀 호출용 ref — useCallback 순환 의존성을 피한다
+  const handleResponseRef = useRef<((data: VoiceResponseData) => Promise<void>) | null>(null);
+
   function handleTouchStart(e: GestureResponderEvent): void {
     const { locationX: x, locationY: y } = e.nativeEvent;
     touchPts.current = [{ x, y }];
@@ -166,6 +170,24 @@ export default function RootLayout() {
 
   const handleResponse = useCallback(
     async (data: VoiceResponseData) => {
+      // ASV 인증 성공 직후 — "처리 중" TTS를 재생한 뒤 /proceed를 자동 호출한다
+      if (data.execution_pending) {
+        setVoiceState('processing');
+        useVoiceResponseStore.getState().setLastResponse(data);
+        await stopAllTts();
+        if (data.audio) {
+          await playBase64Audio(data.audio).catch(() => undefined);
+        }
+        try {
+          const result = await proceedTransfer();
+          await handleResponseRef.current?.(result);
+        } catch {
+          setVoiceState('idle');
+          speakText('이체 처리 중 오류가 발생했습니다.');
+        }
+        return;
+      }
+
       const prevSlots =
         (useVoiceResponseStore.getState().lastResponse?.collected_slots as
           | Record<string, unknown>
@@ -233,6 +255,10 @@ export default function RootLayout() {
     },
     [router],
   );
+
+  useEffect(() => {
+    handleResponseRef.current = handleResponse;
+  }, [handleResponse]);
 
   const handleError = useCallback((message: string) => {
     setVoiceState('idle');

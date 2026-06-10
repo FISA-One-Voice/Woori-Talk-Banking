@@ -12,7 +12,7 @@
 
     Layer B — 스키마 구조 검증 (의존성 없음):
         - VoiceResponseData 기본값 확인
-        - ASVResult / AntiSpoofResult 필드 확인
+        - ASVResult 필드 확인
 
 실행 방법:
     cd backend
@@ -25,9 +25,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.exception import ASVError, STTError
-from app.shared.voice.schema import AntiSpoofResult, ASVResult, VoiceResponseData
+from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.service import (
-    _call_anti_spoofing_ec2,
     _call_asv_ec2,
     _get_user_embedding,
     _handle_asv_flow,
@@ -94,7 +93,7 @@ def _make_mock_graph(
 
 
 class TestSchemas:
-    """VoiceResponseData, ASVResult, AntiSpoofResult 스키마 기본 검증."""
+    """VoiceResponseData, ASVResult 스키마 기본 검증."""
 
     def test_voice_response_data_defaults(self) -> None:
         """TC-S01: VoiceResponseData 기본값 확인."""
@@ -112,14 +111,6 @@ class TestSchemas:
         assert result.verified is True
         # approx: float 비교 시 부동소수점 오차를 허용
         assert result.score == pytest.approx(0.72)
-
-    def test_anti_spoof_result_fields(self) -> None:
-        """TC-S03: AntiSpoofResult 필드 타입 확인."""
-        result = AntiSpoofResult(is_real=False, confidence=0.3)
-        # is_real=False: 스푸핑 감지 시나리오 — False 값도 정상 저장되는지 확인
-        assert result.is_real is False
-        assert result.confidence == pytest.approx(0.3)
-
 
 # ── Layer A: 정상 흐름 테스트 ────────────────────────────────────────────────────
 
@@ -371,12 +362,6 @@ class TestAsvFlow:
                 new=AsyncMock(return_value=ASVResult(verified=True, score=0.85)),
             ),
             patch(
-                "app.shared.voice.service._call_anti_spoofing_ec2",
-                new=AsyncMock(
-                    return_value=AntiSpoofResult(is_real=True, confidence=0.99)
-                ),
-            ),
-            patch(
                 "app.shared.voice.service.synthesize_speech",
                 new=AsyncMock(return_value=b"MP3"),
             ),
@@ -409,12 +394,6 @@ class TestAsvFlow:
                 new=AsyncMock(return_value=ASVResult(verified=False, score=0.3)),
             ),
             patch(
-                "app.shared.voice.service._call_anti_spoofing_ec2",
-                new=AsyncMock(
-                    return_value=AntiSpoofResult(is_real=True, confidence=0.99)
-                ),
-            ),
-            patch(
                 "app.shared.voice.service.synthesize_speech",
                 new=AsyncMock(return_value=b"MP3"),
             ),
@@ -445,12 +424,6 @@ class TestAsvFlow:
                 "app.shared.voice.service._call_asv_ec2",
                 new=AsyncMock(return_value=ASVResult(verified=False, score=0.2)),
             ),
-            patch(
-                "app.shared.voice.service._call_anti_spoofing_ec2",
-                new=AsyncMock(
-                    return_value=AntiSpoofResult(is_real=True, confidence=0.99)
-                ),
-            ),
             patch("app.shared.voice.service.synthesize_speech", new=mock_tts),
         ):
             result = await process_voice_pipeline(
@@ -477,12 +450,6 @@ class TestAsvFlow:
             patch(
                 "app.shared.voice.service._call_asv_ec2",
                 new=AsyncMock(return_value=ASVResult(verified=False, score=0.1)),
-            ),
-            patch(
-                "app.shared.voice.service._call_anti_spoofing_ec2",
-                new=AsyncMock(
-                    return_value=AntiSpoofResult(is_real=True, confidence=0.99)
-                ),
             ),
             patch(
                 "app.shared.voice.service.synthesize_speech",
@@ -610,20 +577,3 @@ class TestGetUserEmbedding:
 
         assert exc_info.value.code == "ASV_NOT_ENROLLED"
         assert exc_info.value.status_code == 400
-
-
-# ── Layer A: anti-spoofing 바이패스 테스트 ────────────────────────────────────────
-
-
-class TestAntiSpoofBypass:
-    """USE_ANTI_SPOOFING=False 시 바이패스 동작 확인."""
-
-    @pytest.mark.asyncio
-    async def test_bypass_returns_real_true(self) -> None:
-        """TC-SP01: USE_ANTI_SPOOFING=False → is_real=True, confidence=1.0 반환."""
-        with patch("app.shared.voice.service.settings") as mock_settings:
-            mock_settings.USE_ANTI_SPOOFING = False
-            result = await _call_anti_spoofing_ec2(FAKE_AUDIO)
-
-        assert result.is_real is True
-        assert result.confidence == pytest.approx(1.0)

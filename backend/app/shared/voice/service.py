@@ -7,7 +7,7 @@
       오디오 → STT → LangGraph 에이전트 → TTS → VoiceResponseData
 
   ASV 인증 흐름 (awaiting_asv_audio=True):
-      오디오 → ASV EC2 + anti-spoofing EC2 병렬 호출
+      오디오 → ASV EC2 호출
             → 성공: 상태 업데이트 → 에이전트 실행 → TTS
             → 실패: 재시도 안내 TTS (최대 3회, 초과 시 취소)
 
@@ -38,7 +38,7 @@ from app.shared.agent.transfer_clarification import (
     is_clarification_no,
     is_home_request,
 )
-from app.shared.voice.schema import AntiSpoofResult, ASVResult, VoiceResponseData
+from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.message_utils import tts_text_from_messages
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
@@ -330,7 +330,7 @@ async def _handle_asv_flow(
 ) -> VoiceResponseData:
     """ASV 화자 인증 처리 흐름.
 
-    ASV EC2 서버와 anti-spoofing 서버를 asyncio.gather로 병렬 호출한다.
+    ASV EC2 서버를 호출한다.
     성공 시 aupdate_state()로 execution_ready=True를 설정하고 에이전트를 실행한다.
     실패 시 retry_count를 증가시키고 남은 횟수를 TTS로 안내한다.
     3회 초과 실패 시 작업을 취소하고 상태를 초기화한다.
@@ -392,17 +392,14 @@ async def _handle_asv_flow(
         len(wav_bytes),
     )
 
-    # ASV + anti-spoofing 병렬 호출
-    asv_result, spoof_result = await asyncio.gather(
+    # ASV 호출
+    (asv_result,) = await asyncio.gather(
         _call_asv_ec2(wav_bytes, reference_embedding),
-        _call_anti_spoofing_ec2(wav_bytes),
         return_exceptions=True,
     )
 
     asv_ok = isinstance(asv_result, ASVResult) and asv_result.verified
-    spoof_ok = isinstance(spoof_result, AntiSpoofResult) and spoof_result.is_real
 
-    # 실패 원인 로깅 (ASV 예외 발생 시 재raise)
     if isinstance(asv_result, ASVError):
         raise asv_result
     if isinstance(asv_result, Exception):
@@ -414,20 +411,19 @@ async def _handle_asv_flow(
             user_message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
         )
 
-    auth_success = asv_ok and spoof_ok
+    auth_success = asv_ok
 
     if auth_success:
-        return await _proceed_after_asv_success(user_id, config, graph)
+        return await _return_processing_tts(config, graph)
 
     # ── 인증 실패 처리 ─────────────────────────────────────────────────────────
     new_retry = retry_count + 1
     logger.info(
-        "ASV 인증 실패: user_id=%s, retry=%d/%d, asv_ok=%s, spoof_ok=%s",
+        "ASV 인증 실패: user_id=%s, retry=%d/%d, asv_ok=%s",
         user_id,
         new_retry,
         _MAX_ASV_RETRIES,
         asv_ok,
-        spoof_ok,
     )
 
     if new_retry >= _MAX_ASV_RETRIES:
@@ -487,39 +483,22 @@ async def _handle_asv_flow(
     )
 
 
-async def _proceed_after_asv_success(
-    user_id: str,
+async def _return_processing_tts(
     config: dict,
     graph,
 ) -> VoiceResponseData:
-    """ASV 인증 성공 후 에이전트 실행 흐름.
+    """ASV 인증 성공 직후 "처리 중" TTS를 즉시 반환한다.
 
-    aupdate_state()로 execution_ready=True를 주입하면
-    route_after_intent가 execute_node로 라우팅한다.
-
-    Args:
-        user_id: JWT 사용자 ID.
-        config: LangGraph thread_id 설정.
-        graph: 컴파일된 StateGraph 인스턴스.
-
-    Returns:
-        VoiceResponseData: 금융 작업 실행 결과 TTS 응답.
+    execution_ready=True를 graph 상태에 설정하되 ainvoke는 호출하지 않는다.
+    프론트엔드는 execution_pending=True 수신 시 TTS를 재생한 뒤
+    POST /api/voice/proceed를 자동 호출해 실제 이체를 실행한다.
+    pending_consent_* 필드는 /proceed 에서 필요하므로 여기서 지우지 않는다.
     """
-    # 동의 음성 업로드에 필요한 임시 필드를 에이전트 실행 전에 읽어둔다 (voice-consent-s3)
     state_snapshot = graph.get_state(config)
-    pending_tts_text: str | None = (
-        state_snapshot.values.get("pending_consent_tts_text")
-        if state_snapshot.values
-        else None
-    )
-    pending_audio_b64: str | None = (
-        state_snapshot.values.get("pending_consent_audio_b64")
-        if state_snapshot.values
-        else None
-    )
+    state_vals = state_snapshot.values if state_snapshot.values else {}
+    pending_action = state_vals.get("pending_action")
+    collected_slots = state_vals.get("collected_slots", {})
 
-    # execution_ready=True 주입 → intent_node 이후 route_after_intent가 execute_node로 라우팅
-    # pending_consent_* 필드를 함께 초기화하여 다음 세션에 누수되지 않도록 한다
     await graph.aupdate_state(
         config,
         {
@@ -527,26 +506,59 @@ async def _proceed_after_asv_success(
             "execution_ready": True,
             "asv_retry_count": 0,
             "agent_domain": "transfer",
+        },
+        as_node="supervisor_node",
+    )
+
+    audio_mp3 = await synthesize_speech(
+        "인증이 완료되었습니다. 이체를 처리 중입니다. 잠시만 기다려주십시오."
+    )
+    navigate_to = SCREEN_MAP.get(pending_action) if pending_action else None
+
+    return VoiceResponseData(
+        audio=base64.b64encode(audio_mp3).decode(),
+        navigate_to=navigate_to,
+        collected_slots=collected_slots,
+        awaiting_confirmation=False,
+        awaiting_asv_audio=False,
+        execution_pending=True,
+        awaiting_memo_decision=False,
+        awaiting_transfer_clarification=False,
+        transcript=None,
+        pending_action=pending_action,
+    )
+
+
+async def _execute_pending_transfer(
+    user_id: str,
+    config: dict,
+    graph,
+) -> VoiceResponseData:
+    """execution_ready=True 상태에서 실제 이체를 실행하고 결과 TTS를 반환한다.
+
+    POST /api/voice/proceed 엔드포인트의 실제 처리 함수.
+    """
+    # 동의 음성 업로드에 필요한 임시 필드를 읽은 뒤 즉시 초기화한다
+    state_snapshot = graph.get_state(config)
+    state_vals = state_snapshot.values if state_snapshot.values else {}
+    pending_tts_text: str | None = state_vals.get("pending_consent_tts_text")
+    pending_audio_b64: str | None = state_vals.get("pending_consent_audio_b64")
+
+    await graph.aupdate_state(
+        config,
+        {
             "pending_consent_tts_text": None,
             "pending_consent_audio_b64": None,
         },
         as_node="supervisor_node",
     )
 
-    # intent_node는 LLM을 호출하지만 execution_ready=True가 보존되어
-    # route_after_intent → execute_node로 직행한다. (graph.py 수정 불필요)
     result = await graph.ainvoke(
-        {
-            "messages": [HumanMessage(content="인증 완료")],
-            "user_id": user_id,
-        },
+        {"messages": [HumanMessage(content="인증 완료")], "user_id": user_id},
         config=config,
     )
 
     response_text = tts_text_from_messages(result["messages"])
-
-    # 4-c: ASV 성공 + 동의 필드가 모두 있으면 S3 업로드 task 생성 (voice-consent-s3)
-    # Plan SC: asyncio.create_task로 분리 → 이체 응답은 즉시 반환
     tx_id: str | None = result.get("last_tx_id") or result.get("last_order_id")
     logger.info(
         "[ConsentS3] pending_tts=%s pending_audio=%s tx_id=%s",
@@ -554,18 +566,26 @@ async def _proceed_after_asv_success(
         bool(pending_audio_b64),
         tx_id,
     )
+
     if pending_tts_text and pending_audio_b64 and tx_id:
         from app.shared.voice import s3_service
+
+        # 결과 TTS와 동의 TTS(S3용)를 동시에 합성한다.
+        # 백그라운드 task는 TTS 합성 없이 즉시 S3 업로드를 시작하므로
+        # 사용자가 "업로드하고 있습니다" 메시지를 듣는 시점에 실제 업로드가 진행 중이다.
+        audio_mp3, consent_tts_mp3 = await asyncio.gather(
+            synthesize_speech("이체 확인 음성을 업로드하고 있습니다. " + response_text),
+            synthesize_speech(pending_tts_text),
+        )
 
         async def _upload_consent_task(
             _user_id: str,
             _tx_id: str,
-            _tts_text: str,
+            _tts_mp3: bytes,
             _audio_b64: str,
         ) -> None:
             try:
-                tts_mp3 = await synthesize_speech(_tts_text)
-                tts_wav = s3_service.mp3_to_wav(tts_mp3)
+                tts_wav = s3_service.mp3_to_wav(_tts_mp3)
                 consent_wav = base64.b64decode(_audio_b64)
                 combined = s3_service.concat_wav(tts_wav, consent_wav)
                 await s3_service.upload_consent_audio(_user_id, _tx_id, combined)
@@ -573,12 +593,12 @@ async def _proceed_after_asv_success(
                 logger.error("동의 음성 S3 업로드 실패 (이체 결과 영향 없음)", exc_info=True)
 
         task = asyncio.create_task(
-            _upload_consent_task(user_id, tx_id, pending_tts_text, pending_audio_b64)
+            _upload_consent_task(user_id, tx_id, consent_tts_mp3, pending_audio_b64)
         )
         _background_tasks.add(task)
         task.add_done_callback(_background_tasks.discard)
-
-    audio_mp3 = await synthesize_speech(response_text)
+    else:
+        audio_mp3 = await synthesize_speech(response_text)
 
     return VoiceResponseData(
         audio=base64.b64encode(audio_mp3).decode(),
@@ -586,6 +606,7 @@ async def _proceed_after_asv_success(
         collected_slots=result.get("collected_slots") or {},
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=False,
+        execution_pending=False,
         awaiting_memo_decision=result.get("awaiting_memo_decision", False),
         awaiting_transfer_clarification=result.get(
             "awaiting_transfer_clarification", False
@@ -593,6 +614,20 @@ async def _proceed_after_asv_success(
         transcript=None,
         pending_action=result.get("pending_action"),
     )
+
+
+async def execute_pending_transfer(user_id: str) -> VoiceResponseData:
+    """POST /api/voice/proceed 엔드포인트 진입점.
+
+    Args:
+        user_id: JWT에서 추출한 사용자 ID.
+
+    Returns:
+        VoiceResponseData: 이체 결과 TTS + 상태 플래그.
+    """
+    graph = _get_graph()
+    config = {"configurable": {"thread_id": user_id}}
+    return await _execute_pending_transfer(user_id, config, graph)
 
 
 # ── DB 조회 ─────────────────────────────────────────────────────────────────────
@@ -683,38 +718,3 @@ async def _call_asv_ec2(
         ) from e
 
 
-async def _call_anti_spoofing_ec2(audio_bytes: bytes) -> AntiSpoofResult:
-    """Anti-spoofing EC2 서버(POST /detect)를 호출한다.
-
-    ai/anti-spoofing/이 미구현 상태이므로 settings.USE_ANTI_SPOOFING=False(기본값)이면
-    is_real=True를 즉시 반환하여 바이패스한다.
-
-    Args:
-        audio_bytes: 검사할 오디오 바이트.
-
-    Returns:
-        AntiSpoofResult: is_real(bool) + confidence(float).
-    """
-    if not settings.USE_ANTI_SPOOFING:
-        # anti-spoofing 서버 미구현 — 바이패스 (항상 실제 음성으로 간주)
-        return AntiSpoofResult(is_real=True, confidence=1.0)
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{settings.ANTI_SPOOFING_EC2_URL}/detect",
-                files={"file": ("audio.wav", audio_bytes, "audio/wav")},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return AntiSpoofResult(
-                is_real=data["is_real"],
-                confidence=data.get("confidence", 0.0),
-            )
-    except httpx.HTTPStatusError as e:
-        logger.warning("Anti-spoofing 서버 HTTP 오류 %d: %s", e.response.status_code, e)
-        # anti-spoofing 실패 시 보수적으로 is_real=False 반환
-        return AntiSpoofResult(is_real=False, confidence=0.0)
-    except httpx.TimeoutException as e:
-        logger.warning("Anti-spoofing 서버 타임아웃: %s", e)
-        return AntiSpoofResult(is_real=False, confidence=0.0)

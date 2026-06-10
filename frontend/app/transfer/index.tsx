@@ -71,10 +71,12 @@ export default function TransferScreen() {
   }, [lastResponse]);
 
   useEffect(() => {
-    fetchRecentRecipients()
-      .then((list) => setRecentList(list))
-      .catch(() => undefined);
-  }, []);
+    if (step === 'input-alias') {
+      fetchRecentRecipients()
+        .then((list) => setRecentList(list))
+        .catch(() => undefined);
+    }
+  }, [step]);
 
   useEffect(() => {
     const fromSlots = recipientFromSlots(slots);

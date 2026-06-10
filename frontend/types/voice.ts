@@ -59,6 +59,12 @@ export interface VoiceResponseData {
    * - null이면 액션 없음
    */
   pending_action: string | null;
+
+  /**
+   * True이면 이체 실행이 진행 중. 프론트엔드는 TTS 재생 완료 후
+   * POST /api/voice/proceed를 자동 호출해야 한다.
+   */
+  execution_pending?: boolean;
 }
 
 /**
