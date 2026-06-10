@@ -629,7 +629,7 @@ async def _return_processing_tts(
     )
 
     audio_mp3 = await synthesize_speech(
-        "인증이 완료되었습니다. 이체를 처리 중입니다. 잠시만 기다려주십시오."
+        "인증이 완료되었습니다. 이체 처리와 이체 확인 음성을 업로드 중입니다. 잠시만 기다려주십시오."
     )
     navigate_to = SCREEN_MAP.get(pending_action) if pending_action else None
 
@@ -692,7 +692,7 @@ async def _execute_pending_transfer(
         # 백그라운드 task는 TTS 합성 없이 즉시 S3 업로드를 시작하므로
         # 사용자가 "업로드하고 있습니다" 메시지를 듣는 시점에 실제 업로드가 진행 중이다.
         audio_mp3, consent_tts_mp3 = await asyncio.gather(
-            synthesize_speech("이체 확인 음성을 업로드하고 있습니다. " + response_text),
+            synthesize_speech(response_text),
             synthesize_speech(pending_tts_text),
         )
 

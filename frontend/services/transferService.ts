@@ -11,11 +11,19 @@ interface TransferApiResult {
   createdAt: string;
 }
 
-export async function fetchRecentRecipients(): Promise<RecipientItem[]> {
-  const res = await apiClient.get<ApiResponse<{ recipients: RecipientItem[] }>>(
+export interface RecentRecipientsResult {
+  recipients: RecipientItem[];
+  tts_audio_base64: string | null;
+}
+
+export async function fetchRecentRecipients(): Promise<RecentRecipientsResult> {
+  const res = await apiClient.get<ApiResponse<RecentRecipientsResult>>(
     '/api/transfer/recent',
   );
-  return res.data.data?.recipients ?? [];
+  return {
+    recipients: res.data.data?.recipients ?? [],
+    tts_audio_base64: res.data.data?.tts_audio_base64 ?? null,
+  };
 }
 
 export async function saveMemo(txId: string, memo: string): Promise<void> {

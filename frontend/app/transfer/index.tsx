@@ -8,6 +8,7 @@ import { TRANSFER_FAILED_HOME_SUFFIX } from '@/constants/voicePrompts';
 import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { fetchRecentRecipients, executeTransfer } from '@/services/transferService';
+import { playBase64Audio } from '@/utils/audioPlayer';
 import axios from 'axios';
 import { extractApiErrorMessage } from '@/utils/errorHandler';
 import type { RecipientItem } from '@/components/display';
@@ -66,17 +67,24 @@ export default function TransferScreen() {
   const [recentList, setRecentList] = useState<RecipientItem[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const step = touchStep ?? voiceStep;
+
   useEffect(() => {
     setTouchStep(null);
   }, [lastResponse]);
 
   useEffect(() => {
-    if (step === 'input-alias') {
-      fetchRecentRecipients()
-        .then((list) => setRecentList(list))
-        .catch(() => undefined);
-    }
-  }, [step]);
+    if (step !== 'input-alias') return;
+    if (lastResponse?.navigate_to !== 'transfer') return;
+    fetchRecentRecipients()
+      .then((list) => {
+        setRecentList(list.recipients);
+        if (list.tts_audio_base64) {
+          playBase64Audio(list.tts_audio_base64).catch(() => undefined);
+        }
+      })
+      .catch(() => undefined);
+  }, [lastResponse]);
 
   useEffect(() => {
     const fromSlots = recipientFromSlots(slots);
@@ -91,8 +99,6 @@ export default function TransferScreen() {
       setAmount(null);
     }
   }, [lastResponse, slots.recipient, slots.amount, setSelectedRecipient, setAmount]);
-
-  const step = touchStep ?? voiceStep;
 
   const displayRecipient =
     selectedRecipient ?? recipientFromSlots(slots);
