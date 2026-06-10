@@ -1,4 +1,7 @@
 {
+  "git.openRepositoryInParentFolders": "always",
+  "git.autorefresh": true,
+
   // Python — Ruff handles formatting + import sorting
   "[python]": {
     "editor.formatOnSave": true,

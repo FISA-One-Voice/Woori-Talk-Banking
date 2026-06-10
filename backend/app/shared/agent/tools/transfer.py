@@ -7,11 +7,6 @@ from langchain_core.tools import tool
 
 from app.core.database import get_db
 from app.core.exception import AppError
-from app.features.recipients.service import (
-    lookup_recipient_for_transfer,
-    resolve_by_id,
-    resolve_direct_account,
-)
 from app.features.transfer import service as transfer_service
 
 logger = logging.getLogger(__name__)
@@ -27,47 +22,29 @@ def run_execute_transfer(
     """이체를 실행하고 (TTS 메시지, tx_id)를 반환한다.
 
     execute_node에서 tx_id를 세션 상태에 저장할 때 사용한다.
-    collected_slots에 resolve 결과(recipient_id, account_number, bank_name)가 있으면
-    이름 재조회 없이 이체한다.
+    resolve_node가 이미 collected_slots에 account_number, bank_name,
+    recipient_id를 채워두므로 이 함수는 서비스 호출만 담당한다.
     """
     db = next(get_db())
     slots = collected_slots or {}
     try:
-        user_uuid = uuid.UUID(user_id)
-        resolved = None
-
+        account_number = slots.get("account_number")
+        bank_name = slots.get("bank_name")
         recipient_id = slots.get("recipient_id")
-        if recipient_id:
-            resolved = resolve_by_id(db, user_uuid, str(recipient_id))
-        elif slots.get("account_number") and slots.get("bank_name"):
-            resolved = resolve_direct_account(
-                str(slots["account_number"]),
-                str(slots["bank_name"]),
-                recipient_name=str(slots.get("recipient") or recipient or "수취인"),
-            )
-        else:
-            resolved = lookup_recipient_for_transfer(
-                db,
-                user_uuid,
-                recipient,
-                bank_name=str(slots["bank_name"]) if slots.get("bank_name") else None,
-            )
+        display_name = str(slots.get("recipient") or recipient or "수취인")
 
-        if resolved is None:
-            return f"{recipient}님을 찾을 수 없습니다. 다시 확인해 주세요.", None
+        if not account_number and not recipient_id:
+            return f"{display_name}님을 찾을 수 없습니다. 다시 확인해 주세요.", None
 
-        display_name = str(
-            slots.get("recipient") or recipient or resolved.recipient_name
-        )
         receipt = transfer_service.execute_transfer(
             db=db,
             user_id=user_id,
-            recipient=resolved.account_number,
-            bank_name=resolved.bank_name,
+            recipient=str(account_number) if account_number else "",
+            bank_name=str(bank_name) if bank_name else "",
             amount=amount,
             idempotency_key=str(uuid.uuid4()),
-            recipient_name=resolved.recipient_name,
-            recipient_id=str(resolved.recipient_id) if resolved.recipient_id else None,
+            recipient_name=display_name,
+            recipient_id=str(recipient_id) if recipient_id else None,
         )
         tx_id = receipt["txId"]
         return f"{display_name}님께 {amount:,}원 이체가 완료되었습니다.", tx_id

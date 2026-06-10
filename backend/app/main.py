@@ -39,6 +39,7 @@ from app.core.exception import AppError
 from app.features.auto_transfer.router import router as auto_transfer_router
 from app.core.opensearch import create_indices_if_not_exists
 from app.features.asset.router import router as asset_router
+from app.features.analytics.router import router as analytics_router
 from app.features.event.router import router as event_router
 from app.features.jwt_auth.router import router as jwt_auth_router
 from app.features.recipients.router import router as recipients_router
@@ -144,6 +145,7 @@ logger.info("[Startup] ASV_SERVER_URL = %s", _settings.ASV_SERVER_URL)
 app.include_router(voice_router)
 app.include_router(jwt_auth_router)
 app.include_router(asset_router)  # 자산 화면 — 잔액 조회 + 거래 내역 조회
+app.include_router(analytics_router)  # 지출 분석 리포트
 app.include_router(event_router)
 app.include_router(voice_register_router)
 app.include_router(recipients_router)
