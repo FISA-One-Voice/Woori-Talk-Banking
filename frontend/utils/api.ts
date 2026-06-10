@@ -1,5 +1,13 @@
 import { useAuthStore } from '@/store/authStore';
 import axios from 'axios';
+import { reportClientError } from '@/services/errorReportService';
+
+// URL 경로에서 feature 이름 추출: /api/transfer/... → "transfer"
+function extractFeature(url: string | undefined): string {
+  if (!url) return 'unknown';
+  const match = url.match(/\/api\/([^/?]+)/);
+  return match?.[1] ?? 'unknown';
+}
 
 // =============================================================================
 // frontend/utils/api.ts
@@ -77,6 +85,12 @@ apiClient.interceptors.response.use(
       } else {
         clearTokens();
       }
+    }
+
+    // 에러 리포트 (401 silent refresh 이후 재시도 요청, /api/client-errors 자체는 제외)
+    const url = error.config?.url ?? '';
+    if (!url.includes('/api/client-errors') && !originalRequest._retry) {
+      reportClientError(extractFeature(url), error);
     }
 
     return Promise.reject(error);

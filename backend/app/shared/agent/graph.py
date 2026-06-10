@@ -19,6 +19,7 @@
 
 # import json
 # import logging
+# import time
 # import uuid
 
 # import openai
@@ -31,6 +32,7 @@
 
 # from app.core.config import settings
 # from app.core.exception import AgentError
+# from app.core.metrics import agent_node_executions_total, agent_tool_duration_seconds
 # from app.features.recipients.schema import ResolvedRecipient
 # from app.features.recipients.service import (
 #     classify_recipient_input,
@@ -69,11 +71,7 @@
 #     build_transfer_clarification_response,
 #     should_offer_transfer_clarification,
 # )
-# from app.shared.agent.transfer_intent import (
-#     build_bare_transfer_start_update,
-#     is_plain_transfer_start,
-#     should_use_bare_transfer_fast_start,
-# )
+# from app.shared.agent.transfer_intent import is_plain_transfer_start
 # from app.shared.voice.message_utils import _DEFAULT_TTS_FALLBACK
 
 # logger = logging.getLogger(__name__)
@@ -273,6 +271,7 @@
 #     Args:
 #         tools: LangChain @tool 데코레이터로 정의된 함수 목록.
 #                빈 리스트([])도 허용 — Phase 1 골격 초기화 목적.
+#                MOCK_TOOLS 또는 실제 tool을 전달한다.
 
 #     Returns:
 #         MemorySaver가 연결된 CompiledStateGraph.
@@ -317,13 +316,18 @@
 
 #     # ── tool registry: 액션 이름 → tool 함수 매핑 ───────────────────────────────
 #     # SLOT_SCHEMA에 정의된 액션과 tool 이름(함수명)으로 매핑한다.
+#     # 실제 tool 이름은 "mock_execute_transfer" 또는 "execute_transfer" 패턴을 따른다.
 #     tool_registry: dict[str, object] = {t.name: t for t in tools}
 
-#     # 액션 → tool 이름 매핑. 패턴: "{action}" 또는 "execute_{action}" 또는 "{action}_tool"
+#     # 액션 → tool 이름 매핑 (mock과 실제 tool 모두 지원)
+#     # tool 이름 패턴: "mock_{action}" 또는 "{action}_tool"
 #     def _find_tool_for_action(action: str) -> object | None:
 #         """액션 이름에 해당하는 tool을 registry에서 찾는다."""
 #         candidates = [
 #             action,
+#             f"mock_execute_{action}",
+#             f"mock_register_{action}",
+#             f"mock_get_{action}",
 #             f"execute_{action}",
 #             f"register_{action}",
 #             f"{action}_tool",
@@ -407,13 +411,6 @@
 #         )
 
 #         user_text = last_user_text(state.get("messages", []))
-#         if should_use_bare_transfer_fast_start(user_text):
-#             logger.info(
-#                 "[Graph →intent_node] bare transfer fast path text=%s",
-#                 user_text,
-#             )
-#             return build_bare_transfer_start_update(user_text)
-
 #         if should_offer_transfer_clarification(
 #             user_text,
 #             pending_action=state.get("pending_action"),
@@ -500,12 +497,6 @@
 #             " '정기적으로', '주기적으로', '반복해서', '계속', '꾸준히',"
 #             " '자동으로 보내줘', '고정으로 보내줘', 'N일마다',"
 #             " '격주', '격월')",
-#             "  cancel_auto_transfer: 자동이체 해지·삭제"
-#             " ('자동이체 해지', '자동이체 삭제', '자동이체 취소해줘',"
-#             " '자동이체 끊어줘', '자동이체 없애줘')",
-#             "  list_auto_transfer: 자동이체 목록·내역 조회"
-#             " ('자동이체 내역', '자동이체 목록', '자동이체 조회',"
-#             " '자동이체 뭐 있어', '자동이체 내역 보여줘', '자동이체 확인')",
 #             "  balance     : 잔액·거래내역 조회 ('잔액 얼마야', '내역 보여줘')",
 #             "  event       : 이벤트 조회·이동 ('이벤트 조회해줘', '이벤트 알려줘',"
 #             " '이벤트 화면', '이벤트 이동해줘')",
@@ -545,7 +536,7 @@
 #             "  bank_name: 은행명 (예: '우리은행 1101234567890'→bank_name='우리은행',"
 #             " recipient='1101234567890').",
 #             "- user_confirmed: '네', '맞아요', '그렇게 해줘' 등 확인 발화 시 true",
-#             "- user_cancelled: '취소', '아니오', '아니요', '됐어', '하지 마' 등 취소 발화 시 true",
+#             "- user_cancelled: '취소', '아니오', '됐어', '하지 마' 등 취소 발화 시 true",
 #             "- direct_response: 비금융 챗봇 답변(영업시간, 상품 안내 등)에만 사용.",
 #             "  ★ intent가 설정된 경우 반드시 빈 문자열('')로 설정할 것.",
 #             "  ★ 누락 슬롯 질문('누구에게?', '얼마?')을 절대 여기에 쓰지 말 것."
@@ -982,6 +973,20 @@
 #             awaiting_memo_next = False
 #             response_text = ""
 #             post_execute_navigate: str | None = None
+#             _user_id_log = state.get("user_id", "")
+#             _tool_start = time.monotonic()
+#             _tool_success = True
+
+#             logger.info(
+#                 "agent_tool_call_start",
+#                 extra={
+#                     "event": "agent_tool_call_start",
+#                     "tool": tool_obj.name,
+#                     "action": pending,
+#                     "user_id": _user_id_log,
+#                     **( {"amount": slots.get("amount")} if pending in ("transfer", "auto_transfer") else {}),
+#                 },
+#             )
 
 #             try:
 #                 if pending == "transfer" and tool_obj.name == "execute_transfer":
@@ -995,15 +1000,22 @@
 #                         new_last_tx_id = tx_id
 #                         awaiting_memo_next = True
 #                         response_text = response_text + MEMO_OFFER_SUFFIX
-#                         # 영수증: 프론트 prevSlots(recipient/amount) + tx_id
 #                         completed_slots = {"tx_id": tx_id}
 #                         post_execute_navigate = COMPLETE_SCREEN_MAP["transfer"]
+#                         logger.info(
+#                             "agent_transfer_completed",
+#                             extra={"event": "agent_transfer_completed", "tx_id": tx_id, "user_id": _user_id_log, "amount": slots.get("amount")},
+#                         )
 #                     else:
 #                         completed_slots = {
 #                             **slots,
 #                             "transfer_error_message": response_text,
 #                         }
 #                         post_execute_navigate = FAILED_SCREEN_MAP["transfer"]
+#                         logger.warning(
+#                             "agent_transfer_failed",
+#                             extra={"event": "agent_transfer_failed", "user_id": _user_id_log, "reason": response_text},
+#                         )
 #                 elif pending == "transfer":
 #                     response_text = tool_obj.invoke(invoke_args)
 #                 elif pending == "auto_transfer":
@@ -1021,6 +1033,17 @@
 #                             new_last_order_id = order_id
 #                             awaiting_memo_next = True
 #                             response_text = response_text + MEMO_OFFER_SUFFIX
+#                             logger.info(
+#                                 "agent_auto_transfer_registered",
+#                                 extra={
+#                                     "event": "agent_auto_transfer_registered",
+#                                     "order_id": order_id,
+#                                     "user_id": _user_id_log,
+#                                     "amount": slots.get("amount"),
+#                                     "to_bank": slots.get("bank_name"),
+#                                     "recipient": slots.get("recipient"),
+#                                 },
+#                             )
 #                         completed_slots = {}
 #                 elif pending == "add_note":
 #                     tx_id = slots.get("tx_id") or state.get("last_tx_id")
@@ -1059,6 +1082,7 @@
 #                 else:
 #                     response_text = tool_obj.invoke(invoke_args)
 #             except Exception as e:
+#                 _tool_success = False
 #                 logger.error("execute_node tool 호출 실패 (%s): %s", pending, e)
 #                 response_text = (
 #                     "처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
@@ -1072,6 +1096,21 @@
 #                         "transfer_error_message": response_text,
 #                     }
 #                     post_execute_navigate = FAILED_SCREEN_MAP["transfer"]
+#             finally:
+#                 _duration_ms = int((time.monotonic() - _tool_start) * 1000)
+#                 logger.info(
+#                     "agent_tool_call_end",
+#                     extra={
+#                         "event": "agent_tool_call_end",
+#                         "tool": tool_obj.name,
+#                         "action": pending,
+#                         "user_id": _user_id_log,
+#                         "duration_ms": _duration_ms,
+#                         "success": _tool_success,
+#                     },
+#                 )
+#                 agent_node_executions_total.labels(node=pending).inc()
+#                 agent_tool_duration_seconds.labels(node=pending).observe(_duration_ms / 1000)
 
 #         if post_execute_navigate == FAILED_SCREEN_MAP.get("transfer"):
 #             response_text = response_text.rstrip() + TRANSFER_FAILED_HOME_SUFFIX

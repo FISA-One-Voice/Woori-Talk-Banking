@@ -8,11 +8,15 @@ tool이 에이전트에 연결되는 방식:
     3. 에이전트가 사용자 발화를 분석해 tool 자동 선택·실행
 """
 
+import logging
+
 from langchain_core.tools import tool
 
 from app.core.database import get_db
 from app.core.exception import AppError
 from app.features.asset.service import get_asset_summary, get_account_balance
+
+logger = logging.getLogger(__name__)
 
 
 @tool
@@ -34,6 +38,10 @@ def get_total_balance(user_id: str) -> str:  # noqa: D401
     try:
         accounts = get_asset_summary(db, user_id)
         total = sum(a.balance for a in accounts)
+        logger.info(
+            "balance_query_result",
+            extra={"event": "balance_query_result", "user_id": user_id, "total": total},
+        )
         return f"전체 잔액은 {total:,}원입니다."
     except AppError as e:
         return e.user_message or e.message

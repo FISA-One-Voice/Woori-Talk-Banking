@@ -1,7 +1,14 @@
 """이체 비즈니스 로직."""
 
+import logging
 import re
+import time
 import uuid
+
+from app.core.metrics import transfer_total
+from app.core.request_context import get_request_id
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -142,6 +149,8 @@ def execute_transfer(
             user_message="동일한 이체 요청이 처리 중입니다.",
         )
 
+    transfer_start = time.monotonic()
+
     # SELECT FOR UPDATE — 출금 계좌 비관적 락 (잔액 이중 차감 방지)
     locked_account = (
         db.query(Account)
@@ -153,6 +162,7 @@ def execute_transfer(
     if locked_account.balance < amount:
         tx.status = "failed"
         db.commit()  # failed 상태로 커밋 (idempotency_key 소진)
+        transfer_total.labels(status="failed").inc()
         raise TransferError(
             code="INSUFFICIENT_BALANCE",
             message="잔액이 부족합니다.",
@@ -163,6 +173,22 @@ def execute_transfer(
     locked_account.balance -= amount
     tx.status = "completed"
     db.commit()
+    transfer_total.labels(status="success").inc()
+
+    logger.info(
+        "transfer_executed",
+        extra={
+            "event": "transfer_executed",
+            "request_id": get_request_id(),
+            "user_id": user_id,
+            "tx_id": str(tx.tx_id),
+            "amount": amount,
+            "to_bank": to_bank_name,
+            "to_account_masked": _mask_account(to_account_number),
+            "status": "success",
+            "duration_ms": int((time.monotonic() - transfer_start) * 1000),
+        },
+    )
     return _build_receipt(tx)
 
 

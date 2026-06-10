@@ -27,15 +27,10 @@ import pytest
 from app.core.exception import ASVError, STTError
 from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.service import (
-    _call_asv_ec2,
     _get_user_embedding,
-    _handle_asv_flow,
-    _handle_normal_flow,
     _resolve_navigate_to,
     process_voice_pipeline,
-    reset_voice_state,
 )
-
 
 # ── 테스트 픽스처 ────────────────────────────────────────────────────────────────
 
@@ -111,6 +106,7 @@ class TestSchemas:
         assert result.verified is True
         # approx: float 비교 시 부동소수점 오차를 허용
         assert result.score == pytest.approx(0.72)
+
 
 # ── Layer A: 정상 흐름 테스트 ────────────────────────────────────────────────────
 
