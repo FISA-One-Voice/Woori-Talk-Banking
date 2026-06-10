@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { TopBar } from '@/components/layout';
 import { ActionButton, SummaryBox } from '@/components/display';
@@ -150,7 +151,7 @@ export default function AutoTransferCompleteScreen() {
   const phase = awaitingMemo ? 'memo-pending' : localPhase;
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.root}>
       <View style={styles.body}>
         <TopBar variant="back" title="자동이체" onBack={goHome} />
         <ScrollView contentContainerStyle={styles.content}>
@@ -165,7 +166,7 @@ export default function AutoTransferCompleteScreen() {
           )}
         </ScrollView>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

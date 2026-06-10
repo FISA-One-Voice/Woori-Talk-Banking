@@ -6,8 +6,6 @@ Supervisor 그래프의 MemorySaver를 공유해야 하므로 독립 checkpointe
 
 import json
 import logging
-import re
-import uuid
 
 import openai
 from langchain_core.messages import AIMessage, HumanMessage
@@ -21,10 +19,15 @@ from app.core.exception import AgentError
 from app.features.recipients.schema import ResolvedRecipient
 from app.features.recipients.service import (
     classify_recipient_input,
+    enrich_slots_from_resolved,
     find_recipient_by_voice,
-    match_by_registered_account,
 )
 from app.features.transfer.service import _mask_account
+from app.features.transfer.service import format_confirm_message
+from app.shared.agent.ROUTING_CONSTANTS import (
+    TRANSFER_NAVIGATE_VALUES,
+    TRANSFER_READ,
+)
 from app.shared.agent.memo_decision import (
     build_memo_decision_update,
     last_user_text,
@@ -42,13 +45,15 @@ from app.shared.agent.slot_schema import (
     CONFIRM_YES_NO_SUFFIX,
     FAILED_SCREEN_MAP,
     MEMO_OFFER_SUFFIX,
+    missing_slots,
+    normalize_scheduled_day,
+    parse_korean_amount,
     RECIPIENT_REQUIRED_ACTIONS,
     SCREEN_MAP,
     SLOT_QUESTIONS,
     SLOT_QUESTIONS_BY_ACTION,
     SLOT_SCHEMA,
     TRANSFER_FAILED_HOME_SUFFIX,
-    transfer_missing_slots,
 )
 from app.shared.agent.state import VoiceState
 from app.shared.agent.transfer_clarification import (
@@ -145,160 +150,7 @@ def _clean_transfer_delta(delta: dict) -> dict:
     return validate_transfer_delta(cleaned)
 
 
-def _is_transfer_restart_utterance(text: str) -> bool:
-    """홈 등에서 새 송금을 시작하는 발화인지."""
-    return is_plain_transfer_start(text)
 
-
-def _should_restart_transfer_flow(
-    intent: str | None,
-    pending: str | None,
-    user_text: str,
-    state: dict,
-) -> bool:
-    """이전 transfer 세션이 남아 있어도 동일 intent로 새 송금을 시작한다."""
-    if intent != "transfer" or pending != "transfer":
-        return False
-    if state.get("awaiting_confirmation") or state.get("awaiting_asv_audio"):
-        return False
-    return _is_transfer_restart_utterance(user_text)
-
-
-def _all_slots_filled(pending_action: str, collected_slots: dict) -> bool:
-    """pending_action에 필요한 슬롯이 모두 수집되었는지 확인한다."""
-    return len(_missing_slots(pending_action, collected_slots)) == 0
-
-
-def _missing_slots(pending_action: str, collected_slots: dict) -> list[str]:
-    """수집되지 않은 슬롯 이름 목록을 반환한다."""
-    if pending_action == "transfer":
-        return transfer_missing_slots(collected_slots)
-
-    required = SLOT_SCHEMA.get(pending_action, [])
-    missing = []
-    for slot_name in required:
-        value = collected_slots.get(slot_name)
-        if slot_name == "scheduled_day":
-            if not _valid_scheduled_day(value, collected_slots.get("cycle")):
-                missing.append(slot_name)
-        elif not value:
-            missing.append(slot_name)
-    return missing
-
-
-def _valid_scheduled_day(value: object, cycle: object) -> bool:
-    """자동이체 주기에 맞는 scheduled_day 값인지 확인한다."""
-    if value is None or cycle is None:
-        return False
-    try:
-        day = int(value)
-    except (TypeError, ValueError):
-        return False
-    if cycle == "monthly":
-        return 1 <= day <= 31
-    if cycle == "weekly":
-        return 0 <= day <= 6
-    return False
-
-
-def _enrich_slots_from_resolved(
-    slots: dict,
-    resolved: ResolvedRecipient,
-    recipient_input: str,
-    user_id: str,
-) -> dict:
-    """resolve 결과를 collected_slots에 반영한다."""
-    from app.core.database import get_db
-
-    display = resolved.recipient_name or "수취인"
-    if resolved.recipient_id and classify_recipient_input(recipient_input) == "account":
-        db = next(get_db())
-        try:
-            row = match_by_registered_account(db, uuid.UUID(user_id), recipient_input)
-            if row and row.alias:
-                display = row.alias
-        finally:
-            db.close()
-
-    slots["recipient"] = display
-    slots["bank_name"] = resolved.bank_name
-    slots["account_number"] = resolved.account_number
-    if resolved.recipient_id:
-        slots["recipient_id"] = str(resolved.recipient_id)
-    return slots
-
-
-def _format_confirm_message(pending_action: str, collected_slots: dict) -> str:
-    """수집된 슬롯을 기반으로 TTS 친화적 확인 메시지를 생성한다."""
-    action_label = ACTION_LABELS.get(pending_action, pending_action)
-    parts: list[str] = []
-
-    recipient = collected_slots.get("recipient")
-    bank_name = collected_slots.get("bank_name")
-    account_number = collected_slots.get("account_number")
-    amount = collected_slots.get("amount")
-    cycle = collected_slots.get("cycle")
-    scheduled_day = collected_slots.get("scheduled_day")
-
-    if bank_name and account_number:
-        masked = _mask_account(str(account_number))
-        target = f"{recipient}님 " if recipient else ""
-        parts.append(f"{target}{bank_name} 계좌 {masked}로")
-    elif recipient:
-        parts.append(f"{recipient}에게")
-
-    parts.extend(_format_cycle_parts(cycle, scheduled_day))
-    if amount:
-        try:
-            parts.append(_amount_to_korean(int(amount)))
-        except (TypeError, ValueError):
-            parts.append(str(amount))
-
-    message = f"{' '.join(parts)} {action_label}할까요?"
-    if pending_action in ACTIONS_WITH_YES_NO_CONFIRM:
-        message += CONFIRM_YES_NO_SUFFIX
-    return message
-
-
-def _format_cycle_parts(cycle: object, scheduled_day: object) -> list[str]:
-    """자동이체 주기 슬롯을 확인 메시지 조각으로 변환한다."""
-    dow_labels = ["월", "화", "수", "목", "금", "토", "일"]
-    parts: list[str] = []
-    if cycle == "monthly":
-        parts.append("매월")
-        if scheduled_day is not None:
-            parts.append(f"{scheduled_day}일")
-    elif cycle == "weekly":
-        parts.append("매주")
-        if scheduled_day is not None:
-            try:
-                parts.append(f"{dow_labels[int(scheduled_day)]}요일")
-            except (IndexError, ValueError):
-                parts.append(f"{scheduled_day}요일")
-    return parts
-
-
-def _amount_to_korean(amount: int) -> str:
-    """금액을 TTS 친화적 한국어 표현으로 변환한다."""
-    if amount <= 0:
-        return "영 원"
-    units = [
-        (100_000_000, "억"),
-        (10_000, "만"),
-        (1_000, "천"),
-        (100, "백"),
-        (10, "십"),
-    ]
-    parts: list[str] = []
-    remaining = amount
-    for unit_val, unit_name in units:
-        if remaining >= unit_val:
-            count = remaining // unit_val
-            remaining %= unit_val
-            parts.append(f"{count}{unit_name}")
-    if remaining > 0:
-        parts.append(str(remaining))
-    return "".join(parts) + " 원"
 
 
 def _build_bare_transfer_start_update(user_text: str) -> dict:
@@ -334,7 +186,7 @@ def _build_system_content(state: VoiceState) -> str:
     slots = state.get("collected_slots", {})
 
     if pending:
-        missing = _missing_slots(pending, slots)
+        missing = missing_slots(pending, slots)
         context_lines.append(f"진행 중인 액션: {pending}")
         context_lines.append(f"수집된 슬롯: {json.dumps(slots, ensure_ascii=False)}")
         context_lines.append(f"누락된 슬롯: {missing}")
@@ -559,7 +411,7 @@ def _merge_slot_update(state: VoiceState, extracted_slots: dict) -> dict:
     """진행 중 액션의 누락 슬롯만 보충한다."""
     pending = state.get("pending_action")
     existing = dict(state.get("collected_slots", {}))
-    missing_now = _missing_slots(pending or "", existing)
+    missing_now = missing_slots(pending or "", existing)
     allowed_updates = {}
     for key, value in extracted_slots.items():
         # scheduled_day·cycle은 항상 업데이트 허용 (상호 의존적, 사용자 수정 가능)
@@ -579,12 +431,12 @@ def _merge_slot_update(state: VoiceState, extracted_slots: dict) -> dict:
         and "scheduled_day" not in allowed_updates
     ):
         existing.pop("scheduled_day", None)
-    updated_slots = _normalize_scheduled_day(existing, allowed_updates)
+    updated_slots = normalize_scheduled_day(existing, allowed_updates)
 
     # amount 슬롯은 한국어·STT 오인식 표현을 정수 문자열로 보정한다
     raw_amount = updated_slots.get("amount")
     if raw_amount is not None:
-        parsed = _parse_korean_amount(str(raw_amount))
+        parsed = parse_korean_amount(str(raw_amount))
         updated_slots["amount"] = parsed  # 변환 실패 시 None → slot_fill_node 재질문
 
     updates: dict = {"collected_slots": updated_slots, "navigate_to": None}
@@ -654,7 +506,7 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             )
 
         user_text = last_user_text(state.get("messages", []))
-        if should_use_bare_transfer_fast_start(user_text):
+        if not state.get("pending_action") and should_use_bare_transfer_fast_start(user_text):
             return _clean_transfer_delta(_build_bare_transfer_start_update(user_text))
 
         if should_offer_transfer_clarification(
@@ -678,7 +530,7 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         """누락된 첫 번째 슬롯에 대한 질문을 추가한다."""
         pending = state.get("pending_action", "")
         slots = state.get("collected_slots", {})
-        missing = _missing_slots(pending, slots)
+        missing = missing_slots(pending, slots)
 
         if missing:
             slot_name = missing[0]
@@ -701,7 +553,7 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
     def confirm_node(state: VoiceState) -> dict:
         """슬롯 수집 완료 후 사용자 확인 메시지를 생성한다."""
         pending = state.get("pending_action", "")
-        confirm_message = _format_confirm_message(
+        confirm_message = format_confirm_message(
             pending, state.get("collected_slots", {})
         )
         return _clean_transfer_delta(
@@ -726,13 +578,11 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             bank_name=str(bank_name) if bank_name else None,
         )
         if resolved is not None:
-            _enrich_slots_from_resolved(slots, resolved, recipient_input, user_id)
-            return _clean_transfer_delta(
-                {
-                    "collected_slots": slots,
-                    "recipient_validated": True,
-                }
-            )
+            enrich_slots_from_resolved(slots, resolved, recipient_input, user_id)
+            return _clean_transfer_delta({
+                "collected_slots": slots,
+                "recipient_validated": True,
+            })
 
         if kind == "account" and not bank_name:
             return _clean_transfer_delta(
@@ -782,7 +632,7 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         """수집된 슬롯으로 Transfer 도메인 tool을 호출한다."""
         pending = state.get("pending_action", "")
         slots = dict(state.get("collected_slots", {}))
-        tool_obj = _find_tool_for_action(pending, tool_registry)
+        tool_obj = tool_registry.get(pending) or tool_registry.get(f"execute_{pending}")
         if tool_obj is None:
             raise AgentError(
                 code="TRANSFER_TOOL_NOT_FOUND",
@@ -815,7 +665,7 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         ):
             return "resolve_node"
 
-        missing = _missing_slots(pending, slots)
+        missing = missing_slots(pending, slots)
         if missing:
             return "slot_fill_node"
         if pending not in SLOT_SCHEMA:
@@ -828,7 +678,7 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         """resolve_node 이후 다음 노드를 결정한다."""
         slots = state.get("collected_slots", {})
         pending = state.get("pending_action", "")
-        missing = _missing_slots(pending, slots)
+        missing = missing_slots(pending, slots)
 
         if not slots.get("recipient"):
             return END
@@ -884,7 +734,7 @@ def _build_intent_update(
 
     if state.get("awaiting_confirmation") and result.extracted_slots:
         existing = dict(state.get("collected_slots", {}))
-        existing = _normalize_scheduled_day(existing, result.extracted_slots)
+        existing = normalize_scheduled_day(existing, result.extracted_slots)
         return {
             "collected_slots": existing,
             "awaiting_confirmation": False,
@@ -910,15 +760,12 @@ def _build_intent_update(
         }
 
     pending = state.get("pending_action")
-    restart_transfer = _should_restart_transfer_flow(
-        result.intent, pending, user_text, state
-    )
     if (
         result.intent
         and result.intent in TRANSFER_DOMAIN_ACTIONS
         and not state.get("awaiting_confirmation")
         and not state.get("awaiting_asv_audio")
-        and (result.intent != pending or restart_transfer)
+        and not pending
     ):
         return _build_new_intent_update(result, user_text)
 
@@ -954,7 +801,7 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
     post_execute_navigate: str | None = None
 
     try:
-        if pending == "transfer" and tool_obj.name == "execute_transfer":
+        if pending == "transfer":
             response_text, tx_id = run_execute_transfer(
                 user_id=invoke_args["user_id"],
                 recipient=str(invoke_args.get("recipient", "")),
@@ -981,9 +828,6 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
             awaiting_memo_next = True
             response_text = response_text + MEMO_OFFER_SUFFIX
             completed_slots = {"tx_id": tx_id}
-            post_execute_navigate = COMPLETE_SCREEN_MAP["transfer"]
-        elif tool_obj.name != "execute_transfer":
-            completed_slots = {}
             post_execute_navigate = COMPLETE_SCREEN_MAP["transfer"]
         else:
             completed_slots = {**slots, "transfer_error_message": response_text}

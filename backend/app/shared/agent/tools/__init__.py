@@ -22,21 +22,34 @@ from app.shared.agent.tools.history import (
     get_monthly_expense,
     get_recent_history,
 )
-from app.shared.agent.tools.lookup_recipient import lookup_recipient
+
+# -- Dev-B (TransferAgent tools) ──────────────────────────────────────────────
 from app.shared.agent.tools.transfer import add_note, execute_transfer
+from app.shared.agent.tools.lookup_recipient import lookup_recipient
+from app.shared.agent.tools.event import get_event_list
 
 # ── Dev-C (AssetAgent tools) ──────────────────────────────────────────────────
-# Dev-C: 이 구역에만 추가
-# from app.shared.agent.tools.spending_analysis import get_monthly_spending_report
-
+from app.shared.agent.tools.asset import (
+    query_balance,
+    query_category,
+    query_compare,
+    query_history,
+    query_spending_report,
+    query_top_category,
+    query_transaction_list,
+)
 # ── Dev-D (RAGAgent tools) ────────────────────────────────────────────────────
-# Dev-D: 이 구역에만 추가
 from app.shared.agent.tools.financial_qa import search_financial_docs
 from app.shared.agent.tools.market_info import get_exchange_rate, get_base_rate
 
+RAG_TOOLS: list = [
+    search_financial_docs,
+    get_exchange_rate,
+    get_base_rate,
+]
+
 
 # TransferAgent 서브그래프 전용 tool 목록.
-# Phase 2: supervisor.py에서 build_transfer_graph(TRANSFER_TOOLS)로 전달.
 TRANSFER_TOOLS: list = [
     execute_transfer,
     add_note,
@@ -47,18 +60,31 @@ TRANSFER_TOOLS: list = [
     list_auto_transfer,
 ]
 
+# AssetAgent 서브그래프 전용 tool 목록.
+ASSET_TOOLS: list = [
+    query_balance,
+    query_history,
+    query_category,
+    query_top_category,
+    query_transaction_list,
+    query_spending_report,
+    query_compare,
+]
+
 # 전체 단일 graph용 tool 목록 (build_graph / voice pipeline)
 ALL_TOOLS: list = [
-    get_total_balance,
-    get_account_balance_by_id,
-    get_recent_history,
-    get_category_history,
-    get_monthly_expense,
+    # Dev-C: Asset
+    *ASSET_TOOLS,
+    # Dev-B: Transfer
+    get_event_list,
     execute_transfer,
     lookup_recipient,
     add_note,
     execute_auto_transfer,
     cancel_auto_transfer,
     add_auto_transfer_note,
-    list_auto_transfer,
+    # Dev-D: RAG
+    search_financial_docs,
+    get_exchange_rate,
+    get_base_rate,
 ]

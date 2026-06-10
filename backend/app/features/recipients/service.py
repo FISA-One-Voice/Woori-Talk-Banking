@@ -523,3 +523,28 @@ def find_recipient_by_voice(
         return None
     finally:
         db.close()
+
+
+def enrich_slots_from_resolved(
+    slots: dict,
+    resolved: ResolvedRecipient,
+    recipient_input: str,
+    user_id: str,
+) -> dict:
+    """resolve 결과를 collected_slots에 반영한다."""
+    display = resolved.recipient_name or "수취인"
+    if resolved.recipient_id and classify_recipient_input(recipient_input) == "account":
+        db = next(get_db())
+        try:
+            row = match_by_registered_account(db, uuid.UUID(user_id), recipient_input)
+            if row and row.alias:
+                display = row.alias
+        finally:
+            db.close()
+
+    slots["recipient"] = display
+    slots["bank_name"] = resolved.bank_name
+    slots["account_number"] = resolved.account_number
+    if resolved.recipient_id:
+        slots["recipient_id"] = str(resolved.recipient_id)
+    return slots

@@ -1,7 +1,7 @@
 ﻿import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface TopBarProps {
-  variant: 'logo' | 'back' | 'action';
+  variant: 'logo' | 'back' | 'action' | 'title';
   title?: string;
   onBack?: () => void;
   actionLabel?: string;
@@ -19,6 +19,10 @@ export default function TopBar({
     <View style={styles.container}>
       {variant === 'logo' && (
         <Text style={styles.appName}>우리톡뱅킹</Text>
+      )}
+
+      {variant === 'title' && (
+        <Text style={[styles.title, styles.titleCentered]}>{title}</Text>
       )}
 
       {variant === 'back' && (
@@ -62,6 +66,10 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '500',
     color: '#fff',
+  },
+  titleCentered: {
+    flex: 1,
+    textAlign: 'center',
   },
   backBtn: {
     width: 36,

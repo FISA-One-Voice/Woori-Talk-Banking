@@ -277,8 +277,8 @@ def route_after_supervisor(state: VoiceState) -> str:
         return "cancel_node"
     if domain == "transfer":
         return "transfer"
-    # if domain == "asset":
-    #     return "asset"
+    if domain == "asset":
+        return "asset"
     if domain == "rag":
         return "rag"
     if domain == "event":
@@ -296,17 +296,20 @@ def build_supervisor():
     builder.compile()만 호출해야 세션 상태가 분리되지 않는다.
     """
     from app.shared.agent.subgraphs.transfer import build_transfer_graph
-    from app.shared.agent.subgraphs.consultation import rag_graph
-    from app.shared.agent.tools import TRANSFER_TOOLS
+    from app.shared.agent.subgraphs.consultation import build_rag_graph
+    from app.shared.agent.subgraphs.asset import build_asset_graph
+    from app.shared.agent.tools import TRANSFER_TOOLS, RAG_TOOLS, ASSET_TOOLS
 
     transfer_graph = build_transfer_graph(TRANSFER_TOOLS)
+    rag_graph = build_rag_graph(RAG_TOOLS)
+    asset_graph = build_asset_graph(ASSET_TOOLS)
 
     builder = StateGraph(VoiceState)
     builder.add_node("supervisor_node", supervisor_node)
     builder.add_node("cancel_node", cancel_node)
     builder.add_node("event_node", event_node)
     builder.add_node("transfer", transfer_graph)
-    # builder.add_node("asset", asset_graph)
+    builder.add_node("asset", asset_graph)
     builder.add_node("rag", rag_graph)
 
     builder.set_entry_point("supervisor_node")
@@ -314,7 +317,7 @@ def build_supervisor():
     builder.add_edge("cancel_node", END)
     builder.add_edge("event_node", END)
     builder.add_edge("transfer", END)
-    # builder.add_edge("asset", END)
+    builder.add_edge("asset", END)
     builder.add_edge("rag", END)
 
     return builder.compile(checkpointer=MemorySaver())
