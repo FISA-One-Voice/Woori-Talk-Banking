@@ -1,13 +1,10 @@
 #!/bin/bash
-# Backend EC2 배포 스크립트
-# GitHub Actions SSM send-command에서 호출: bash /home/ubuntu/deploy.sh
-# 역할: ECR 로그인 → SSM Parameter Store에서 .env 재생성 → 컨테이너 롤링 재시작
-
 set -euo pipefail
 
 REGION="ap-northeast-2"
 SSM_PATH="/woori/prod"
 WORKDIR="/home/ubuntu"
+REPO_RAW="https://raw.githubusercontent.com/southgiri/Woori-Talk-Banking/main"
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text --region "$REGION")
 ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
@@ -38,11 +35,17 @@ print(f'[deploy] .env 생성 완료: {len(params)}개 변수')
 "
 rm -f /tmp/ssm_params.json
 
-echo "[deploy] 이미지 갱신 중..."
+echo "[deploy] 최신 설정 파일 동기화..."
+curl -fsSL "${REPO_RAW}/backend/docker-compose.yml" -o "${WORKDIR}/docker-compose.yml"
+mkdir -p "${WORKDIR}/fluent-bit"
+curl -fsSL "${REPO_RAW}/backend/fluent-bit/fluent-bit.conf" -o "${WORKDIR}/fluent-bit/fluent-bit.conf"
+curl -fsSL "${REPO_RAW}/backend/fluent-bit/parsers.conf"    -o "${WORKDIR}/fluent-bit/parsers.conf"
+
+echo "[deploy] 이미지 갱신..."
 cd "$WORKDIR"
 docker compose pull woori-backend
 
 echo "[deploy] 컨테이너 재시작..."
-docker compose up -d woori-backend node-exporter
+docker compose up -d woori-backend node-exporter fluent-bit
 
 echo "[deploy] 완료: $(docker inspect woori-backend --format='{{.Config.Image}}')"
