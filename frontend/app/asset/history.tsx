@@ -61,15 +61,16 @@ export default function HistoryScreen() {
   const [resultAnnounceText, setResultAnnounceText] = useState('');
   const [historyAnnounceText, setHistoryAnnounceText] = useState('');
 
-  const income = transactions.filter((t) => t.category === '수입').reduce((s, t) => s + t.amount, 0);
-  const expense = transactions.filter((t) => t.category !== '수입').reduce((s, t) => s + t.amount, 0);
+  const completedTxs = transactions.filter((t) => t.status === 'completed');
+  const income = completedTxs.filter((t) => t.category === '수입').reduce((s, t) => s + t.amount, 0);
+  const expense = completedTxs.filter((t) => t.category !== '수입').reduce((s, t) => s + t.amount, 0);
 
   const buildHistoryAnnouncement = (txs: typeof transactions) => {
     const txText = txs
       .slice(0, 10)
       .map((tx) => {
         const date = new Date(tx.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
-        const sign = tx.amount > 0 ? '입금' : '출금';
+        const sign = tx.category === '수입' ? '입금' : '출금';
         const memo = tx.memo ? `. 메모 ${tx.memo}` : '';
         return `${date} ${tx.to_name ?? ''} ${sign} ${Math.abs(tx.amount).toLocaleString()}원${memo}`;
       })
@@ -325,9 +326,9 @@ export default function HistoryScreen() {
                   </View>
                   <Text style={[
                     styles.txAmount,
-                    { color: tx.amount > 0 ? COLORS.success : COLORS.error }
+                    { color: tx.category === '수입' ? COLORS.success : COLORS.error }
                   ]}>
-                    {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}원
+                    {tx.category === '수입' ? '+' : '-'}{tx.amount.toLocaleString()}원
                   </Text>
                 </TouchableOpacity>
               );
