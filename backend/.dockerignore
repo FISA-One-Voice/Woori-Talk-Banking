@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+
+# Virtual environment
+.venv
+venv
+
+# Tests & dev tools
+tests
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Secrets — mounted as volume at runtime, never baked into image
+.env
+.env.prod
+certs
+
+# Dev requirements (Dockerfile uses requirements.prod.txt)
+requirements.txt
+
+# Docker files themselves
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Logs
+*.log
+logs
+
+# OS
+.DS_Store

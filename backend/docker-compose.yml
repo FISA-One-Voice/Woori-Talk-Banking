@@ -1,0 +1,57 @@
+# Backend EC2에서 실행되는 서비스 3개:
+#   woori-backend  — FastAPI 앱 (ECR 이미지)
+#   fluent-bit     — 로그 수집 → Aiven OpenSearch 전송
+#   node-exporter  — 호스트 메트릭 노출 → Monitoring EC2의 Prometheus가 scrape
+#
+# 로그 공유 경로:
+#   backend    /app/logs              (컨테이너 내부 — 쓰기)
+#   host       /home/ubuntu/woori-logs (호스트 공유 디렉토리)
+#   fluent-bit /logs                  (컨테이너 내부 — 읽기)
+
+services:
+  woori-backend:
+    image: 974145758017.dkr.ecr.ap-northeast-2.amazonaws.com/woori-backend:latest
+    container_name: woori-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - /home/ubuntu/.env
+    volumes:
+      - /home/ubuntu/certs:/app/certs:ro
+      - /home/ubuntu/woori-logs:/app/logs
+
+  fluent-bit:
+    image: fluent/fluent-bit:3.2
+    container_name: fluent-bit
+    restart: unless-stopped
+    volumes:
+      - /home/ubuntu/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - /home/ubuntu/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - /home/ubuntu/woori-logs:/logs:ro
+      - fluent-bit-db:/fluent-bit/db
+      - fluent-bit-storage:/fluent-bit/storage
+    env_file:
+      - /home/ubuntu/.env
+    depends_on:
+      - woori-backend
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.0
+    container_name: node-exporter
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    expose:
+      - "9100"
+
+volumes:
+  fluent-bit-db:
+  fluent-bit-storage:

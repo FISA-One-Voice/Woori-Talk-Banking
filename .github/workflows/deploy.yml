@@ -1,0 +1,52 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches: [main]
+
+env:
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+jobs:
+  deploy:
+    name: Build → ECR Push → SSM Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        working-directory: backend
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }} \
+            -t $ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:latest \
+            .
+          docker push $ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          docker push $ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:latest
+
+      - name: Sync deploy script to EC2
+        # 최신 deploy.sh를 EC2에 반영한 뒤 배포 실행
+        # deploy.sh: ECR 로그인 → SSM Parameter Store .env 재생성 → docker compose up
+        run: |
+          SCRIPT=$(cat infra/scripts/deploy.sh | base64 -w 0)
+          aws ssm send-command \
+            --region '${{ secrets.AWS_REGION }}' \
+            --document-name 'AWS-RunShellScript' \
+            --targets 'Key=tag:App,Values=woori-backend' \
+            --parameters "commands=[
+              \"echo \$SCRIPT | base64 -d > /home/ubuntu/deploy.sh && chmod +x /home/ubuntu/deploy.sh\",
+              \"bash /home/ubuntu/deploy.sh\"
+            ]" \
+            --comment 'Deploy ${{ github.sha }} by ${{ github.actor }}'
