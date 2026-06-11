@@ -111,16 +111,23 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # ── 에이전트 mock tool 설정 (Issue #21) ──────────────────────────────────────
-    # True : MOCK_TOOLS 사용 — Phase 2 화면 담당자 tool 완성 전 개발/테스트용
-    # False: 실제 tool 사용 — 각 화면 담당자의 features/*/tools 완성 후 (기본값)
-    USE_MOCK_TOOLS: bool = False
-
     # ── ASV 화자 인증 서버 설정 (Issue #7, ai/asv/) ───────────────────────────────
     # ASV_SERVER_URL: CAM++ 기반 화자 인증 서버 주소 (POST /verify)
     #   로컬 개발: ai/asv/main.py 실행 시 포트 8000
     #   프로덕션: EC2 인스턴스 주소 (southgiri/asv:1.0 Docker 이미지)
     ASV_SERVER_URL: str = "http://localhost:8000"
+
+    # ── 한국은행 API 키 ─────────────────────
+    BOK_ECOS_API_KEY: str = ""
+
+    # ── AWS S3 동의 음성 저장 (voice-consent-s3) ──────────────────────────────────
+    # AWS_S3_BUCKET: 업로드 대상 버킷. 빈 문자열이면 업로드를 스킵한다.
+    # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY: 비어있으면 EC2 IAM Role 자동 인식.
+    # AWS_REGION: 버킷이 위치한 리전 (기본: 서울).
+    AWS_S3_BUCKET: str = ""
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_REGION: str = "ap-northeast-2"
 
     # ── LangSmith 트레이싱 (개발 전용 — 프로덕션에서는 미설정) ────────────────────────
     # .env에 LANGSMITH_* 형식으로 설정한다.

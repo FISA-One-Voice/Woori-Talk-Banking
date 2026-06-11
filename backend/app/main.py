@@ -34,11 +34,9 @@ logger = logging.getLogger(__name__)
 
 from app.core.database import Base, engine
 from app.core.exception import AppError
-
-# from app.features.event.router import router as event_router  # TODO: event 기능 재구현 후 주석 해제
-from app.features.auto_transfer.router import router as auto_transfer_router
-from app.core.opensearch import create_indices_if_not_exists
+from app.features.analytics.router import router as analytics_router
 from app.features.asset.router import router as asset_router
+from app.features.auto_transfer.router import router as auto_transfer_router
 from app.features.client_errors.router import router as client_errors_router
 from app.features.event.router import router as event_router
 from app.features.jwt_auth.router import router as jwt_auth_router
@@ -113,6 +111,7 @@ async def validation_exception_handler(_request: Request, exc: RequestValidation
 @app.exception_handler(AppError)
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     from app.core.middleware import _extract_feature
+
     logger.error(
         "app_error",
         extra={
@@ -158,6 +157,7 @@ logger.info("[Startup] ASV_SERVER_URL = %s", _settings.ASV_SERVER_URL)
 app.include_router(voice_router)
 app.include_router(jwt_auth_router)
 app.include_router(asset_router)  # 자산 화면 — 잔액 조회 + 거래 내역 조회
+app.include_router(analytics_router)  # 지출 분석 리포트
 app.include_router(event_router)
 app.include_router(voice_register_router)
 app.include_router(recipients_router)
@@ -184,7 +184,9 @@ scheduler = BackgroundScheduler()
 @app.on_event("startup")
 def start_scheduler():
     def job() -> None:
-        job_id = f"auto_transfer_{datetime.now(timezone(timedelta(hours=9))).isoformat()}"
+        job_id = (
+            f"auto_transfer_{datetime.now(timezone(timedelta(hours=9))).isoformat()}"
+        )
         db = SessionLocal()
         try:
             run_due_auto_transfers(db, user_id=None)

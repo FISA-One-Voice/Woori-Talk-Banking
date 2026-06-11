@@ -6,15 +6,14 @@ import { ActionButton } from '@/components/display';
 import { TtsBubble } from '@/components/feedback';
 import { TopBar } from '@/components/layout';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
-import { apiClient, type ApiResponse } from '@/utils/api';
 import { useMic } from '@/context/MicContext';
+import { apiClient, type ApiResponse } from '@/utils/api';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Platform,
+  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -54,9 +53,13 @@ function EventRow({ event }: { event: EventItem }) {
       activeOpacity={0.7}
     >
       <View style={rowStyles.content}>
-        <Text style={rowStyles.title} numberOfLines={1}>{event.title}</Text>
+        <Text style={rowStyles.title} numberOfLines={1}>
+          {event.title}
+        </Text>
         {event.description && (
-          <Text style={rowStyles.desc} numberOfLines={1}>{event.description}</Text>
+          <Text style={rowStyles.desc} numberOfLines={1}>
+            {event.description}
+          </Text>
         )}
         <Text style={rowStyles.date}>{formatEndDate(event.end_at)}</Text>
       </View>
@@ -112,8 +115,7 @@ export default function EventListScreen() {
     apiClient
       .get<ApiResponse<{ events: EventItem[]; total: number }>>('/api/events')
       .then((res) => {
-        const list =
-          res.data.success && res.data.data ? res.data.data.events : [];
+        const list = res.data.success && res.data.data ? res.data.data.events : [];
         setEvents(list);
         setScreen(list.length > 0 ? 'list' : 'empty');
       })
@@ -121,12 +123,14 @@ export default function EventListScreen() {
   }, []);
 
   const ttsMessage =
-    screen === 'loading' ? '이벤트 목록을 불러오고 있습니다.' :
-    screen === 'empty'   ? '진행 중인 이벤트가 없습니다.'     :
-    `진행 중인 이벤트 ${events.length}개가 있습니다.`;
+    screen === 'loading'
+      ? '이벤트 목록을 불러오고 있습니다.'
+      : screen === 'empty'
+        ? '진행 중인 이벤트가 없습니다.'
+        : `진행 중인 이벤트 ${events.length}개가 있습니다.`;
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.root}>
       <View style={styles.body}>
         <TopBar variant="back" title="이벤트" onBack={() => router.replace('/home' as never)} />
         <TtsBubble message={ttsMessage} autoPlay={false} />
@@ -159,7 +163,7 @@ export default function EventListScreen() {
           </View>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -167,7 +171,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 24 : 0,
   },
   body: {
     flex: 1,

@@ -27,15 +27,10 @@ import pytest
 from app.core.exception import ASVError, STTError
 from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.service import (
-    _call_asv_ec2,
     _get_user_embedding,
-    _handle_asv_flow,
-    _handle_normal_flow,
     _resolve_navigate_to,
     process_voice_pipeline,
-    reset_voice_state,
 )
-
 
 # ── 테스트 픽스처 ────────────────────────────────────────────────────────────────
 
@@ -578,5 +573,3 @@ class TestGetUserEmbedding:
 
         assert exc_info.value.code == "ASV_NOT_ENROLLED"
         assert exc_info.value.status_code == 400
-
-

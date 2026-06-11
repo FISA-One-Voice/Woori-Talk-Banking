@@ -275,3 +275,85 @@ def get_recent_recipients(db: Session, user_id: str, limit: int = 5) -> list[dic
             }
         )
     return result
+
+
+# ── TTS 포맷 ────────────────────────────────────────────────────────────────────
+
+from app.shared.agent.slot_schema import (  # noqa: E402
+    ACTION_LABELS,
+    ACTIONS_WITH_YES_NO_CONFIRM,
+    CONFIRM_YES_NO_SUFFIX,
+)
+
+
+def amount_to_korean(amount: int) -> str:
+    """금액을 TTS 친화적 한국어 표현으로 변환한다."""
+    if amount <= 0:
+        return "영 원"
+    units = [
+        (100_000_000, "억"),
+        (10_000, "만"),
+        (1_000, "천"),
+        (100, "백"),
+        (10, "십"),
+    ]
+    parts: list[str] = []
+    remaining = amount
+    for unit_val, unit_name in units:
+        if remaining >= unit_val:
+            count = remaining // unit_val
+            remaining %= unit_val
+            parts.append(f"{count}{unit_name}")
+    if remaining > 0:
+        parts.append(str(remaining))
+    return "".join(parts) + " 원"
+
+
+def format_cycle_parts(cycle: object, scheduled_day: object) -> list[str]:
+    """자동이체 주기 슬롯을 확인 메시지 조각으로 변환한다."""
+    dow_labels = ["월", "화", "수", "목", "금", "토", "일"]
+    parts: list[str] = []
+    if cycle == "monthly":
+        parts.append("매월")
+        if scheduled_day is not None:
+            parts.append(f"{scheduled_day}일")
+    elif cycle == "weekly":
+        parts.append("매주")
+        if scheduled_day is not None:
+            try:
+                parts.append(f"{dow_labels[int(scheduled_day)]}요일")
+            except (IndexError, ValueError):
+                parts.append(f"{scheduled_day}요일")
+    return parts
+
+
+def format_confirm_message(pending_action: str, collected_slots: dict) -> str:
+    """수집된 슬롯을 기반으로 TTS 친화적 확인 메시지를 생성한다."""
+    action_label = ACTION_LABELS.get(pending_action, pending_action)
+    parts: list[str] = []
+
+    recipient = collected_slots.get("recipient")
+    bank_name = collected_slots.get("bank_name")
+    account_number = collected_slots.get("account_number")
+    amount = collected_slots.get("amount")
+    cycle = collected_slots.get("cycle")
+    scheduled_day = collected_slots.get("scheduled_day")
+
+    if bank_name and account_number:
+        masked = _mask_account(str(account_number))
+        target = f"{recipient}님 " if recipient else ""
+        parts.append(f"{target}{bank_name} 계좌 {masked}로")
+    elif recipient:
+        parts.append(f"{recipient}에게")
+
+    parts.extend(format_cycle_parts(cycle, scheduled_day))
+    if amount:
+        try:
+            parts.append(amount_to_korean(int(amount)))
+        except (TypeError, ValueError):
+            parts.append(str(amount))
+
+    message = f"{' '.join(parts)} {action_label}할까요?"
+    if pending_action in ACTIONS_WITH_YES_NO_CONFIRM:
+        message += CONFIRM_YES_NO_SUFFIX
+    return message

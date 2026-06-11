@@ -34,6 +34,7 @@ class AssetSummaryResponse(BaseModel):
 
     total_asset: int
     accounts: list[AccountBalanceItem]
+    tts_text: str = ""  # 화면 진입 시 재생할 TTS 안내 문구 (백엔드 생성)
 
 
 class TransactionItem(BaseModel):
@@ -51,6 +52,7 @@ class TransactionItem(BaseModel):
     category: str | None
     memo: str | None
     created_at: datetime
+    tts_text: str = ""  # 카드 탭 시 재생할 TTS 문구 (백엔드 생성)
 
 
 class TransactionListResponse(BaseModel):

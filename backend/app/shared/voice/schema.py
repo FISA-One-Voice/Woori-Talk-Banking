@@ -35,7 +35,6 @@ class ASVResult(BaseModel):
     score: float
 
 
-
 class ApiResponse(BaseModel):
     success: bool
     data: Any = None
@@ -99,3 +98,7 @@ class VoiceResponseData(BaseModel):
     pending_action: str | None = None
     """현재 진행 중인 액션 이름 (e.g. 'transfer', 'auto_transfer', 'cancel_auto_transfer').
     프론트엔드가 액션별로 다른 UI/단계를 렌더링할 때 사용."""
+
+    execution_pending: bool = False
+    """True이면 이체 실행이 아직 완료되지 않았으며 프론트엔드가 POST /api/voice/proceed를
+    자동 호출해야 한다. ASV 인증 성공 직후 한 번만 True로 설정된다."""

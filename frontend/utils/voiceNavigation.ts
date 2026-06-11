@@ -2,6 +2,8 @@
 
 export function agentPathFromNavigateTo(navigateTo: string): string {
   if (navigateTo === 'home') return '/home';
+  // 구 버전 호환 — "balance"는 자산 화면
+  if (navigateTo === 'balance') return '/asset';
   return `/${navigateTo}`;
 }
 

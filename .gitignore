@@ -48,6 +48,7 @@ Thumbs.db
 backend/seeds/
 
 report/
+!frontend/app/report/
 .bkit/
 docs/
 

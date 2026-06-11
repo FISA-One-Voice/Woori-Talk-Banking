@@ -12,6 +12,7 @@ from app.features.recipients.service import classify_recipient_input
 SLOT_SCHEMA: dict[str, list[str]] = {
     "transfer": ["recipient", "amount"],
     "auto_transfer": ["recipient", "amount", "cycle", "scheduled_day"],
+    "cancel_auto_transfer": ["recipient"],
     "add_note": ["memo"],
 }
 
@@ -29,6 +30,7 @@ SCREEN_MAP: dict[str, str] = {
     "event": "event",
     "home": "home",
     "cancel_auto_transfer": "auto-transfer",
+    "list_auto_transfer": "auto-transfer",
 }
 
 # ── 수취인 검증이 필요한 액션 ────────────────────────────────────────────────────
@@ -79,6 +81,7 @@ COMPLETE_SCREEN_MAP: dict[str, str] = {
     "transfer": "transfer/complete",
     "auto_transfer": "auto-transfer/complete",
     "cancel_auto_transfer": "auto-transfer",
+    "list_auto_transfer": "auto-transfer",
 }
 
 # execute_node 이체 실패 시 프론트엔드 실패 화면 (SCR004-F08)
@@ -104,6 +107,7 @@ ACTION_LABELS: dict[str, str] = {
     "transfer": "이체",
     "auto_transfer": "자동이체 등록",
     "cancel_auto_transfer": "자동이체 해지",
+    "list_auto_transfer": "자동이체 조회",
 }
 
 # ── 화면 전환 전용 인텐트 ─────────────────────────────────────────────────────────
@@ -131,3 +135,130 @@ def transfer_missing_slots(collected_slots: dict) -> list[str]:
     if not collected_slots.get("amount"):
         missing.append("amount")
     return missing
+
+
+# ── 슬롯 유효성 검사 ─────────────────────────────────────────────────────────────
+
+def valid_scheduled_day(value: object, cycle: object) -> bool:
+    """자동이체 주기에 맞는 scheduled_day 값인지 확인한다."""
+    if value is None or cycle is None:
+        return False
+    try:
+        day = int(value)
+    except (TypeError, ValueError):
+        return False
+    if cycle == "monthly":
+        return 1 <= day <= 31
+    if cycle == "weekly":
+        return 0 <= day <= 6
+    return False
+
+
+def missing_slots(pending_action: str, collected_slots: dict) -> list[str]:
+    """pending_action에 따라 수집되지 않은 슬롯 이름 목록을 반환한다."""
+    if pending_action == "transfer":
+        return transfer_missing_slots(collected_slots)
+    required = SLOT_SCHEMA.get(pending_action, [])
+    result: list[str] = []
+    for slot_name in required:
+        value = collected_slots.get(slot_name)
+        if slot_name == "scheduled_day":
+            if not valid_scheduled_day(value, collected_slots.get("cycle")):
+                result.append(slot_name)
+        elif not value:
+            result.append(slot_name)
+    return result
+
+
+# ── STT·한국어 금액·요일 파싱 ────────────────────────────────────────────────────
+
+KOR_DOW_MAP: dict[str, int] = {
+    "월": 0, "월요일": 0,
+    "화": 1, "화요일": 1,
+    "수": 2, "수요일": 2,
+    "목": 3, "목요일": 3,
+    "금": 4, "금요일": 4,
+    "토": 5, "토요일": 5,
+    "일": 6, "일요일": 6,
+}
+
+STT_AMOUNT_ALIASES: dict[str, int] = {
+    "전원": 1000,
+    "천원": 1000,
+    "천": 1000,
+    "만원": 10000,
+    "만": 10000,
+}
+
+
+def _kor_to_int(text: str) -> int | None:
+    """순수 한국어 숫자 문자열을 정수로 변환한다."""
+    _DIGIT = {
+        "일": 1, "이": 2, "삼": 3, "사": 4, "오": 5,
+        "육": 6, "칠": 7, "팔": 8, "구": 9,
+    }
+    _SMALL = {"십": 10, "백": 100, "천": 1000}
+
+    def _below_10000(s: str) -> int:
+        result, current = 0, 0
+        for ch in s:
+            if ch in _DIGIT:
+                current = _DIGIT[ch]
+            elif ch in _SMALL:
+                result += (current or 1) * _SMALL[ch]
+                current = 0
+        return result + current
+
+    total = 0
+    if "억" in text:
+        parts = text.split("억", 1)
+        total += (_below_10000(parts[0]) or 1) * 100_000_000
+        text = parts[1]
+    if "만" in text:
+        parts = text.split("만", 1)
+        total += (_below_10000(parts[0]) or 1) * 10_000
+        text = parts[1]
+    total += _below_10000(text)
+    return total if total > 0 else None
+
+
+def parse_korean_amount(raw: str) -> str | None:
+    """한국어·STT 오인식 금액 표현을 정수 문자열로 변환한다.
+
+    STT 오인식("전원"→천원), 한국어 숫자("오만원"→50000),
+    숫자+단위("1000원"→1000) 세 경우를 처리한다.
+    변환 불가 시 None을 반환한다.
+    """
+    import re as _re
+    text = str(raw).strip().replace(" ", "").replace(",", "")
+    if not text:
+        return None
+    if text in STT_AMOUNT_ALIASES:
+        return str(STT_AMOUNT_ALIASES[text])
+    text_no_won = _re.sub(r"원$", "", text)
+    try:
+        val = int(text_no_won)
+        return str(val) if val > 0 else None
+    except ValueError:
+        pass
+    val = _kor_to_int(text_no_won)
+    return str(val) if val is not None and val > 0 else None
+
+
+def normalize_scheduled_day(slots: dict, extracted_slots: dict) -> dict:
+    """STT 오류 보정 및 한글 요일명 → 정수 변환."""
+    normalized = dict(slots)
+    for key, value in extracted_slots.items():
+        if key == "scheduled_day" and value is not None:
+            kor_key = str(value).replace(" ", "")
+            if kor_key in KOR_DOW_MAP:
+                value = KOR_DOW_MAP[kor_key]
+            else:
+                try:
+                    day_int = int(value)
+                except (TypeError, ValueError):
+                    day_int = None
+                if day_int is not None and 32 <= day_int <= 91 and day_int % 10 == 1:
+                    value = day_int // 10
+        normalized[key] = value
+    return normalized

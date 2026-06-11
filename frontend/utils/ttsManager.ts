@@ -36,6 +36,7 @@ export function speakText(
   Speech.speak(message, {
     language: 'ko-KR',
     rate: getTtsRate(),
+    volume: 1.0,
     ...opts,
   });
 }

@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
-import { getTtsMessage } from '@/utils/errorHandler';
+import { extractApiErrorMessage } from '@/utils/errorHandler';
 import { fetchAssetSummary, AccountItem } from '@/services/assetService';
+import { speakText, stopAllTts } from '@/utils/ttsManager';
+import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 
 function formatAmount(amount: number): string {
   if (amount >= 100000000) {
@@ -23,32 +25,40 @@ function formatAmount(amount: number): string {
   return `${amount.toLocaleString()}원`;
 }
 
-function AccountCard({ account }: { account: AccountItem }) {
+function AccountCard({ account, onPress }: { account: AccountItem; onPress?: () => void }) {
   return (
-    <View style={styles.accountCard}>
+    <TouchableOpacity style={styles.accountCard} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.accountInfo}>
         <Text style={styles.accountBank}>{account.bank_name}</Text>
         <Text style={styles.accountAlias}>{account.alias ?? account.account_type}</Text>
       </View>
       <Text style={styles.accountBalance}>{account.balance.toLocaleString()}원</Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 export default function AssetScreen() {
   const router = useRouter();
-  const [isListening, setIsListening] = useState(false);
   const [accounts, setAccounts] = useState<AccountItem[]>([]);
   const [totalAsset, setTotalAsset] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [announceText, setAnnounceText] = useState('');
 
   useEffect(() => {
     fetchAssetSummary()
-      .then(({ accounts, total_asset }) => {
+      .then(({ accounts, total_asset, tts_text }) => {
         setAccounts(accounts);
         setTotalAsset(total_asset);
+        setAnnounceText(tts_text);
+        // 음성 명령으로 이동 시 에이전트 TTS가 이미 재생 중 — 화면 자동 TTS 생략
+        const lastResp = useVoiceResponseStore.getState().lastResponse;
+        const navigatedViaVoice = !!lastResp?.audio &&
+          (lastResp?.navigate_to === 'asset' || lastResp?.navigate_to?.startsWith('asset'));
+        if (!navigatedViaVoice) {
+          speakText(tts_text);
+        }
       })
-      .catch((err: Error) => Alert.alert('안내', getTtsMessage(err.message)))
+      .catch((err: unknown) => Alert.alert('안내', extractApiErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -56,29 +66,42 @@ export default function AssetScreen() {
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => { stopAllTts(); router.back(); }} style={styles.backBtn}>
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>내 자산</Text>
           <View style={styles.headerRight} />
         </View>
-        <View style={styles.ttsBubble}>
-          <Text style={styles.ttsLabel}>음성 안내</Text>
+
+        <TouchableOpacity
+          style={styles.ttsBubble}
+          onPress={() => announceText && speakText(announceText)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.ttsLabel}>음성 안내 · 탭하면 다시 듣기</Text>
           <Text style={styles.ttsText}>
             {loading ? '불러오는 중...' : `총 자산 ${formatAmount(totalAsset)} 입니다`}{'\n'}
-            지출·수입 / 거래내역
+            지출·수입 / 거래내역 버튼으로 확인하세요
           </Text>
-        </View>
-        <View style={styles.totalCard}>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.totalCard}
+          onPress={() => announceText && speakText(announceText)}
+          activeOpacity={0.85}
+        >
           <Text style={styles.totalLabel}>총 자산</Text>
           <Text style={styles.totalAmount}>{totalAsset.toLocaleString()}원</Text>
-          <TouchableOpacity style={styles.listenBtn} onPress={() => setIsListening((v) => !v)}>
-            <Text style={styles.listenBtnText}>{isListening ? '● 듣고 있어요' : '○ 듣기 시작'}</Text>
-          </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
+
         {accounts.map((account) => (
-          <AccountCard key={account.account_id} account={account} />
+          <AccountCard
+            key={account.account_id}
+            account={account}
+            onPress={() => announceText && speakText(announceText)}
+          />
         ))}
+
         <View style={styles.bottomBtns}>
           <TouchableOpacity
             style={styles.actionBtn}
@@ -145,20 +168,6 @@ const styles = StyleSheet.create({
   totalAmount: {
     fontSize: FONT_SIZES.title,
     color: COLORS.textMain,
-    fontWeight: 'bold',
-  },
-  listenBtn: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: COLORS.highlightYellow,
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 28,
-    alignSelf: 'center',
-  },
-  listenBtnText: {
-    fontSize: FONT_SIZES.caption,
-    color: COLORS.highlightYellow,
     fontWeight: 'bold',
   },
   accountCard: {

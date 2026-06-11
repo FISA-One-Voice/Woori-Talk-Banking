@@ -21,17 +21,16 @@ import { ActionButton } from '@/components/display';
 import { TtsBubble } from '@/components/feedback';
 import { TopBar } from '@/components/layout';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
-import { apiClient, type ApiResponse } from '@/utils/api';
-import { useScreenAnnounce } from '@/hooks/useScreenAnnounce';
 import { useMic } from '@/context/MicContext';
+import { useScreenAnnounce } from '@/hooks/useScreenAnnounce';
 import { useEventStore } from '@/store/eventStore';
+import { apiClient, type ApiResponse } from '@/utils/api';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
-  Platform,
-  StatusBar,
+  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -50,7 +49,7 @@ interface EventDetail {
   end_at: string;
 }
 
-type Screen     = 'loading' | 'detail' | 'not_found';
+type Screen = 'loading' | 'detail' | 'not_found';
 type ModalState = 'confirm' | 'processing' | 'success' | 'duplicate' | 'error' | null;
 
 // ── 헬퍼 ─────────────────────────────────────────────────────────────────────
@@ -72,9 +71,7 @@ function EventDetailCard({ event }: { event: EventDetail }) {
       <View style={cardStyles.divider} />
       <View style={cardStyles.row}>
         <Text style={cardStyles.label}>혜택</Text>
-        <Text style={[cardStyles.value, cardStyles.highlight]}>
-          {event.description ?? '-'}
-        </Text>
+        <Text style={[cardStyles.value, cardStyles.highlight]}>{event.description ?? '-'}</Text>
       </View>
       <View style={cardStyles.divider} />
       <View style={cardStyles.row}>
@@ -126,38 +123,30 @@ interface ParticipateModalProps {
   onClose: () => void;
 }
 
-function ParticipateModal({
-  event,
-  modalState,
-  onConfirm,
-  onClose,
-}: ParticipateModalProps) {
+function ParticipateModal({ event, modalState, onConfirm, onClose }: ParticipateModalProps) {
   const { activateMic } = useMic();
   if (!modalState) return null;
 
-  const isConfirm    = modalState === 'confirm' || modalState === 'processing';
+  const isConfirm = modalState === 'confirm' || modalState === 'processing';
   const isProcessing = modalState === 'processing';
-  const isSuccess    = modalState === 'success';
-  const isDuplicate  = modalState === 'duplicate';
-  const isError      = modalState === 'error';
-  const isDone       = isSuccess || isDuplicate || isError;
+  const isSuccess = modalState === 'success';
+  const isDuplicate = modalState === 'duplicate';
+  const isError = modalState === 'error';
+  const isDone = isSuccess || isDuplicate || isError;
 
-  const ttsMessage =
-    isConfirm   ? `${event.title}\n참여하시겠어요?`    :
-    isSuccess   ? '이벤트 참여가 완료되었습니다!'       :
-    isDuplicate ? '이미 참여하신 이벤트입니다.'         :
-                  '참여 처리 중 오류가 발생했습니다.';
+  const ttsMessage = isConfirm
+    ? `${event.title}\n참여하시겠어요?`
+    : isSuccess
+      ? '이벤트 참여가 완료되었습니다!'
+      : isDuplicate
+        ? '이미 참여하신 이벤트입니다.'
+        : '참여 처리 중 오류가 발생했습니다.';
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
       <View style={modalStyles.overlay}>
         <View style={modalStyles.card}>
-
-          <TtsBubble
-            message={ttsMessage}
-            variant={isError ? 'error' : 'default'}
-            autoPlay
-          />
+          <TtsBubble message={ttsMessage} variant={isError ? 'error' : 'default'} autoPlay />
 
           {isConfirm && <EventDetailCard event={event} />}
 
@@ -166,13 +155,12 @@ function ParticipateModal({
               <Text style={modalStyles.resultIcon}>
                 {isSuccess ? '✅' : isDuplicate ? 'ℹ️' : '⚠️'}
               </Text>
-              <Text style={[
-                modalStyles.resultText,
-                isError && { color: COLORS.error },
-              ]}>
-                {isSuccess   ? '참여가 완료되었습니다!'    :
-                 isDuplicate ? '이미 참여하신 이벤트입니다.' :
-                               '처리 중 오류가 발생했습니다.'}
+              <Text style={[modalStyles.resultText, isError && { color: COLORS.error }]}>
+                {isSuccess
+                  ? '참여가 완료되었습니다!'
+                  : isDuplicate
+                    ? '이미 참여하신 이벤트입니다.'
+                    : '처리 중 오류가 발생했습니다.'}
               </Text>
             </View>
           )}
@@ -217,13 +205,10 @@ function ParticipateModal({
                 delayLongPress={600}
                 activeOpacity={0.7}
               >
-                <Text style={modalStyles.btnTextPrimary}>
-                  {isSuccess ? '확인' : '닫기'}
-                </Text>
+                <Text style={modalStyles.btnTextPrimary}>{isSuccess ? '확인' : '닫기'}</Text>
               </TouchableOpacity>
             )}
           </View>
-
         </View>
       </View>
     </Modal>
@@ -304,17 +289,16 @@ export default function EventDetailScreen() {
   const [dbParticipated, setDbParticipated] = useState(false);
 
   // DB 참여 여부 OR 이번 세션에서 참여한 경우 모두 반영
-  const participated =
-    dbParticipated || (event ? joinedIds.includes(event.event_id) : false);
+  const participated = dbParticipated || (event ? joinedIds.includes(event.event_id) : false);
 
   useScreenAnnounce('이벤트 상세 화면입니다.');
 
   // joinStatus 변화 → modalState 동기화
   useEffect(() => {
-    if (joinStatus === 'loading')   setModalState('processing');
-    else if (joinStatus === 'success')   setModalState('success');
+    if (joinStatus === 'loading') setModalState('processing');
+    else if (joinStatus === 'success') setModalState('success');
     else if (joinStatus === 'duplicate') setModalState('duplicate');
-    else if (joinStatus === 'error')     setModalState('error');
+    else if (joinStatus === 'error') setModalState('error');
   }, [joinStatus]);
 
   useEffect(() => {
@@ -341,7 +325,7 @@ export default function EventDetailScreen() {
 
   function handleConfirmParticipate(): void {
     if (!event) return;
-    joinEvent(event.event_id);  // 인터셉터가 authStore 토큰을 자동으로 첨부합니다.
+    joinEvent(event.event_id); // 인터셉터가 authStore 토큰을 자동으로 첨부합니다.
   }
 
   function handleCloseModal(): void {
@@ -350,14 +334,14 @@ export default function EventDetailScreen() {
   }
 
   const ttsMap: Record<Screen, { message: string; variant: 'default' | 'error' }> = {
-    loading:   { message: '이벤트 정보를 불러오고 있습니다.', variant: 'default' },
-    detail:    { message: `${event?.title ?? ''}\n참여하시겠어요?`,  variant: 'default' },
-    not_found: { message: '이벤트를 찾을 수\n없습니다.',            variant: 'error'   },
+    loading: { message: '이벤트 정보를 불러오고 있습니다.', variant: 'default' },
+    detail: { message: `${event?.title ?? ''}\n참여하시겠어요?`, variant: 'default' },
+    not_found: { message: '이벤트를 찾을 수\n없습니다.', variant: 'error' },
   };
   const tts = ttsMap[screen];
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.root}>
       {event && modalState && (
         <ParticipateModal
           event={event}
@@ -410,7 +394,7 @@ export default function EventDetailScreen() {
           </View>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -418,7 +402,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight ?? 24 : 0,
   },
   body: {
     flex: 1,

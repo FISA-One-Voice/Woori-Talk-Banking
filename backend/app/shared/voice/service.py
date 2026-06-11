@@ -37,19 +37,23 @@ from app.core.metrics import asv_verification_total, voice_stage_duration
 from app.core.opensearch_writer import write_voice_pipeline_record_async
 from app.core.request_context import get_request_id
 from app.models.user import User
-from app.shared.agent import build_graph
 from app.shared.agent.slot_schema import SCREEN_MAP
-from app.shared.agent.tools import ALL_TOOLS
+from app.shared.agent.supervisor import build_supervisor
 from app.shared.agent.transfer_clarification import (
     is_clarification_no,
     is_home_request,
 )
-from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.message_utils import tts_text_from_messages
+from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
 
 logger = logging.getLogger(__name__)
+
+# ── 백그라운드 태스크 참조 보관 (GC 방지) ──────────────────────────────────────
+# asyncio.create_task() 결과를 저장하지 않으면 이벤트 루프가 weak reference만 유지해
+# 실행 중에 GC로 수거될 수 있다. 완료 시 자동 제거된다.
+_background_tasks: set[asyncio.Task] = set()
 
 # ── 그래프 싱글턴 (지연 초기화) ────────────────────────────────────────────────
 # 모듈 임포트 시점에 초기화하면 OPENAI_CHAT_API_KEY 미설정 환경(테스트 등)에서
@@ -59,10 +63,10 @@ _graph = None
 
 
 def _get_graph():
-    """LangGraph 그래프 싱글턴을 반환한다. 최초 호출 시 build_graph()를 실행한다."""
+    """LangGraph 그래프 싱글턴을 반환한다. 최초 호출 시 build_supervisor()를 실행한다."""
     global _graph
     if _graph is None:
-        _graph = build_graph(ALL_TOOLS)
+        _graph = build_supervisor()
     return _graph
 
 
@@ -91,6 +95,10 @@ def _voice_state_reset_payload() -> dict:
         "draft_recipient": None,
         "last_tx_id": None,
         "last_order_id": None,
+        "agent_domain": None,
+        "analytics_period": None,
+        "pending_consent_tts_text": None,
+        "pending_consent_audio_b64": None,
         "messages": clear_conversation_messages(),
     }
 
@@ -126,7 +134,7 @@ async def reset_voice_state(user_id: str) -> None:
     await graph.aupdate_state(
         config,
         _voice_state_reset_payload(),
-        as_node="intent_node",
+        as_node="supervisor_node",
     )
 
 
@@ -188,14 +196,14 @@ async def process_voice_pipeline(
 # ── 정상 흐름: STT → 에이전트 → TTS ────────────────────────────────────────────
 
 _NAVIGATE_TO_INTENT: dict[str, str] = {
-    "transfer":           "transfer",
-    "transfer/complete":  "transfer",
-    "transfer/failed":    "transfer",
-    "auto-transfer":      "auto_transfer",
+    "transfer": "transfer",
+    "transfer/complete": "transfer",
+    "transfer/failed": "transfer",
+    "auto-transfer": "auto_transfer",
     "auto-transfer/complete": "auto_transfer",
-    "balance":            "balance",
-    "event":              "event",
-    "home":               "home",
+    "balance": "balance",
+    "event": "event",
+    "home": "home",
 }
 
 
@@ -232,7 +240,9 @@ async def _record_voice_pipeline(
         navigate_to: 에이전트가 설정한 화면 이동 경로.
     """
     record: dict = {
-        "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%dT%H:%M:%S+09:00"),
+        "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime(
+            "%Y-%m-%dT%H:%M:%S+09:00"
+        ),
         "request_id": get_request_id(),
         "user_id": user_id,
         "stt_ms": stt_ms,
@@ -244,7 +254,9 @@ async def _record_voice_pipeline(
         "success": True,
         "error_code": None,
     }
-    logger.info("voice_pipeline_complete", extra={"event": "voice_pipeline_complete", **record})
+    logger.info(
+        "voice_pipeline_complete", extra={"event": "voice_pipeline_complete", **record}
+    )
     asyncio.create_task(write_voice_pipeline_record_async(record))
     voice_stage_duration.labels(stage="stt").observe(stt_ms / 1000)
     voice_stage_duration.labels(stage="agent").observe(agent_ms / 1000)
@@ -263,12 +275,37 @@ async def _handle_normal_flow(
     Args:
         audio_bytes: 원시 오디오 바이트.
         user_id: JWT 사용자 ID.
+        db: SQLAlchemy DB 세션.
+        content_type: 오디오 포맷.
         config: LangGraph thread_id 설정.
         graph: 컴파일된 StateGraph 인스턴스.
 
     Returns:
         VoiceResponseData: TTS 오디오 + 에이전트 상태 반영.
     """
+    # 에이전트 호출 전 현재 state에서 awaiting_confirmation 확인
+    state_before = graph.get_state(config)
+    was_awaiting_confirmation = (
+        state_before.values.get("awaiting_confirmation", False)
+        if state_before.values
+        else False
+    )
+
+    # 4-b: 현재 확인 대기 중이면 사용자 동의 음성을 base64로 임시 저장 (voice-consent-s3)
+    # Plan SC: pending_consent_audio_b64 캡처 — 요청 B에 해당
+    if was_awaiting_confirmation:
+        try:
+            consent_wav = _to_wav_bytes(audio_bytes)
+            await graph.aupdate_state(
+                config,
+                {"pending_consent_audio_b64": base64.b64encode(consent_wav).decode()},
+                as_node="supervisor_node",
+            )
+        except Exception:
+            logger.warning("동의 음성 임시 저장 실패 — 계속 진행", exc_info=True)
+
+    # 1. STT: 오디오 → 텍스트
+    transcript = await transcribe_audio(audio_bytes, content_type)
     pipeline_start = time.monotonic()
 
     # 1. STT: 오디오 → 텍스트
@@ -288,6 +325,19 @@ async def _handle_normal_flow(
     agent_ms = int((time.monotonic() - t0) * 1000)
 
     response_text = tts_text_from_messages(result["messages"])
+
+    # 4-a: awaiting_confirmation이 False→True로 전환되면 TTS 텍스트를 임시 저장 (voice-consent-s3)
+    # Plan SC: pending_consent_tts_text 캡처 — 요청 A에 해당
+    now_awaiting_confirmation = result.get("awaiting_confirmation", False)
+    if not was_awaiting_confirmation and now_awaiting_confirmation:
+        try:
+            await graph.aupdate_state(
+                config,
+                {"pending_consent_tts_text": response_text},
+                as_node="supervisor_node",
+            )
+        except Exception:
+            logger.warning("TTS 텍스트 임시 저장 실패 — 계속 진행", exc_info=True)
 
     # 3. TTS: 텍스트 → MP3
     t0 = time.monotonic()
@@ -454,23 +504,35 @@ async def _handle_asv_flow(
 
     if auth_success:
         asv_verification_total.labels(result="pass").inc()
-        asyncio.create_task(write_voice_pipeline_record_async({
-            "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%dT%H:%M:%S+09:00"),
-            "request_id": get_request_id(),
-            "user_id": user_id,
-            "asv_result": "pass",
-            "success": True,
-        }))
-        return await _proceed_after_asv_success(user_id, config, graph)
+        asyncio.create_task(
+            write_voice_pipeline_record_async(
+                {
+                    "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime(
+                        "%Y-%m-%dT%H:%M:%S+09:00"
+                    ),
+                    "request_id": get_request_id(),
+                    "user_id": user_id,
+                    "asv_result": "pass",
+                    "success": True,
+                }
+            )
+        )
+        return await _return_processing_tts(config, graph)
 
     asv_verification_total.labels(result="fail").inc()
-    asyncio.create_task(write_voice_pipeline_record_async({
-        "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%dT%H:%M:%S+09:00"),
-        "request_id": get_request_id(),
-        "user_id": user_id,
-        "asv_result": "fail",
-        "success": False,
-    }))
+    asyncio.create_task(
+        write_voice_pipeline_record_async(
+            {
+                "timestamp": datetime.now(timezone(timedelta(hours=9))).strftime(
+                    "%Y-%m-%dT%H:%M:%S+09:00"
+                ),
+                "request_id": get_request_id(),
+                "user_id": user_id,
+                "asv_result": "fail",
+                "success": False,
+            }
+        )
+    )
 
     # ── 인증 실패 처리 ─────────────────────────────────────────────────────────
     new_retry = retry_count + 1
@@ -495,8 +557,11 @@ async def _handle_asv_flow(
                 "asv_retry_count": 0,
                 "awaiting_memo_decision": False,
                 "navigate_to": "home",
+                "agent_domain": None,
+                "pending_consent_tts_text": None,
+                "pending_consent_audio_b64": None,
             },
-            as_node="intent_node",
+            as_node="supervisor_node",
         )
         tts_text = (
             "본인 확인에 세 번 실패하여 작업이 취소되었습니다. 홈 화면으로 이동합니다."
@@ -509,7 +574,7 @@ async def _handle_asv_flow(
         await graph.aupdate_state(
             config,
             {"asv_retry_count": new_retry},
-            as_node="intent_node",
+            as_node="supervisor_node",
         )
         tts_text = (
             f"본인 확인에 실패했습니다. {remaining}번 더 시도하실 수 있습니다. "
@@ -536,47 +601,124 @@ async def _handle_asv_flow(
     )
 
 
-async def _proceed_after_asv_success(
-    user_id: str,
+async def _return_processing_tts(
     config: dict,
     graph,
 ) -> VoiceResponseData:
-    """ASV 인증 성공 후 에이전트 실행 흐름.
+    """ASV 인증 성공 직후 "처리 중" TTS를 즉시 반환한다.
 
-    aupdate_state()로 execution_ready=True를 주입하면
-    route_after_intent가 execute_node로 라우팅한다.
-
-    Args:
-        user_id: JWT 사용자 ID.
-        config: LangGraph thread_id 설정.
-        graph: 컴파일된 StateGraph 인스턴스.
-
-    Returns:
-        VoiceResponseData: 금융 작업 실행 결과 TTS 응답.
+    execution_ready=True를 graph 상태에 설정하되 ainvoke는 호출하지 않는다.
+    프론트엔드는 execution_pending=True 수신 시 TTS를 재생한 뒤
+    POST /api/voice/proceed를 자동 호출해 실제 이체를 실행한다.
+    pending_consent_* 필드는 /proceed 에서 필요하므로 여기서 지우지 않는다.
     """
-    # execution_ready=True 주입 → intent_node 이후 route_after_intent가 execute_node로 라우팅
+    state_snapshot = graph.get_state(config)
+    state_vals = state_snapshot.values if state_snapshot.values else {}
+    pending_action = state_vals.get("pending_action")
+    collected_slots = state_vals.get("collected_slots", {})
+
     await graph.aupdate_state(
         config,
         {
             "awaiting_asv_audio": False,
             "execution_ready": True,
             "asv_retry_count": 0,
+            "agent_domain": "transfer",
         },
-        as_node="intent_node",
+        as_node="supervisor_node",
     )
 
-    # intent_node는 LLM을 호출하지만 execution_ready=True가 보존되어
-    # route_after_intent → execute_node로 직행한다. (graph.py 수정 불필요)
-    result = await graph.ainvoke(
+    audio_mp3 = await synthesize_speech(
+        "인증이 완료되었습니다. 이체 처리와 이체 확인 음성을 업로드 중입니다. 잠시만 기다려주십시오."
+    )
+    navigate_to = SCREEN_MAP.get(pending_action) if pending_action else None
+
+    return VoiceResponseData(
+        audio=base64.b64encode(audio_mp3).decode(),
+        navigate_to=navigate_to,
+        collected_slots=collected_slots,
+        awaiting_confirmation=False,
+        awaiting_asv_audio=False,
+        execution_pending=True,
+        awaiting_memo_decision=False,
+        awaiting_transfer_clarification=False,
+        transcript=None,
+        pending_action=pending_action,
+    )
+
+
+async def _execute_pending_transfer(
+    user_id: str,
+    config: dict,
+    graph,
+) -> VoiceResponseData:
+    """execution_ready=True 상태에서 실제 이체를 실행하고 결과 TTS를 반환한다.
+
+    POST /api/voice/proceed 엔드포인트의 실제 처리 함수.
+    """
+    # 동의 음성 업로드에 필요한 임시 필드를 읽은 뒤 즉시 초기화한다
+    state_snapshot = graph.get_state(config)
+    state_vals = state_snapshot.values if state_snapshot.values else {}
+    pending_tts_text: str | None = state_vals.get("pending_consent_tts_text")
+    pending_audio_b64: str | None = state_vals.get("pending_consent_audio_b64")
+
+    await graph.aupdate_state(
+        config,
         {
-            "messages": [HumanMessage(content="인증 완료")],
-            "user_id": user_id,
+            "pending_consent_tts_text": None,
+            "pending_consent_audio_b64": None,
         },
+        as_node="supervisor_node",
+    )
+
+    result = await graph.ainvoke(
+        {"messages": [HumanMessage(content="인증 완료")], "user_id": user_id},
         config=config,
     )
 
     response_text = tts_text_from_messages(result["messages"])
-    audio_mp3 = await synthesize_speech(response_text)
+    tx_id: str | None = result.get("last_tx_id") or result.get("last_order_id")
+    logger.info(
+        "[ConsentS3] pending_tts=%s pending_audio=%s tx_id=%s",
+        bool(pending_tts_text),
+        bool(pending_audio_b64),
+        tx_id,
+    )
+
+    if pending_tts_text and pending_audio_b64 and tx_id:
+        from app.shared.voice import s3_service
+
+        # 결과 TTS와 동의 TTS(S3용)를 동시에 합성한다.
+        # 백그라운드 task는 TTS 합성 없이 즉시 S3 업로드를 시작하므로
+        # 사용자가 "업로드하고 있습니다" 메시지를 듣는 시점에 실제 업로드가 진행 중이다.
+        audio_mp3, consent_tts_mp3 = await asyncio.gather(
+            synthesize_speech(response_text),
+            synthesize_speech(pending_tts_text),
+        )
+
+        async def _upload_consent_task(
+            _user_id: str,
+            _tx_id: str,
+            _tts_mp3: bytes,
+            _audio_b64: str,
+        ) -> None:
+            try:
+                tts_wav = s3_service.mp3_to_wav(_tts_mp3)
+                consent_wav = base64.b64decode(_audio_b64)
+                combined = s3_service.concat_wav(tts_wav, consent_wav)
+                await s3_service.upload_consent_audio(_user_id, _tx_id, combined)
+            except Exception:
+                logger.error(
+                    "동의 음성 S3 업로드 실패 (이체 결과 영향 없음)", exc_info=True
+                )
+
+        task = asyncio.create_task(
+            _upload_consent_task(user_id, tx_id, consent_tts_mp3, pending_audio_b64)
+        )
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+    else:
+        audio_mp3 = await synthesize_speech(response_text)
 
     return VoiceResponseData(
         audio=base64.b64encode(audio_mp3).decode(),
@@ -584,6 +726,7 @@ async def _proceed_after_asv_success(
         collected_slots=result.get("collected_slots") or {},
         awaiting_confirmation=result.get("awaiting_confirmation", False),
         awaiting_asv_audio=False,
+        execution_pending=False,
         awaiting_memo_decision=result.get("awaiting_memo_decision", False),
         awaiting_transfer_clarification=result.get(
             "awaiting_transfer_clarification", False
@@ -591,6 +734,20 @@ async def _proceed_after_asv_success(
         transcript=None,
         pending_action=result.get("pending_action"),
     )
+
+
+async def execute_pending_transfer(user_id: str) -> VoiceResponseData:
+    """POST /api/voice/proceed 엔드포인트 진입점.
+
+    Args:
+        user_id: JWT에서 추출한 사용자 ID.
+
+    Returns:
+        VoiceResponseData: 이체 결과 TTS + 상태 플래그.
+    """
+    graph = _get_graph()
+    config = {"configurable": {"thread_id": user_id}}
+    return await _execute_pending_transfer(user_id, config, graph)
 
 
 # ── DB 조회 ─────────────────────────────────────────────────────────────────────
@@ -679,5 +836,3 @@ async def _call_asv_ec2(
             message="화자 인증 서버 응답 시간이 초과되었습니다.",
             status_code=504,
         ) from e
-
-

@@ -8,6 +8,24 @@ export type AutoTransferStep =
   | 'cancel-input-recipient'
   | 'cancel-confirm';
 
+export type AutoTransferPhase = 'voice-guide' | 'slot-filling' | 'list-view';
+
+/**
+ * pending_action / 슬롯 / ASV 상태로 현재 화면 Phase를 결정한다.
+ * - list-view : pending 없음 → 자동이체 목록 조회 화면
+ * - voice-guide: pending 있고 슬롯 미수집 → TTS 안내 대기
+ * - slot-filling: 슬롯 수집 중 또는 ASV 인증 대기
+ */
+export function resolveAutoTransferPhase(
+  pendingAction: string | null | undefined,
+  hasSlots: boolean,
+  awaitingAsv: boolean,
+): AutoTransferPhase {
+  if (awaitingAsv || hasSlots) return 'slot-filling';
+  if (!pendingAction) return 'list-view';
+  return 'voice-guide';
+}
+
 export function resolveAutoTransferStep(
   slots: Record<string, unknown>,
   awaitingAsv: boolean,

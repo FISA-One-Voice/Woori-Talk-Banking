@@ -5,15 +5,17 @@ from app.core.database import get_db
 from app.core.jwt_utils import get_current_user_id
 from app.features.jwt_auth import service
 from app.features.jwt_auth.schema import JwtLoginRequest, JwtRefreshRequest
+from app.shared.voice.service import reset_voice_state
 
 router = APIRouter(prefix="/api/users", tags=["Users Auth"])
 
 
 @router.post("/login", response_model=dict)
-def login(req: JwtLoginRequest, db: Session = Depends(get_db)):
+async def login(req: JwtLoginRequest, db: Session = Depends(get_db)):
     """사용자 로그인을 처리하고 JWT 토큰을 발급합니다.
 
     전화번호와 PIN 번호를 DB의 정보와 대조하여 유효성을 검사합니다.
+    로그인 성공 시 이전 세션의 voice state(슬롯, 대화 이력)를 초기화합니다.
 
     Args:
         req: 로그인 요청 데이터 (phone, pin).
@@ -23,6 +25,7 @@ def login(req: JwtLoginRequest, db: Session = Depends(get_db)):
         발급된 JWT 토큰 정보(accessToken, refreshToken)를 포함한 표준 API 응답.
     """
     data = service.login(db, req)
+    await reset_voice_state(data.user_id)
     return {
         "success": True,
         "data": data.model_dump(by_alias=True),

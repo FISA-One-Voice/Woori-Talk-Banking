@@ -23,7 +23,11 @@ from app.shared.voice.schema import (
     TTSResult,
     VoiceResponseData,
 )
-from app.shared.voice.service import process_voice_pipeline, reset_voice_state
+from app.shared.voice.service import (
+    execute_pending_transfer,
+    process_voice_pipeline,
+    reset_voice_state,
+)
 from app.shared.voice.stt_service import transcribe_audio
 from app.shared.voice.tts_service import synthesize_speech
 
@@ -83,6 +87,49 @@ async def voice_pipeline(
             collected_slots={},
             awaiting_confirmation=False,
             awaiting_asv_audio=False,
+            transcript=None,
+        )
+        return ApiResponse(
+            success=False,
+            data=error_data.model_dump(),
+            message=exc.message,
+            code=exc.code,
+        )
+
+
+@router.post("/proceed", response_model=ApiResponse)
+async def proceed_execution(
+    user_id: str = Depends(get_current_user_id),
+) -> ApiResponse:
+    """ASV 인증 성공 후 실제 이체를 실행하는 엔드포인트.
+
+    프론트엔드가 execution_pending=True 응답 수신 후 TTS 재생을 마치고 자동 호출한다.
+    오디오 업로드 없이 JWT 인증만 필요하다.
+
+    Args:
+        user_id: JWT Bearer 토큰에서 추출한 사용자 ID.
+
+    Returns:
+        ApiResponse — data 필드에 VoiceResponseData 포함 (이체 결과 TTS + 상태 플래그).
+    """
+    try:
+        data = await execute_pending_transfer(user_id)
+        return ApiResponse(
+            success=True,
+            data=data.model_dump(),
+            message="이체 처리가 완료되었습니다.",
+        )
+    except TTSError:
+        raise
+    except AppError as exc:
+        audio_mp3 = await synthesize_speech(exc.user_message or exc.message)
+        error_data = VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to=None,
+            collected_slots={},
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            awaiting_memo_decision=False,
             transcript=None,
         )
         return ApiResponse(

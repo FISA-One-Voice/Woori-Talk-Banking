@@ -37,7 +37,7 @@ import pytest
 
 from app.core.config import settings
 from app.shared.agent import build_graph
-from app.shared.agent.tools import MOCK_TOOLS
+from app.shared.agent.tools import ALL_TOOLS
 from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.service import _call_asv_ec2, process_voice_pipeline
 
@@ -123,7 +123,7 @@ def real_graph(llm_api_key):
 
     각 테스트는 고유한 thread_id(uuid)를 사용하므로 그래프 인스턴스 자체는 공유해도 안전하다.
     """
-    return build_graph(MOCK_TOOLS)
+    return build_graph(ALL_TOOLS)
 
 
 def _db_with_embedding(embedding: list[float]) -> MagicMock:
@@ -326,7 +326,7 @@ class TestAsvLlmFullPipeline:
         config = {"configurable": {"thread_id": uid}}
 
         # 실제 그래프를 사용하되 _get_graph() 싱글턴을 우회한다
-        real_g = build_graph(MOCK_TOOLS)
+        real_g = build_graph(ALL_TOOLS)
 
         # ASV 대기 상태를 직접 주입 (이전 LLM 턴 없이 격리 가능)
         await real_g.aupdate_state(
@@ -376,11 +376,11 @@ class TestAsvLlmFullPipeline:
         """TC-F02: ASV 성공을 강제 주입 후 execute_node → 이체 결과 응답 확인.
 
         _proceed_after_asv_success가 "인증 완료" 메시지로 LLM을 재호출하여
-        execute_node가 mock_execute_transfer를 실행하는 전체 흐름을 검증한다.
+        execute_node가 execute_transfer를 실행하는 전체 흐름을 검증한다.
         """
         uid = str(uuid.uuid4())
         config = {"configurable": {"thread_id": uid}}
-        real_g = build_graph(MOCK_TOOLS)
+        real_g = build_graph(ALL_TOOLS)
 
         # ASV 대기 상태 + 슬롯 완전 수집 상태 주입
         await real_g.aupdate_state(
@@ -420,7 +420,7 @@ class TestAsvLlmFullPipeline:
         assert result.audio != ""
         assert result.awaiting_asv_audio is False
 
-        # LLM이 execute_node를 통해 mock_execute_transfer를 호출한 결과
+        # LLM이 execute_node를 통해 execute_transfer를 호출한 결과
         # 마지막 그래프 메시지에 이체 관련 내용이 포함되어야 한다
         state_after = real_g.get_state(config)
         last_content: str = state_after.values["messages"][-1].content

@@ -1,6 +1,7 @@
 import VoiceStatusOverlay, { VoiceState } from '@/components/VoiceStatusOverlay';
 import { needsYesNoVoicePrompt, YES_NO_CONFIRM_INSTRUCTION } from '@/constants/voicePrompts';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { proceedTransfer } from '@/services/voiceService';
 import { useAuthStore } from '@/store/authStore';
 import { useTransferStore as transferStore } from '@/store/transferStore';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
@@ -10,6 +11,7 @@ import { FALLBACK_MESSAGE } from '@/utils/errorHandler';
 import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { speakText, stopAllTts } from '@/utils/ttsManager';
 import { agentPathFromNavigateTo, shouldNavigateToRoute } from '@/utils/voiceNavigation';
+import { Audio } from 'expo-av';
 import { Href, Stack, useRouter, useSegments } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
@@ -108,55 +110,57 @@ export default function RootLayout() {
   }, [segments]);
 
   const touchPts = useRef<Array<{ x: number; y: number }>>([]);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressTouchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const isLongPressActiveRef = useRef(false);
+  // Long press 타이머 (카드 위에서도 동작하도록 onTouchStart 기반으로 구현)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchOrigin = useRef<{ x: number; y: number } | null>(null);
+
+  // execution_pending 재귀 호출용 ref — useCallback 순환 의존성을 피한다
+  const handleResponseRef = useRef<((data: VoiceResponseData) => Promise<void>) | null>(null);
 
   function handleTouchStart(e: GestureResponderEvent): void {
-    const x = e.nativeEvent.locationX;
-    const y = e.nativeEvent.locationY;
+    const { locationX: x, locationY: y } = e.nativeEvent;
     touchPts.current = [{ x, y }];
+    touchOrigin.current = { x, y };
 
-    longPressTouchStartRef.current = { x, y };
-    isLongPressActiveRef.current = false;
-    longPressTimerRef.current = setTimeout(() => {
-      longPressTimerRef.current = null;
-      isLongPressActiveRef.current = true;
+    // 500ms 유지하면 녹음 시작 — onLongPress 대신 사용해 자식 컴포넌트 위에서도 동작
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
       handleLongPress();
     }, 500);
   }
 
   function handleTouchMove(e: GestureResponderEvent): void {
-    const x = e.nativeEvent.locationX;
-    const y = e.nativeEvent.locationY;
+    const { locationX: x, locationY: y } = e.nativeEvent;
     touchPts.current.push({ x, y });
 
-    if (longPressTimerRef.current && longPressTouchStartRef.current) {
-      const dx = Math.abs(x - longPressTouchStartRef.current.x);
-      const dy = Math.abs(y - longPressTouchStartRef.current.y);
+    // 15px 이상 움직이면 long press 취소 (V 제스처 or 스크롤)
+    if (longPressTimer.current && touchOrigin.current) {
+      const dx = Math.abs(x - touchOrigin.current.x);
+      const dy = Math.abs(y - touchOrigin.current.y);
       if (dx > 15 || dy > 15) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
       }
     }
   }
 
   function handleTouchEnd(): void {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
+    // Long press 타이머가 아직 살아있으면 취소 (short tap)
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
     }
+    touchOrigin.current = null;
 
-    if (isLongPressActiveRef.current) {
-      isLongPressActiveRef.current = false;
-      handlePressOut();
-    }
-
+    // V 제스처 감지
     const pts = touchPts.current;
     touchPts.current = [];
     if (isVGesture(pts)) {
       stopAllTts();
     }
+
+    // 녹음 중이면 종료 (내부에서 recording 유무 확인하므로 항상 호출 가능)
+    handlePressOut();
   }
 
   // ── 음성 응답 처리 ──────────────────────────────────────────────────────────
@@ -166,6 +170,24 @@ export default function RootLayout() {
 
   const handleResponse = useCallback(
     async (data: VoiceResponseData) => {
+      // ASV 인증 성공 직후 — "처리 중" TTS를 재생한 뒤 /proceed를 자동 호출한다
+      if (data.execution_pending) {
+        setVoiceState('processing');
+        useVoiceResponseStore.getState().setLastResponse(data);
+        await stopAllTts();
+        if (data.audio) {
+          await playBase64Audio(data.audio).catch(() => undefined);
+        }
+        try {
+          const result = await proceedTransfer();
+          await handleResponseRef.current?.(result);
+        } catch {
+          setVoiceState('idle');
+          speakText('이체 처리 중 오류가 발생했습니다.');
+        }
+        return;
+      }
+
       const prevSlots =
         (useVoiceResponseStore.getState().lastResponse?.collected_slots as
           | Record<string, unknown>
@@ -177,8 +199,7 @@ export default function RootLayout() {
 
       if (isFailedNav) {
         const mergedSlots = { ...prevSlots, ...(data.collected_slots ?? {}) };
-        const errorMessage =
-          (mergedSlots.transfer_error_message as string) ?? '';
+        const errorMessage = (mergedSlots.transfer_error_message as string) ?? '';
         transferStore.getState().setTxReceipt(null);
         transferStore.getState().setTransferFailure({
           message: errorMessage || FALLBACK_MESSAGE,
@@ -221,7 +242,7 @@ export default function RootLayout() {
 
       if (data.audio && !isFailedNav) {
         await stopAllTts();
-        playBase64Audio(data.audio).catch(() => undefined);
+        playBase64Audio(data.audio).catch(() => undefined); // 음성과 함께 이동
       }
 
       if (needsYesNoVoicePrompt(data) && !data.audio) {
@@ -235,6 +256,10 @@ export default function RootLayout() {
     [router],
   );
 
+  useEffect(() => {
+    handleResponseRef.current = handleResponse;
+  }, [handleResponse]);
+
   const handleError = useCallback((message: string) => {
     setVoiceState('idle');
     speakText(message);
@@ -247,6 +272,12 @@ export default function RootLayout() {
   );
 
   const hasVoiceRegistered = useAuthStore((state) => state.hasVoiceRegistered);
+
+  useEffect(() => {
+    if (hasVoiceRegistered) {
+      Audio.requestPermissionsAsync();
+    }
+  }, [hasVoiceRegistered]);
 
   return (
     <Pressable

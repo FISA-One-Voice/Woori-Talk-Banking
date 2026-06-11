@@ -55,6 +55,31 @@ export async function sendVoice(audioUri: string): Promise<VoiceResponseData> {
 }
 
 /**
+ * execution_pending=true 상태에서 실제 이체를 실행하고 결과 VoiceResponseData를 반환합니다.
+ *
+ * @returns VoiceResponseData — 이체 결과 TTS 오디오 + 상태 플래그
+ * @throws Error — HTTP 실패 시
+ */
+export async function proceedTransfer(): Promise<VoiceResponseData> {
+  const { data } = await apiClient.post<ApiResponse<VoiceResponseData>>(
+    '/api/voice/proceed',
+    null,
+    { timeout: 30000 },
+  );
+
+  if (!data.success) {
+    if (data.data) return data.data;
+    throw new Error(data.code ?? 'VOICE_PROCESSING_ERROR');
+  }
+
+  if (!data.data) {
+    throw new Error('VOICE_PROCESSING_ERROR');
+  }
+
+  return data.data;
+}
+
+/**
  * 텍스트를 Azure TTS로 변환해 base64 MP3를 반환합니다.
  *
  * @param text  - 읽어줄 텍스트
