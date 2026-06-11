@@ -49,7 +49,14 @@ async def transcribe_audio(
             )
     except httpx.TimeoutException as exc:
         external_api_calls_total.labels(service="clova_stt", status="error").inc()
-        logger.warning("external_api_call", extra={"event": "external_api_call", "service": "clova_stt", "status": "error"})
+        logger.warning(
+            "external_api_call",
+            extra={
+                "event": "external_api_call",
+                "service": "clova_stt",
+                "status": "error",
+            },
+        )
         raise STTError(
             code="STT_FAILED",
             message="Clova Speech API 요청 시간이 초과됐습니다.",
@@ -57,7 +64,14 @@ async def transcribe_audio(
         ) from exc
     except httpx.RequestError as exc:
         external_api_calls_total.labels(service="clova_stt", status="error").inc()
-        logger.warning("external_api_call", extra={"event": "external_api_call", "service": "clova_stt", "status": "error"})
+        logger.warning(
+            "external_api_call",
+            extra={
+                "event": "external_api_call",
+                "service": "clova_stt",
+                "status": "error",
+            },
+        )
         raise STTError(
             code="SERVICE_UNAVAILABLE",
             message="Clova Speech API에 연결할 수 없습니다.",
@@ -66,7 +80,14 @@ async def transcribe_audio(
 
     if response.status_code != 200:
         external_api_calls_total.labels(service="clova_stt", status="error").inc()
-        logger.warning("external_api_call", extra={"event": "external_api_call", "service": "clova_stt", "status": "error"})
+        logger.warning(
+            "external_api_call",
+            extra={
+                "event": "external_api_call",
+                "service": "clova_stt",
+                "status": "error",
+            },
+        )
         raise STTError(
             code="STT_FAILED",
             message=f"Clova Speech API 오류: status={response.status_code}, body={response.text}",
@@ -77,14 +98,29 @@ async def transcribe_audio(
     text: str | None = payload.get("text")
     if not text:
         external_api_calls_total.labels(service="clova_stt", status="error").inc()
-        logger.warning("external_api_call", extra={"event": "external_api_call", "service": "clova_stt", "status": "error"})
+        logger.warning(
+            "external_api_call",
+            extra={
+                "event": "external_api_call",
+                "service": "clova_stt",
+                "status": "error",
+            },
+        )
         raise STTError(
             code="STT_FAILED",
             message="Clova Speech 응답에 텍스트가 없습니다.",
+            user_message="음성을 인식하지 못했습니다. 다시 말씀해 주세요.",
         )
 
     external_api_calls_total.labels(service="clova_stt", status="success").inc()
-    logger.info("external_api_call", extra={"event": "external_api_call", "service": "clova_stt", "status": "success"})
+    logger.info(
+        "external_api_call",
+        extra={
+            "event": "external_api_call",
+            "service": "clova_stt",
+            "status": "success",
+        },
+    )
     return text
 
 

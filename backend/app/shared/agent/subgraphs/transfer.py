@@ -6,6 +6,7 @@ Supervisor 그래프의 MemorySaver를 공유해야 하므로 독립 checkpointe
 
 import json
 import logging
+import time
 
 import openai
 from langchain_core.messages import AIMessage, HumanMessage
@@ -16,6 +17,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.exception import AgentError
+from app.core.metrics import agent_node_executions_total, agent_tool_duration_seconds
 from app.features.recipients.service import (
     classify_recipient_input,
     enrich_slots_from_resolved,
@@ -332,6 +334,14 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
 
     def intent_node(state: VoiceState) -> dict:
         """Transfer 도메인 intent와 슬롯을 추출한다."""
+        logger.info(
+            "[Transfer →intent_node] pending=%s await_confirm=%s await_asv=%s memo=%s exec_ready=%s",
+            state.get("pending_action"),
+            state.get("awaiting_confirmation", False),
+            state.get("awaiting_asv_audio", False),
+            state.get("awaiting_memo_decision", False),
+            state.get("execution_ready", False),
+        )
         if state.get("execution_ready") or state.get("awaiting_asv_audio"):
             return _clean_transfer_delta({"navigate_to": None})
 
@@ -380,6 +390,13 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         result = llm_structured.invoke(
             _chat_messages_for_llm(state, _build_system_content(state))
         )
+        logger.info(
+            "[Transfer] intent=%s slots=%s confirmed=%s cancelled=%s",
+            result.intent,
+            result.extracted_slots,
+            result.user_confirmed,
+            result.user_cancelled,
+        )
         return _clean_transfer_delta(_build_intent_update(state, result, user_text))
 
     def slot_fill_node(state: VoiceState) -> dict:
@@ -387,6 +404,7 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         pending = state.get("pending_action", "")
         slots = state.get("collected_slots", {})
         missing = missing_slots(pending, slots)
+        logger.info("[Transfer →slot_fill_node] pending=%s missing=%s", pending, missing)
 
         if missing:
             slot_name = missing[0]
@@ -409,6 +427,7 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
     def confirm_node(state: VoiceState) -> dict:
         """슬롯 수집 완료 후 사용자 확인 메시지를 생성한다."""
         pending = state.get("pending_action", "")
+        logger.info("[Transfer →confirm_node] pending=%s slots=%s", pending, state.get("collected_slots", {}))
         confirm_message = format_confirm_message(
             pending, state.get("collected_slots", {})
         )
@@ -427,6 +446,10 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         bank_name = slots.get("bank_name")
         user_id = state.get("user_id", "")
         kind = classify_recipient_input(recipient_input) if recipient_input else "name"
+        logger.info(
+            "[Transfer →resolve_node] recipient=%s bank=%s kind=%s user_id=%s",
+            recipient_input, bank_name, kind, user_id,
+        )
 
         resolved = find_recipient_by_voice(
             user_id,
@@ -490,6 +513,7 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         """수집된 슬롯으로 Transfer 도메인 tool을 호출한다."""
         pending = state.get("pending_action", "")
         slots = dict(state.get("collected_slots", {}))
+        logger.info("[Transfer →execute_node] pending=%s slots=%s", pending, slots)
 
         # 메모 액션은 세션 ID를 슬롯에 주입해 tool.invoke가 직접 받을 수 있게 한다.
         if pending == "add_note" and not slots.get("tx_id"):
@@ -510,16 +534,21 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
     def route_after_intent(state: VoiceState) -> str:
         """intent_node 이후 다음 노드를 결정한다."""
         if state.get("awaiting_asv_audio"):
+            logger.info("[Transfer route] intent_node → END (awaiting_asv_audio)")
             return END
         if state.get("awaiting_memo_decision"):
+            logger.info("[Transfer route] intent_node → END (awaiting_memo_decision)")
             return END
         if state.get("awaiting_transfer_clarification"):
+            logger.info("[Transfer route] intent_node → END (awaiting_transfer_clarification)")
             return END
         if state.get("execution_ready"):
+            logger.info("[Transfer route] intent_node → execute_node (execution_ready)")
             return "execute_node"
 
         pending = state.get("pending_action")
         if not pending:
+            logger.info("[Transfer route] intent_node → END (no pending_action)")
             return END
 
         slots = state.get("collected_slots", {})
@@ -528,15 +557,20 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             and slots.get("recipient")
             and not state.get("recipient_validated")
         ):
+            logger.info("[Transfer route] intent_node → resolve_node (recipient unvalidated)")
             return "resolve_node"
 
         missing = missing_slots(pending, slots)
         if missing:
+            logger.info("[Transfer route] intent_node → slot_fill_node (missing=%s)", missing)
             return "slot_fill_node"
         if pending not in SLOT_SCHEMA:
+            logger.info("[Transfer route] intent_node → execute_node (no slots required)")
             return "execute_node"
         if not state.get("awaiting_confirmation"):
+            logger.info("[Transfer route] intent_node → confirm_node (all slots filled)")
             return "confirm_node"
+        logger.info("[Transfer route] intent_node → END (awaiting_confirmation)")
         return END
 
     def route_after_resolve(state: VoiceState) -> str:
@@ -546,15 +580,21 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         missing = missing_slots(pending, slots)
 
         if not slots.get("recipient"):
+            logger.info("[Transfer route] resolve_node → END (recipient not found)")
             return END
         if not state.get("recipient_validated"):
             if missing == ["amount"]:
+                logger.info("[Transfer route] resolve_node → END (unvalidated, only amount missing)")
                 return END
             if missing:
+                logger.info("[Transfer route] resolve_node → slot_fill_node (missing=%s)", missing)
                 return "slot_fill_node"
+            logger.info("[Transfer route] resolve_node → END (unvalidated)")
             return END
         if missing:
+            logger.info("[Transfer route] resolve_node → slot_fill_node (missing=%s)", missing)
             return "slot_fill_node"
+        logger.info("[Transfer route] resolve_node → confirm_node")
         return "confirm_node"
 
     try:
@@ -686,22 +726,51 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
     파싱하고, 나머지 tool 은 plain string 응답을 그대로 사용한다.
     """
     pending = state.get("pending_action", "")
-    invoke_args = {"user_id": state.get("user_id", ""), **slots}
+    user_id = state.get("user_id", "")
+    invoke_args = {"user_id": user_id, **slots}
     last_tx_id: str | None = state.get("last_tx_id")
     last_order_id: str | None = state.get("last_order_id")
     completed_slots: dict = {}
     awaiting_memo_next = False
     post_execute_navigate: str | None = None
 
+    _tool_start = time.monotonic()
+    _tool_success = True
+    logger.info(
+        "agent_tool_call_start",
+        extra={
+            "event": "agent_tool_call_start",
+            "tool": tool_obj.name,
+            "action": pending,
+            "user_id": user_id,
+            **({"amount": slots.get("amount")} if pending in ("transfer", "auto_transfer") else {}),
+        },
+    )
     try:
         raw = tool_obj.invoke(invoke_args)
     except Exception as exc:
+        _tool_success = False
         raise AgentError(
             code="TRANSFER_TOOL_FAILED",
             message="TransferAgent tool 호출에 실패했습니다.",
             status_code=500,
             user_message="이체 처리 중 일시적인 오류가 발생했습니다.",
         ) from exc
+    finally:
+        _duration_ms = int((time.monotonic() - _tool_start) * 1000)
+        logger.info(
+            "agent_tool_call_end",
+            extra={
+                "event": "agent_tool_call_end",
+                "tool": tool_obj.name,
+                "action": pending,
+                "user_id": user_id,
+                "duration_ms": _duration_ms,
+                "success": _tool_success,
+            },
+        )
+        agent_node_executions_total.labels(node=pending).inc()
+        agent_tool_duration_seconds.labels(node=pending).observe(_duration_ms / 1000)
 
     response_text, tx_id, order_id, note_consumed = _parse_tool_response(raw)
 
@@ -712,13 +781,32 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
             response_text = response_text + MEMO_OFFER_SUFFIX
             completed_slots = {"tx_id": tx_id}
             post_execute_navigate = COMPLETE_SCREEN_MAP["transfer"]
+            logger.info(
+                "agent_transfer_completed",
+                extra={"event": "agent_transfer_completed", "tx_id": tx_id, "user_id": user_id, "amount": slots.get("amount")},
+            )
         else:
             completed_slots = {**slots, "transfer_error_message": response_text}
             post_execute_navigate = "home"
+            logger.warning(
+                "agent_transfer_failed",
+                extra={"event": "agent_transfer_failed", "user_id": user_id, "reason": response_text},
+            )
     elif pending == "auto_transfer" and order_id:
         last_order_id = order_id
         awaiting_memo_next = True
         response_text = response_text + MEMO_OFFER_SUFFIX
+        logger.info(
+            "agent_auto_transfer_registered",
+            extra={
+                "event": "agent_auto_transfer_registered",
+                "order_id": order_id,
+                "user_id": user_id,
+                "amount": slots.get("amount"),
+                "to_bank": slots.get("bank_name"),
+                "recipient": slots.get("recipient"),
+            },
+        )
 
     if post_execute_navigate == FAILED_SCREEN_MAP.get("transfer"):
         response_text = response_text.rstrip() + TRANSFER_FAILED_HOME_SUFFIX

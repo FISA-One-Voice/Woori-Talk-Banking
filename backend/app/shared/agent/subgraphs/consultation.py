@@ -1,9 +1,13 @@
+import logging
+
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
 from app.core.config import settings
 from app.shared.agent.state import VoiceState
 from app.shared.agent.prompts import RAG_SYSTEM_PROMPT
+
+logger = logging.getLogger(__name__)
 
 RAG_DOMAIN_ACTIONS: frozenset[str] = frozenset({
     "financial_qa", "exchange_rate", "interest_rate",
@@ -21,7 +25,13 @@ def build_rag_graph(tools: list):
     )
 
     async def _rag_graph(state: VoiceState) -> dict:
+        user_id = state.get("user_id", "")
+        logger.info("[RAG] invoke start user_id=%s", user_id)
         result = await agent.ainvoke(state)
+        logger.info(
+            "[RAG] invoke complete user_id=%s messages=%d",
+            user_id, len(result.get("messages", [])),
+        )
         return {
             "messages": result["messages"],
             "navigate_to": None,

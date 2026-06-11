@@ -190,7 +190,10 @@ async def supervisor_node(state: VoiceState) -> dict:
     """
     text = _last_user_text(state)
     domain = await _decide_domain(text, state)
-    logger.info("supervisor_node: domain=%s, text=%r", domain, text)
+    logger.info(
+        "supervisor_node",
+        extra={"event": "supervisor_route", "domain": domain, "text": text},
+    )
 
     # unknown: 다시 질문 TTS (서브그래프 없이 인라인 처리)
     if domain == "unknown":
@@ -225,6 +228,10 @@ async def event_node(state: VoiceState) -> dict:
             user_message="이벤트 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
         ) from e
 
+    logger.info(
+        "event_node",
+        extra={"event": "supervisor_event", "user_id": user_id},
+    )
     return {
         "messages": [AIMessage(content=response_text)],
         "navigate_to": "event",
@@ -243,6 +250,10 @@ async def cancel_node(state: VoiceState) -> dict:
         "취소했습니다. 홈 화면으로 이동합니다."
         if has_session
         else "홈 화면으로 이동합니다."
+    )
+    logger.info(
+        "cancel_node",
+        extra={"event": "supervisor_cancel", "has_active_session": has_session},
     )
     return {
         "messages": [
@@ -274,15 +285,21 @@ def route_after_supervisor(state: VoiceState) -> str:
     """supervisor_node 이후 조건부 엣지 함수."""
     domain = state.get("agent_domain")
     if domain == "cancel":
+        logger.info("[Supervisor route] supervisor_node → cancel_node")
         return "cancel_node"
     if domain == "transfer":
+        logger.info("[Supervisor route] supervisor_node → transfer")
         return "transfer"
     if domain == "asset":
+        logger.info("[Supervisor route] supervisor_node → asset")
         return "asset"
     if domain == "rag":
+        logger.info("[Supervisor route] supervisor_node → rag")
         return "rag"
     if domain == "event":
+        logger.info("[Supervisor route] supervisor_node → event_node")
         return "event_node"
+    logger.info("[Supervisor route] supervisor_node → END (domain=%s)", domain)
     return END
 
 
