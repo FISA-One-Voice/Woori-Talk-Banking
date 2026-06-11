@@ -8,13 +8,15 @@
 """
 
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+from pydantic import BaseModel, Field
 
 from app.core.config import settings
+from app.core.metrics import agent_node_executions_total, agent_tool_duration_seconds
 from app.shared.agent.ROUTING_CONSTANTS import ASSET_NAVIGATE_VALUES
 from app.shared.agent.prompts import ASSET_SYSTEM_PROMPT
 from app.shared.agent.state import VoiceState
@@ -30,71 +32,160 @@ _NAVIGATE_MAP: dict[str, str] = {
     "top_category":     "asset/history",
     "transaction_list": "asset/history",
     "spending_report":  "report",
-    "compare":          "asset/compare",  # [Dev-A에게] ROUTING_CONSTANTS.ASSET_NAVIGATE_VALUES에 "asset/compare" 추가 요청
+    "compare":          "asset/compare",
 }
 
 
-def _extract_tool_info(messages: list) -> tuple[str | None, dict]:
-    """result["messages"] 역순 순회해 첫 tool_call 정보 반환."""
-    for msg in reversed(messages):
-        if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
-            tc = msg.tool_calls[0]
-            return tc["name"], tc.get("args", {})
-    return None, {}
+class AssetIntent(BaseModel):
+    """자산 조회 인텐트 슬롯 스키마."""
+
+    tool: str = Field(
+        description=(
+            "balance|history|category|top_category"
+            "|transaction_list|spending_report|compare"
+        )
+    )
+    period: str = Field(
+        default="이번달",
+        description="사용자가 말한 기간 그대로. 기본값도 항상 반환, 생략 금지",
+    )
+    filter_type: str | None = Field(default=None, description="expense|income|null")
+    category: str | None = Field(default=None)
+    compare_period: str = Field(default="지난달")
+    date_range: str | None = Field(
+        default=None, description="YYYY-MM-DD, 특정 날짜 조회 시"
+    )
+    direct_response: str | None = Field(
+        default=None, description="history 기간 되묻기 TTS 텍스트"
+    )
+
+
+def _chat_messages_for_llm(state: VoiceState, system_content: str) -> list[dict]:
+    """LangChain 메시지 이력을 OpenAI chat 메시지 형식으로 변환한다."""
+    chat_messages: list[dict] = [{"role": "system", "content": system_content}]
+    for message in state.get("messages", []):
+        if hasattr(message, "type"):
+            role = "user" if message.type == "human" else "assistant"
+            chat_messages.append({"role": role, "content": message.content})
+    return chat_messages
 
 
 def build_asset_graph(tools: list):
-    """AssetAgent 서브그래프를 빌드한다. RAGAgent 패턴(create_react_agent) 사용."""
+    """AssetAgent 서브그래프를 빌드한다. with_structured_output 패턴 사용."""
+    tool_map = {t.name.removeprefix("query_"): t for t in tools}
     llm = ChatOpenAI(
         model=settings.OPENAI_MODEL,
         api_key=settings.OPENAI_CHAT_API_KEY,
         temperature=0,
     )
-    agent = create_react_agent(model=llm, tools=tools, state_schema=VoiceState)
+    llm_structured = llm.with_structured_output(AssetIntent)
 
     async def _asset_graph(state: VoiceState) -> dict:
         user_id = state["user_id"]
-
-        # user_id를 시스템 프롬프트에 주입 — create_react_agent prompt는 정적이므로 여기서 prepend
         today_str = datetime.now(KST).strftime("%Y-%m-%d")
-        system_msg = SystemMessage(content=ASSET_SYSTEM_PROMPT.format(user_id=user_id, today=today_str))
-        result = await agent.ainvoke({
-            **state,
-            "messages": [system_msg, *state["messages"]],
-        })
+        system_content = ASSET_SYSTEM_PROMPT.format(user_id=user_id, today=today_str)
+        chat_msgs = _chat_messages_for_llm(state, system_content)
 
-        # MemorySaver 오염 방지: SystemMessage는 반환 메시지에서 제거
-        clean_msgs = [m for m in result["messages"] if not isinstance(m, SystemMessage)]
+        intent: AssetIntent = llm_structured.invoke(chat_msgs)
+        logger.info(
+            "[Asset →intent] tool=%s period=%s filter_type=%s direct_response=%s",
+            intent.tool, intent.period, intent.filter_type, bool(intent.direct_response),
+        )
 
-        tool_name, tool_args = _extract_tool_info(result["messages"])
+        # history 기간 되묻기
+        if intent.direct_response:
+            return {
+                "messages": [AIMessage(content=intent.direct_response)],
+                "navigate_to": None,
+                "analytics_period": None,
+                "collected_slots": state.get("collected_slots") or {},
+            }
+
+        # 도구 호출 인자 구성 — period는 항상 명시적으로 전달
+        invoke_args: dict = {"user_id": user_id}
+
+        if intent.tool == "balance":
+            pass  # user_id만 필요
+        elif intent.tool == "history":
+            invoke_args["period"] = intent.period
+            if intent.filter_type:
+                invoke_args["filter_type"] = intent.filter_type
+        elif intent.tool == "category":
+            invoke_args["period"] = intent.period
+            if intent.category:
+                invoke_args["category"] = intent.category
+        elif intent.tool == "top_category":
+            invoke_args["period"] = intent.period
+        elif intent.tool == "transaction_list":
+            invoke_args["period"] = intent.period
+            if intent.date_range:
+                invoke_args["date_range"] = intent.date_range
+        elif intent.tool == "spending_report":
+            invoke_args["period"] = intent.period
+        elif intent.tool == "compare":
+            invoke_args["period"] = intent.period
+            invoke_args["compare_period"] = intent.compare_period
+            if intent.category:
+                invoke_args["category"] = intent.category
+
+        if intent.tool not in tool_map:
+            logger.error("AssetAgent 알 수 없는 tool: %s", intent.tool)
+            return {
+                "messages": [AIMessage(content="죄송합니다. 요청을 처리할 수 없습니다.")],
+                "navigate_to": "asset",
+                "analytics_period": None,
+                "collected_slots": {},
+            }
+
+        _tool_start = time.monotonic()
+        _tool_success = True
+        logger.info(
+            "agent_tool_call_start",
+            extra={"event": "agent_tool_call_start", "tool": intent.tool, "action": intent.tool, "user_id": user_id},
+        )
+        try:
+            tts_text: str = tool_map[intent.tool].invoke(invoke_args)
+        except Exception:
+            _tool_success = False
+            raise
+        finally:
+            _duration_ms = int((time.monotonic() - _tool_start) * 1000)
+            logger.info(
+                "agent_tool_call_end",
+                extra={
+                    "event": "agent_tool_call_end",
+                    "tool": intent.tool,
+                    "action": intent.tool,
+                    "user_id": user_id,
+                    "duration_ms": _duration_ms,
+                    "success": _tool_success,
+                },
+            )
+            agent_node_executions_total.labels(node=intent.tool).inc()
+            agent_tool_duration_seconds.labels(node=intent.tool).observe(_duration_ms / 1000)
 
         # navigate_to 결정
-        action_key = tool_name.removeprefix("query_") if tool_name else None
-        navigate_to = _NAVIGATE_MAP.get(action_key) if action_key else None
-        if navigate_to not in ASSET_NAVIGATE_VALUES and navigate_to != "asset/compare":
+        navigate_to = _NAVIGATE_MAP.get(intent.tool, "asset")
+        valid = navigate_to in ASSET_NAVIGATE_VALUES or navigate_to == "asset/compare"
+        if not valid:
             logger.error("AssetAgent navigate_to 계약 위반: %s", navigate_to)
             navigate_to = "asset"
 
-        # collected_slots 구성
-        slots: dict = {}
-        if tool_name:
-            slots["action"] = action_key
-            period = tool_args.get("period")
-            if period:                          slots["period"] = period
-            if tool_args.get("compare_period"): slots["compare_period"] = tool_args["compare_period"]
-            if tool_args.get("category"):       slots["category"] = tool_args["category"]
-            if tool_args.get("filter_type"):    slots["filter_type"] = tool_args["filter_type"]
-            if tool_args.get("date_range"):     slots["date_range"] = tool_args["date_range"]
-        else:
-            # 되묻기: 이전 collected_slots 유지 (다음 턴에서 action 기억)
-            slots = state.get("collected_slots") or {}
-
-        period = tool_args.get("period") if tool_args else None
+        # collected_slots — period 항상 포함
+        slots: dict = {"action": intent.tool, "period": intent.period}
+        if intent.filter_type:
+            slots["filter_type"] = intent.filter_type
+        if intent.category:
+            slots["category"] = intent.category
+        if intent.tool == "compare":
+            slots["compare_period"] = intent.compare_period
+        if intent.date_range:
+            slots["date_range"] = intent.date_range
 
         return {
-            "messages": clean_msgs,
+            "messages": [AIMessage(content=tts_text)],
             "navigate_to": navigate_to,
-            "analytics_period": period if tool_name and tool_name != "query_balance" else None,
+            "analytics_period": intent.period if intent.tool != "balance" else None,
             "collected_slots": slots,
         }
 
