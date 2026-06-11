@@ -11,7 +11,7 @@ class AppError(Exception):
         self.code = code
         self.message = message
         self.status_code = status_code
-        self.user_message = user_message  # TTS 전용. None이면 message로 폴백
+        self.user_message = user_message if user_message is not None else message
         super().__init__(message)
 
 
