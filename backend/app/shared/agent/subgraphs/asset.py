@@ -187,6 +187,7 @@ def build_asset_graph(tools: list):
             "navigate_to": navigate_to,
             "analytics_period": intent.period if intent.tool != "balance" else None,
             "collected_slots": slots,
+            "tool_execution_ms": _duration_ms,
         }
 
     return _asset_graph

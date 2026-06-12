@@ -70,22 +70,22 @@ docker rm -f asv-server 2>/dev/null || true
 docker run -d \
   --name asv-server \
   --restart unless-stopped \
-  -p 8001:8000 \
+  -p 8000:8000 \
   southgiri/asv:1.0
 
-echo "  컨테이너 시작 완료 (포트 매핑: 8001 → 8000)"
+echo "  컨테이너 시작 완료 (포트 매핑: 8000 → 8000)"
 
 # ── Health Check ──────────────────────────────────────────────────────────────
 echo "서버 기동 대기 중..."
 for i in $(seq 1 12); do
   sleep 5
-  STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8001/health || true)
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || true)
   if [ "$STATUS" = "200" ]; then
-    PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4 || echo "unknown")
+    PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || echo "unknown")
     echo "========================================"
     echo " ✅ ASV 서버 기동 완료"
-    echo " Health: http://${PRIVATE_IP}:8001/health"
-    echo " Docs:   http://${PRIVATE_IP}:8001/docs"
+    echo " Health: http://${PUBLIC_IP}:8000/health"
+    echo " Docs:   http://${PUBLIC_IP}:8000/docs"
     echo " Image:  southgiri/asv:1.0"
     echo " ASV_THRESHOLD=0.6404"
     echo " $(date '+%Y-%m-%d %H:%M:%S')"

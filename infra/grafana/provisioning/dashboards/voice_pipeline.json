@@ -2,7 +2,7 @@
   "title": "음성 파이프라인 현황",
   "uid": "woori-voice-pipeline",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -168,269 +168,6 @@
       ]
     },
     {
-      "id": 4,
-      "title": "ASV 인증 결과",
-      "type": "bargauge",
-      "gridPos": {
-        "h": 4,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
-      "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "fail"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "pass"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "values": true,
-          "limit": 10,
-          "calcs": [
-            "sum"
-          ]
-        },
-        "displayMode": "gradient"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "alias": "pass",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:pass",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "B",
-          "alias": "fail",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:fail",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-      ],
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "id": 9,
-      "title": "ASV 통과율",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 12,
-        "y": 4
-      },
-      "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "green",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value_and_name"
-      },
-      "targets": [
-        {
-          "refId": "Pass",
-          "alias": "통과",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:pass",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "Total",
-          "alias": "전체",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:*",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        }
-      ],
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
-        },
-        {
-          "id": "calculateField",
-          "options": {
-            "alias": "통과율",
-            "mode": "binary",
-            "binary": {
-              "left": "통과",
-              "right": "전체",
-              "operator": "/"
-            }
-          }
-        }
-      ]
-    },
-    {
       "id": 5,
       "title": "단계별 레이턴시 시계열",
       "type": "timeseries",
@@ -438,7 +175,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 4
       },
       "datasource": {
         "type": "prometheus",
@@ -479,7 +216,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 8
+        "y": 4
       },
       "datasource": {
         "type": "prometheus",
@@ -504,86 +241,6 @@
       ]
     },
     {
-      "id": 10,
-      "title": "Tool별 평균 실행시간",
-      "description": "각 agent tool 호출 완료까지 걸린 평균 시간 (DB·외부 API 포함)",
-      "type": "bargauge",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 24
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "min": 0,
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
-        "displayMode": "gradient",
-        "showUnfilled": true
-      },
-      "targets": [
-        {
-          "expr": "agent_tool_duration_seconds_sum / agent_tool_duration_seconds_count * 1000",
-          "legendFormat": "{{node}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "id": 11,
-      "title": "Tool별 실행시간 추이",
-      "description": "에이전트 tool별 실행시간 시계열 (P95)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 24
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": {
-            "lineWidth": 2
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, rate(agent_tool_duration_seconds_bucket[$__rate_interval])) * 1000",
-          "legendFormat": "{{node}} P95",
-          "refId": "A"
-        },
-        {
-          "expr": "rate(agent_tool_duration_seconds_sum[$__rate_interval]) / rate(agent_tool_duration_seconds_count[$__rate_interval]) * 1000",
-          "legendFormat": "{{node}} 평균",
-          "refId": "B"
-        }
-      ]
-    },
-    {
       "id": 8,
       "title": "에이전트 액션별 실행 횟수",
       "description": "LangGraph execute_node에서 tool 호출이 완료된 액션별 누적 횟수 (node=pending_action)",
@@ -592,7 +249,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 16
+        "y": 12
       },
       "datasource": {
         "type": "grafana-opensearch-datasource",
@@ -809,7 +466,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 16
+        "y": 12
       },
       "datasource": {
         "type": "grafana-opensearch-datasource",
@@ -987,6 +644,160 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Subagent별 호출 횟수",
+      "description": "각 서브그래프(도메인)의 누적 호출 횟수",
+      "type": "bargauge",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "displayMode": "gradient",
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "expr": "agent_subgraph_duration_seconds_count",
+          "legendFormat": "{{subgraph}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "전체 처리 소요시간 (STT -> Agent -> TTS)",
+      "description": "음성 파이프라인 전체 소요 시간 (실행시간 1번)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 28
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(pipeline_total_duration_seconds_bucket[$__rate_interval])) * 1000",
+          "legendFormat": "P95",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(pipeline_total_duration_seconds_sum[$__rate_interval]) / rate(pipeline_total_duration_seconds_count[$__rate_interval]) * 1000",
+          "legendFormat": "평균",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "에이전트 라우팅 소요시간 (Tool 선택 전)",
+      "description": "에이전트 라우팅(Tool 선택 전) 소요 시간 (실행시간 2번)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 28
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(agent_routing_duration_seconds_bucket[$__rate_interval])) * 1000",
+          "legendFormat": "P95",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(agent_routing_duration_seconds_sum[$__rate_interval]) / rate(agent_routing_duration_seconds_count[$__rate_interval]) * 1000",
+          "legendFormat": "평균",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "에이전트 전체 소요시간 (Tool 실행 및 DB 적재 포함)",
+      "description": "에이전트 전체(Supervisor -> Tool -> DB적재) 소요 시간 (실행시간 3번)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 28
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(agent_total_duration_seconds_bucket[$__rate_interval])) * 1000",
+          "legendFormat": "P95",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(agent_total_duration_seconds_sum[$__rate_interval]) / rate(agent_total_duration_seconds_count[$__rate_interval]) * 1000",
+          "legendFormat": "평균",
+          "refId": "B"
         }
       ]
     }

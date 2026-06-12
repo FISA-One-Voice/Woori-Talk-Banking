@@ -1,4 +1,5 @@
 import logging
+import time
 
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
@@ -27,14 +28,17 @@ def build_rag_graph(tools: list):
     async def _rag_graph(state: VoiceState) -> dict:
         user_id = state.get("user_id", "")
         logger.info("[RAG] invoke start user_id=%s", user_id)
+        t0 = time.monotonic()
         result = await agent.ainvoke(state)
+        tool_ms = int((time.monotonic() - t0) * 1000)
         logger.info(
-            "[RAG] invoke complete user_id=%s messages=%d",
-            user_id, len(result.get("messages", [])),
+            "[RAG] invoke complete user_id=%s messages=%d duration_ms=%d",
+            user_id, len(result.get("messages", [])), tool_ms,
         )
         return {
             "messages": result["messages"],
             "navigate_to": None,
+            "tool_execution_ms": None,
         }
 
     return _rag_graph

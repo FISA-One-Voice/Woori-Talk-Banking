@@ -7,12 +7,9 @@ __pycache__/
 
 # 환경변수
 .env
-.env.prod
+
 .env.local
 .env.*.local
-
-# AWS CLI installer
-AWSCLIV2.pkg
 
 # 로그
 *.log

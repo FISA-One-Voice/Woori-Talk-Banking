@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = ""
     POSTGRES_PASSWORD: str = ""
     POSTGRES_SSL_MODE: str = "require"
-    POSTGRES_SSL_ROOT_CERT: str = ""
+    POSTGRES_SSL_ROOT_CERT: str = "certs/aiven-postgre.pem"  # Aiven CA 인증서 경로
 
     # 실행 환경 구분 ("development" | "production")
     ENV: str = "development"
@@ -129,11 +129,6 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_REGION: str = "ap-northeast-2"
 
-    # ── CORS 허용 출처 ────────────────────────────────────────────────────────────
-    # 개발: ["*"] (기본값)
-    # 프로덕션 .env 예시: ALLOWED_ORIGINS=["https://api.woori-talk.site"]
-    ALLOWED_ORIGINS: list[str] = ["*"]
-
     # ── LangSmith 트레이싱 (개발 전용 — 프로덕션에서는 미설정) ────────────────────────
     # .env에 LANGSMITH_* 형식으로 설정한다.
     # LangChain/LangGraph는 os.environ을 직접 읽으므로 model_post_init에서 반영한다.
@@ -145,7 +140,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
 
     def model_post_init(self, __context: object) -> None:
-        """LangSmith 환경변수 반영 + 프로덕션 위험 설정 fast-fail."""
+        """LangSmith가 직접 읽는 환경변수를 os.environ에 반영한다."""
         if self.LANGSMITH_TRACING:
             os.environ["LANGSMITH_TRACING"] = self.LANGSMITH_TRACING
         if self.LANGSMITH_API_KEY:
@@ -154,14 +149,6 @@ class Settings(BaseSettings):
             os.environ["LANGSMITH_PROJECT"] = self.LANGSMITH_PROJECT
         if self.LANGSMITH_ENDPOINT:
             os.environ["LANGSMITH_ENDPOINT"] = self.LANGSMITH_ENDPOINT
-
-        if self.ENV == "production":
-            if self.JWT_SECRET_KEY == "supersecretkey-change-me-in-production":
-                raise ValueError(
-                    "JWT_SECRET_KEY가 기본값입니다. "
-                    ".env에서 교체하세요: "
-                    "python -c \"import secrets; print(secrets.token_hex(32))\""
-                )
 
 
 # 싱글턴 패턴: 이 모듈을 import 하는 모든 파일이 같은 객체를 공유합니다.

@@ -45,8 +45,6 @@ from app.features.transfer.router import router as transfer_router
 from app.features.voice.router import router as voice_register_router
 from app.shared.voice.router import router as voice_router
 
-from app.core.config import settings as _settings
-
 # ── FastAPI 앱 생성 ─────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Woori-Talk-Banking API",
@@ -62,7 +60,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_settings.ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -147,6 +145,7 @@ Base.metadata.create_all(bind=engine)
 # app.include_router({name}_router)
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from app.core.config import settings as _settings
 from app.core.metrics import app_error_total, auto_transfer_scheduler_runs_total
 from app.core.middleware import RequestLoggingMiddleware
 

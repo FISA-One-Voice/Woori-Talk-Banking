@@ -20,6 +20,13 @@ agent_tool_duration_seconds = Histogram(
     buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0],
 )
 
+agent_subgraph_duration_seconds = Histogram(
+    "agent_subgraph_duration_seconds",
+    "에이전트 subgraph(도메인)별 실행 시간",
+    labelnames=["subgraph"],
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0],
+)
+
 app_error_total = Counter(
     "app_error_total",
     "AppError 코드별 발생 횟수",
@@ -67,3 +74,28 @@ asv_verification_total = Counter(
     "ASV 화자 인증 결과 횟수",
     labelnames=["result"],
 )
+
+asv_duration_seconds = Histogram(
+    "asv_duration_seconds",
+    "ASV 화자 인증 API 호출 소요 시간",
+    buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0],
+)
+
+pipeline_total_duration_seconds = Histogram(
+    "pipeline_total_duration_seconds",
+    "음성 파이프라인 전체 소요 시간 (STT -> Agent -> TTS)",
+    buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0],
+)
+
+agent_routing_duration_seconds = Histogram(
+    "agent_routing_duration_seconds",
+    "에이전트 라우팅(Tool 선택 전) 소요 시간",
+    buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0],
+)
+
+agent_total_duration_seconds = Histogram(
+    "agent_total_duration_seconds",
+    "에이전트 전체(Supervisor -> Tool -> DB적재) 소요 시간",
+    buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0],
+)
+

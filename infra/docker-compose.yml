@@ -1,5 +1,17 @@
 services:
 
+  fluent-bit:
+    image: fluent/fluent-bit:3.2
+    volumes:
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - ${HOME}/woori-logs:/logs:ro
+      - fluent-bit-db:/fluent-bit/db
+      - fluent-bit-storage:/fluent-bit/storage
+    env_file:
+      - ../.env
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v2.52.0
     volumes:
@@ -49,5 +61,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  fluent-bit-db:
+  fluent-bit-storage:
   prometheus-data:
   grafana-data:

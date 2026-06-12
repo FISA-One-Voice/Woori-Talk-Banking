@@ -214,18 +214,26 @@ def test_all_metrics_importable():
         agent_tool_duration_seconds,
         app_error_total,
         asv_verification_total,
+        asv_duration_seconds,
         auto_transfer_scheduler_runs_total,
         external_api_calls_total,
         transfer_total,
         voice_stage_duration,
+        pipeline_total_duration_seconds,
+        agent_routing_duration_seconds,
+        agent_total_duration_seconds,
     )
     for metric in [
         agent_node_executions_total, agent_tool_duration_seconds,
-        app_error_total, asv_verification_total,
+        app_error_total, asv_verification_total, asv_duration_seconds,
         auto_transfer_scheduler_runs_total, external_api_calls_total,
         transfer_total, voice_stage_duration,
+        pipeline_total_duration_seconds, agent_routing_duration_seconds,
+        agent_total_duration_seconds,
     ]:
         assert metric is not None
+
+
 
 
 @pytest.mark.parametrize("code", [
@@ -294,3 +302,23 @@ async def test_opensearch_writer_failure_logs_warning_not_raise(monkeypatch, cap
 
     assert len(caplog.records) >= 1
     assert any("실패" in r.message for r in caplog.records)
+
+
+def test_asv_duration_seconds_observe():
+    """asv_duration_seconds 메트릭에 값을 기록 시 정상 동작해야 한다."""
+    from app.core.metrics import asv_duration_seconds
+    asv_duration_seconds.observe(0.75)
+
+
+def test_new_durations_observe():
+    """새로 추가된 세 가지 실행시간 메트릭에 값을 기록 시 정상 동작해야 한다."""
+    from app.core.metrics import (
+        pipeline_total_duration_seconds,
+        agent_routing_duration_seconds,
+        agent_total_duration_seconds,
+    )
+    pipeline_total_duration_seconds.observe(1.25)
+    agent_routing_duration_seconds.observe(0.35)
+    agent_total_duration_seconds.observe(0.85)
+
+
