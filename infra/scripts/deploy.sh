@@ -4,7 +4,7 @@ set -euo pipefail
 REGION="ap-northeast-2"
 SSM_PATH="/woori/prod"
 WORKDIR="/home/ubuntu"
-REPO_RAW="https://raw.githubusercontent.com/southgiri/Woori-Talk-Banking/main"
+REPO_RAW="https://raw.githubusercontent.com/FISA-One-Voice/Woori-Talk-Banking/main"
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text --region "$REGION")
 ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"

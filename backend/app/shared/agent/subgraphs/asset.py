@@ -17,8 +17,8 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.core.metrics import agent_node_executions_total, agent_tool_duration_seconds
-from app.shared.agent.ROUTING_CONSTANTS import ASSET_NAVIGATE_VALUES
 from app.shared.agent.prompts import ASSET_SYSTEM_PROMPT
+from app.shared.agent.ROUTING_CONSTANTS import ASSET_NAVIGATE_VALUES
 from app.shared.agent.state import VoiceState
 
 KST = timezone(timedelta(hours=9))
@@ -199,6 +199,7 @@ def build_asset_graph(tools: list):
             "navigate_to": navigate_to,
             "analytics_period": intent.period if intent.tool != "balance" else None,
             "collected_slots": slots,
+            "tool_execution_ms": _duration_ms,
         }
 
     return _asset_graph

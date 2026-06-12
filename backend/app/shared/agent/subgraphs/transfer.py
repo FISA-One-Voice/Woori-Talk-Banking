@@ -91,6 +91,7 @@ TRANSFER_WRITE: frozenset[str] = frozenset(
         "draft_recipient",
         "last_tx_id",
         "last_order_id",
+        "tool_execution_ms",
     }
 )
 
@@ -869,6 +870,7 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
         "messages": [AIMessage(content=response_text)],
         "last_tx_id": None if note_consumed else last_tx_id,
         "last_order_id": None if note_consumed else last_order_id,
+        "tool_execution_ms": _duration_ms,
     }
     if note_consumed:
         updates["awaiting_memo_decision"] = False

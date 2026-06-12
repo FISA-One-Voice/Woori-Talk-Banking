@@ -70,13 +70,14 @@ jobs:
 
       - name: Deploy to Backend EC2 via SSM
         run: |
-          SCRIPT=$(cat infra/scripts/deploy.sh | base64 -w 0)
+          REPO_RAW="https://raw.githubusercontent.com/${{ github.repository }}/main"
           aws ssm send-command \
             --region '${{ secrets.AWS_REGION }}' \
             --document-name 'AWS-RunShellScript' \
             --targets 'Key=tag:App,Values=woori-backend' \
             --parameters "commands=[
-              \"echo \$SCRIPT | base64 -d > /home/ubuntu/deploy.sh && chmod +x /home/ubuntu/deploy.sh\",
+              \"curl -fsSL ${REPO_RAW}/infra/scripts/deploy.sh -o /home/ubuntu/deploy.sh\",
+              \"chmod +x /home/ubuntu/deploy.sh\",
               \"bash /home/ubuntu/deploy.sh\"
             ]" \
             --comment 'Deploy ${{ github.sha }} by ${{ github.actor }}'

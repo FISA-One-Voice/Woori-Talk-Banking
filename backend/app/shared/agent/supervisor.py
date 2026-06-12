@@ -8,14 +8,17 @@ Design Ref: docs/02-design/features/dev-a-supervisor-plan.design.md §4.5
 """
 
 import logging
+import time
 
 from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from app.core.config import settings
 from app.core.exception import EventError
+from app.core.metrics import agent_subgraph_duration_seconds
 from app.shared.agent.prompts import DOMAIN_CLASSIFY_PROMPT
 from app.shared.agent.session_reset import clear_conversation_messages
 from app.shared.agent.state import VoiceState
@@ -317,6 +320,18 @@ def build_supervisor():
     from app.shared.agent.subgraphs.transfer import build_transfer_graph
     from app.shared.agent.tools import ASSET_TOOLS, RAG_TOOLS, TRANSFER_TOOLS
 
+    def measure_subgraph(name: str, subgraph):
+        async def wrapper(state: VoiceState, config: RunnableConfig):
+            t0 = time.monotonic()
+            result = await subgraph.ainvoke(state, config=config)
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            agent_subgraph_duration_seconds.labels(subgraph=name).observe(
+                duration_ms / 1000
+            )
+            return result
+
+        return wrapper
+
     transfer_graph = build_transfer_graph(TRANSFER_TOOLS)
     rag_graph = build_rag_graph(RAG_TOOLS)
     asset_graph = build_asset_graph(ASSET_TOOLS)
@@ -325,9 +340,9 @@ def build_supervisor():
     builder.add_node("supervisor_node", supervisor_node)
     builder.add_node("cancel_node", cancel_node)
     builder.add_node("event_node", event_node)
-    builder.add_node("transfer", transfer_graph)
-    builder.add_node("asset", asset_graph)
-    builder.add_node("rag", rag_graph)
+    builder.add_node("transfer", measure_subgraph("transfer", transfer_graph))
+    builder.add_node("asset", measure_subgraph("asset", asset_graph))
+    builder.add_node("rag", measure_subgraph("rag", rag_graph))
 
     builder.set_entry_point("supervisor_node")
     builder.add_conditional_edges("supervisor_node", route_after_supervisor)

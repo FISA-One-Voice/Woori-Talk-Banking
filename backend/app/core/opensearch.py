@@ -86,6 +86,8 @@ _VOICE_PIPELINE_MAPPING: dict[str, Any] = {
             "user_id": {"type": "keyword"},
             "stt_ms": {"type": "integer"},
             "agent_ms": {"type": "integer"},
+            "routing_ms": {"type": "integer"},
+            "tool_execution_ms": {"type": "integer"},
             "tts_ms": {"type": "integer"},
             "total_ms": {"type": "integer"},
             "intent": {"type": "keyword"},

@@ -2,10 +2,11 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-# ── Monitoring EC2 배포 전 필수 수정 ──────────────────────────────────────────
-# 10.0.138.226: Backend EC2의 VPC 내부 사설 IP로 교체하세요.
-# AWS Console → EC2 → woori-backend-01 → Private IPv4 address 에서 확인.
-# 예: 10.0.1.42
+# ── 아키텍처 주의 ─────────────────────────────────────────────────────────────
+# Prometheus는 Monitoring EC2에서 실행되고, 앱·node-exporter는 별도의 Backend EC2에
+# 있습니다. 따라서 타깃은 Backend EC2의 VPC 내부 사설 IP여야 합니다.
+#   10.0.138.226 = woori-backend EC2 Private IPv4 (인스턴스 교체 시 갱신)
+# host.docker.internal / 서비스명(node-exporter)은 단일 호스트 전제라 여기선 동작하지 않음.
 # ─────────────────────────────────────────────────────────────────────────────
 
 scrape_configs:

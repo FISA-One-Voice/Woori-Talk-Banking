@@ -33,7 +33,14 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exception import ASVError
-from app.core.metrics import asv_verification_total, voice_stage_duration
+from app.core.metrics import (
+    agent_routing_duration_seconds,
+    agent_total_duration_seconds,
+    asv_duration_seconds,
+    asv_verification_total,
+    pipeline_total_duration_seconds,
+    voice_stage_duration,
+)
 from app.core.opensearch_writer import write_voice_pipeline_record_async
 from app.core.request_context import get_request_id
 from app.models.user import User
@@ -225,6 +232,8 @@ async def _record_voice_pipeline(
     agent_ms: int,
     tts_ms: int,
     total_ms: int,
+    routing_ms: int | None,
+    tool_execution_ms: int | None,
     intent: str | None,
     navigate_to: str | None,
 ) -> None:
@@ -233,9 +242,13 @@ async def _record_voice_pipeline(
     Args:
         user_id: JWT 사용자 ID.
         stt_ms: STT 단계 소요 시간 (ms).
-        agent_ms: agent 단계 소요 시간 (ms). LLM + tool + DB 시간 포함.
+        agent_ms: Supervisor + Subagent + tool + DB 전체 소요 시간 (ms).
         tts_ms: TTS 단계 소요 시간 (ms).
-        total_ms: 파이프라인 전체 소요 시간 (ms).
+        total_ms: audio in → TTS 완료 전체 소요 시간 (ms).
+        routing_ms: Supervisor + Subagent + tool 선택까지만의 소요 시간 (ms).
+            tool이 실행되지 않은 턴(슬롯 수집 등)에는 None.
+        tool_execution_ms: tool 실행 + DB 적재 소요 시간 (ms).
+            tool이 실행되지 않은 턴에는 None.
         intent: 감지된 인텐트 (pending_action).
         navigate_to: 에이전트가 설정한 화면 이동 경로.
     """
@@ -247,6 +260,8 @@ async def _record_voice_pipeline(
         "user_id": user_id,
         "stt_ms": stt_ms,
         "agent_ms": agent_ms,
+        "routing_ms": routing_ms,
+        "tool_execution_ms": tool_execution_ms,
         "tts_ms": tts_ms,
         "total_ms": total_ms,
         "intent": intent or "unknown",
@@ -261,6 +276,10 @@ async def _record_voice_pipeline(
     voice_stage_duration.labels(stage="stt").observe(stt_ms / 1000)
     voice_stage_duration.labels(stage="agent").observe(agent_ms / 1000)
     voice_stage_duration.labels(stage="tts").observe(tts_ms / 1000)
+    pipeline_total_duration_seconds.observe(total_ms / 1000)
+    agent_total_duration_seconds.observe(agent_ms / 1000)
+    if routing_ms is not None:
+        agent_routing_duration_seconds.observe(routing_ms / 1000)
 
 
 async def _handle_normal_flow(
@@ -305,13 +324,10 @@ async def _handle_normal_flow(
             logger.warning("동의 음성 임시 저장 실패 — 계속 진행", exc_info=True)
 
     # 1. STT: 오디오 → 텍스트
-    transcript = await transcribe_audio(audio_bytes, content_type)
     pipeline_start = time.monotonic()
 
-    # 1. STT: 오디오 → 텍스트
-    t0 = time.monotonic()
     transcript = await transcribe_audio(audio_bytes, content_type)
-    stt_ms = int((time.monotonic() - t0) * 1000)
+    stt_ms = int((time.monotonic() - pipeline_start) * 1000)
 
     # 2. LangGraph 에이전트 호출 (LLM + tool + DB 시간 포함)
     t0 = time.monotonic()
@@ -319,10 +335,13 @@ async def _handle_normal_flow(
         {
             "messages": [HumanMessage(content=transcript)],
             "user_id": user_id,
+            "tool_execution_ms": None,
         },
         config=config,
     )
     agent_ms = int((time.monotonic() - t0) * 1000)
+    tool_exec_ms: int | None = result.get("tool_execution_ms")
+    routing_ms = (agent_ms - tool_exec_ms) if tool_exec_ms is not None else None
 
     response_text = tts_text_from_messages(result["messages"])
 
@@ -354,6 +373,8 @@ async def _handle_normal_flow(
         agent_ms=agent_ms,
         tts_ms=tts_ms,
         total_ms=total_ms,
+        routing_ms=routing_ms,
+        tool_execution_ms=tool_exec_ms,
         intent=_infer_intent(result),
         navigate_to=navigate_to,
     )
@@ -486,6 +507,7 @@ async def _handle_asv_flow(
     )
 
     # ASV 호출
+    t0 = time.monotonic()
     try:
         asv_result = await _call_asv_ec2(wav_bytes, reference_embedding)
     except ASVError:
@@ -498,6 +520,10 @@ async def _handle_asv_flow(
             status_code=502,
             user_message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
         ) from e
+    finally:
+        duration_sec = time.monotonic() - t0
+        asv_duration_seconds.observe(duration_sec)
+        asv_ms = int(duration_sec * 1000)
 
     asv_ok = isinstance(asv_result, ASVResult) and asv_result.verified
     auth_success = asv_ok
@@ -513,6 +539,8 @@ async def _handle_asv_flow(
                     "request_id": get_request_id(),
                     "user_id": user_id,
                     "asv_result": "pass",
+                    "asv_ms": asv_ms,
+                    "similarity_score": round(asv_result.score, 4),
                     "success": True,
                 }
             )
@@ -529,6 +557,8 @@ async def _handle_asv_flow(
                 "request_id": get_request_id(),
                 "user_id": user_id,
                 "asv_result": "fail",
+                "asv_ms": asv_ms,
+                "similarity_score": round(asv_result.score, 4),
                 "success": False,
             }
         )
@@ -671,10 +701,14 @@ async def _execute_pending_transfer(
         as_node="supervisor_node",
     )
 
+    pipeline_start = time.monotonic()
     result = await graph.ainvoke(
         {"messages": [HumanMessage(content="인증 완료")], "user_id": user_id},
         config=config,
     )
+    agent_ms = int((time.monotonic() - pipeline_start) * 1000)
+    tool_exec_ms: int | None = result.get("tool_execution_ms")
+    routing_ms = (agent_ms - tool_exec_ms) if tool_exec_ms is not None else None
 
     response_text = tts_text_from_messages(result["messages"])
     tx_id: str | None = result.get("last_tx_id") or result.get("last_order_id")
@@ -685,6 +719,7 @@ async def _execute_pending_transfer(
         tx_id,
     )
 
+    tts_start = time.monotonic()
     if pending_tts_text and pending_audio_b64 and tx_id:
         from app.shared.voice import s3_service
 
@@ -695,6 +730,7 @@ async def _execute_pending_transfer(
             synthesize_speech(response_text),
             synthesize_speech(pending_tts_text),
         )
+        tts_ms = int((time.monotonic() - tts_start) * 1000)
 
         async def _upload_consent_task(
             _user_id: str,
@@ -719,6 +755,20 @@ async def _execute_pending_transfer(
         task.add_done_callback(_background_tasks.discard)
     else:
         audio_mp3 = await synthesize_speech(response_text)
+        tts_ms = int((time.monotonic() - tts_start) * 1000)
+
+    total_ms = int((time.monotonic() - pipeline_start) * 1000)
+    await _record_voice_pipeline(
+        user_id=user_id,
+        stt_ms=0,
+        agent_ms=agent_ms,
+        tts_ms=tts_ms,
+        total_ms=total_ms,
+        routing_ms=routing_ms,
+        tool_execution_ms=tool_exec_ms,
+        intent=_infer_intent(result),
+        navigate_to=_resolve_navigate_to(result),
+    )
 
     return VoiceResponseData(
         audio=base64.b64encode(audio_mp3).decode(),

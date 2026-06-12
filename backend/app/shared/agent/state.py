@@ -55,6 +55,8 @@ class VoiceState(TypedDict):
         pending_consent_audio_b64: 사용자 "네" 동의 음성 base64 임시 보관.
             awaiting_confirmation=True 상태에서 사용자 응답 수신 시 저장.
             ASV 성공 후 None으로 초기화. (voice-consent-s3)
+        tool_execution_ms: tool 실행 + DB 적재 소요 시간 (ms).
+            tool이 실행된 턴에만 설정되며, 매 ainvoke 시작 시 None으로 초기화된다.
     """
 
     messages: Annotated[list, add_messages]
@@ -77,3 +79,4 @@ class VoiceState(TypedDict):
     remaining_steps: int
     pending_consent_tts_text: str | None
     pending_consent_audio_b64: str | None
+    tool_execution_ms: int | None
