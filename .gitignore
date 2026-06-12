@@ -1,8 +1,96 @@
+# Python
 .venv/
 .venv
-.env
-
-*.log
 __pycache__/
 *.pyc
-.vscode/
+.pytest_cache/
+
+# 환경변수
+.env
+.env.prod
+.env.local
+.env.*.local
+
+# AWS CLI installer
+AWSCLIV2.pkg
+
+# 로그
+*.log
+npm-debug.log*
+.coverage
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+.cursor/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# iOS / Android (네이티브 빌드)
+ios/
+android/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Personal
+.claude/
+
+# Seeds (개발용 DB 시드 스크립트)
+backend/seeds/
+
+report/
+!frontend/app/report/
+.bkit/
+docs/
+
+CLAUDE.md
+작업일지.md
+CODE_STYLE_4.md
+CODE_STYLE.md
+guideline.md
+SCR007_DATA_FLOW.md
+
+*.db
+*.dbml
+# Documentation
+develop/
+DbTableScheme
+Develop_Guidline.md
+to-do.md
+TRANSFER_API_DEVICE_TEST.md
+voice-pipeline-flow.md
+AUTO_TRANSFER_IMPLEMENTATION_PLAN.md
+TRANSFER_IMPLEMENTATION_PLAN.md
+frontend/app/README.md
+계좌번호_음성_이체_4ea8c234.plan.md
+
+# Media / Keys
+*.wav
+!frontend/assets/sounds/beep.wav
+*.pem
+
+# AI Agent
+.agent/
+
+.cursorrules
+kill_connections.py
+
+# 설계 문서 (로컬 참조용)
+observability-design.md
+observability-dev-plan.md
+observability-changes.md
+
+# 기타 로컬 파일
+*.rev*.json

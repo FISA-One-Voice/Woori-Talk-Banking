@@ -1,0 +1,150 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deploy target'
+        required: true
+        default: 'all'
+        type: choice
+        options: [all, backend, asv, monitoring]
+
+env:
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+jobs:
+  # ── 변경된 경로 감지 ───────────────────────────────────────────────────────
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      asv: ${{ steps.filter.outputs.asv }}
+      monitoring: ${{ steps.filter.outputs.monitoring }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            asv:
+              - 'ai/asv/**'
+            monitoring:
+              - 'infra/**'
+
+  # ── Job 1: Backend ────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Backend — Build → ECR → SSM
+    needs: changes
+    if: |
+      needs.changes.outputs.backend == 'true' ||
+      github.event.inputs.target == 'backend' ||
+      github.event.inputs.target == 'all'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        working-directory: backend
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t $ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }} \
+            -t $ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:latest \
+            .
+          docker push $ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
+          docker push $ECR_REGISTRY/${{ secrets.ECR_REPOSITORY }}:latest
+
+      - name: Deploy to Backend EC2 via SSM
+        run: |
+          SCRIPT=$(cat infra/scripts/deploy.sh | base64 -w 0)
+          aws ssm send-command \
+            --region '${{ secrets.AWS_REGION }}' \
+            --document-name 'AWS-RunShellScript' \
+            --targets 'Key=tag:App,Values=woori-backend' \
+            --parameters "commands=[
+              \"echo \$SCRIPT | base64 -d > /home/ubuntu/deploy.sh && chmod +x /home/ubuntu/deploy.sh\",
+              \"bash /home/ubuntu/deploy.sh\"
+            ]" \
+            --comment 'Deploy ${{ github.sha }} by ${{ github.actor }}'
+
+  # ── Job 2: ASV ────────────────────────────────────────────────────────────
+  deploy-asv:
+    name: ASV — Docker Hub → SSM
+    needs: changes
+    if: |
+      needs.changes.outputs.asv == 'true' ||
+      github.event.inputs.target == 'asv' ||
+      github.event.inputs.target == 'all'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Restart ASV container via SSM
+        run: |
+          aws ssm send-command \
+            --region '${{ secrets.AWS_REGION }}' \
+            --document-name 'AWS-RunShellScript' \
+            --targets 'Key=tag:Name,Values=woori-asv' \
+            --parameters 'commands=[
+              "docker pull southgiri/asv:1.0",
+              "docker rm -f asv-server || true",
+              "docker run -d --name asv-server --restart unless-stopped -p 8001:8000 southgiri/asv:1.0",
+              "sleep 10 && curl -sf http://localhost:8001/health || (docker logs asv-server && exit 1)"
+            ]' \
+            --comment 'ASV deploy by ${{ github.actor }}'
+
+  # ── Job 3: Monitoring ─────────────────────────────────────────────────────
+  deploy-monitoring:
+    name: Monitoring — Compose sync → SSM
+    needs: changes
+    if: |
+      needs.changes.outputs.monitoring == 'true' ||
+      github.event.inputs.target == 'monitoring' ||
+      github.event.inputs.target == 'all'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Sync infra config and restart via SSM
+        run: |
+          REPO_RAW="https://raw.githubusercontent.com/${{ github.repository }}/main"
+          aws ssm send-command \
+            --region '${{ secrets.AWS_REGION }}' \
+            --document-name 'AWS-RunShellScript' \
+            --targets 'Key=tag:Name,Values=woori-monitoring-01' \
+            --parameters "commands=[
+              \"curl -fsSL ${REPO_RAW}/infra/docker-compose.yml -o /home/ubuntu/docker-compose.yml\",
+              \"curl -fsSL ${REPO_RAW}/infra/prometheus/prometheus.yml -o /home/ubuntu/prometheus/prometheus.yml\",
+              \"docker compose -f /home/ubuntu/docker-compose.yml up -d prometheus grafana blackbox-exporter\",
+              \"docker compose -f /home/ubuntu/docker-compose.yml ps\"
+            ]" \
+            --comment 'Monitoring deploy by ${{ github.actor }}'

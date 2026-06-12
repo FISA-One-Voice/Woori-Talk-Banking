@@ -1,0 +1,79 @@
+"""VoiceState — LangGraph 멀티턴 대화 상태 정의 (Issue #21).
+
+MemorySaver를 통해 thread_id=user_id로 세션 간 상태가 유지된다.
+
+Design Ref (Issue #21):
+    §state.py — VoiceState TypedDict
+"""
+
+from typing import Annotated, TypedDict
+
+from langgraph.graph.message import add_messages
+
+
+class VoiceState(TypedDict):
+    """LangGraph 에이전트 멀티턴 대화 상태.
+
+    MemorySaver를 통해 동일한 thread_id (= user_id) 내에서
+    요청 간 상태가 유지됩니다. 새 턴마다 messages만 추가하면
+    나머지 슬롯·확인 상태는 자동으로 이어집니다.
+
+    Attributes:
+        messages: 대화 이력. add_messages 리듀서로 자동 누적.
+        user_id: JWT에서 추출한 사용자 ID. MemorySaver thread_id와 동일.
+        pending_action: 진행 중인 액션 이름 ("transfer", "auto_transfer").
+            None이면 대기 상태.
+        collected_slots: 수집된 슬롯 값.
+            예: {"recipient": "엄마", "amount": 100000}
+        awaiting_confirmation: True이면 사용자의 "네/아니오" 확인 대기 중.
+        awaiting_asv_audio: True이면 다음 오디오 입력이 ASV 검증용임.
+            router.py에서 이 값을 확인해 ASV EC2 서버로 라우팅한다.
+        asv_retry_count: ASV 검증 실패 횟수. 3회 초과 시 pending_action 취소.
+        navigate_to: 프론트엔드 화면 이동 신호 (Expo Router 경로).
+            intent 첫 감지 시에만 설정되고, 이후 턴에서는 None.
+        execution_ready: True이면 사용자 확인 완료 + ASV 불필요 → execute_node로 즉시 실행.
+            intent_node에서 "네" 수신 후 설정. execute_node 완료 후 False로 초기화.
+        recipient_validated: True이면 recipient 슬롯이 resolve_node를 통과한 상태.
+            새 인텐트 감지 또는 취소 시 False로 초기화.
+        last_tx_id: execute_transfer 성공 시 저장된 tx_id.
+            add_note 실행 후 None으로 초기화. 최근 거래 DB 조회 대신 사용.
+        last_order_id: execute_auto_transfer 성공 시 저장된 order_id.
+            add_auto_transfer_note 실행 후 None으로 초기화.
+        awaiting_memo_decision: True이면 이체 직후 메모 제안에 대한 응답 대기 중.
+        awaiting_transfer_clarification: True이면 전화·계좌만 말한 뒤 송금 여부 확인 대기 중.
+        draft_recipient: 송금 확인 대기 중 보관한 수취인 힌트(전화·계좌 등).
+        agent_domain: Supervisor가 기록한 현재 도메인.
+            ("transfer" | "asset" | "rag" | "navigate" | "cancel")
+            연속 발화에서 AssetAgent 세션 유지 여부 판단에 사용된다.
+            새 도메인 감지 또는 취소 시 None으로 초기화.
+        analytics_period: AssetAgent용 분석 기간 힌트.
+            ("이번달" | "지난달" | "3개월") AssetAgent가 설정하며,
+            후속 발화에서 기간을 재지정하지 않으면 이 값이 유지된다.
+        pending_consent_tts_text: 이체 확인 단계 TTS 텍스트 임시 보관.
+            awaiting_confirmation=True 응답 생성 시 저장.
+            ASV 성공 후 None으로 초기화. (voice-consent-s3)
+        pending_consent_audio_b64: 사용자 "네" 동의 음성 base64 임시 보관.
+            awaiting_confirmation=True 상태에서 사용자 응답 수신 시 저장.
+            ASV 성공 후 None으로 초기화. (voice-consent-s3)
+    """
+
+    messages: Annotated[list, add_messages]
+    user_id: str
+    pending_action: str | None
+    collected_slots: dict
+    awaiting_confirmation: bool
+    awaiting_asv_audio: bool
+    awaiting_memo_decision: bool
+    awaiting_transfer_clarification: bool
+    draft_recipient: str | None
+    asv_retry_count: int
+    navigate_to: str | None
+    execution_ready: bool
+    recipient_validated: bool
+    last_tx_id: str | None
+    last_order_id: str | None
+    agent_domain: str | None
+    analytics_period: str | None
+    remaining_steps: int
+    pending_consent_tts_text: str | None
+    pending_consent_audio_b64: str | None

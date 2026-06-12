@@ -1,0 +1,664 @@
+{
+  "title": "에러 분석",
+  "uid": "woori-errors",
+  "schemaVersion": 39,
+  "version": 3,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "tags": [
+    "woori"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP 5xx 발생 건수",
+      "type": "gauge",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ]
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "targets": [
+        {
+          "expr": "increase(http_requests_total{status=\"5xx\"}[5m])",
+          "legendFormat": "5xx (5분)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "전체 에러율",
+      "type": "stat",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=~\"4xx|5xx\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+          "legendFormat": "에러율",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "최다 발생 에러 코드",
+      "type": "stat",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "topk(1, app_error_total)",
+          "legendFormat": "{{code}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "HTTP 4xx / 5xx 비율 시계열",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5xx 비율"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "4xx 비율"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status=\"5xx\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+          "legendFormat": "5xx 비율",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(http_requests_total{status=\"4xx\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+          "legendFormat": "4xx 비율",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "AppError 코드별 발생 건수 (OpenSearch)",
+      "type": "bargauge",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "datasource": {
+        "type": "grafana-opensearch-datasource",
+        "uid": "opensearch"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "fixedColor": "orange",
+            "mode": "fixed"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": true,
+          "limit": 30,
+          "calcs": [
+            "sum"
+          ]
+        },
+        "displayMode": "gradient"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "app_logs",
+          "query": "event:app_error",
+          "metrics": [
+            {
+              "type": "count",
+              "id": "1"
+            }
+          ],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "terms",
+              "field": "code.keyword",
+              "id": "2",
+              "settings": {
+                "order": "desc",
+                "orderBy": "1",
+                "size": "20",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "transformations": [
+        {
+          "id": "rowsToFields",
+          "options": {
+            "nameField": "code.keyword",
+            "valueField": "Count"
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "에러 스파이크 타임라인 (분당 전체 에러)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 30,
+            "drawStyle": "line"
+          },
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{status=~\"4xx|5xx\"}[1m]) * 60",
+          "legendFormat": "에러/분",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "에러 코드별 발생 추이",
+      "description": "에러가 발생한 코드만 표시 (0인 코드는 숨김)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 80,
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "app_error_total > 0",
+          "legendFormat": "{{code}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "에러 로그 검색 (OpenSearch — level:ERROR 최신 30건)",
+      "type": "table",
+      "gridPos": {
+        "h": 10,
+        "w": 16,
+        "x": 0,
+        "y": 31
+      },
+      "datasource": {
+        "type": "grafana-opensearch-datasource",
+        "uid": "opensearch"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "sortBy": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "app_logs",
+          "query": "level:ERROR",
+          "metrics": [
+            {
+              "type": "raw_data",
+              "id": "1",
+              "settings": {
+                "size": "30"
+              }
+            }
+          ],
+          "timeField": "timestamp",
+          "bucketAggs": []
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "기능별 에러 분포 (app_error + client_error)",
+      "type": "barchart",
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 31
+      },
+      "datasource": {
+        "type": "grafana-opensearch-datasource",
+        "uid": "opensearch"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "vertical",
+        "barRadius": 0.05,
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "stacking": "none",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": -30,
+        "reduceOptions": {
+          "values": true,
+          "limit": 20,
+          "calcs": [
+            "sum"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "app_logs",
+          "query": "event:app_error OR event:client_error",
+          "metrics": [
+            {
+              "type": "count",
+              "id": "1"
+            }
+          ],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "terms",
+              "field": "feature.keyword",
+              "id": "2",
+              "settings": {
+                "order": "desc",
+                "orderBy": "1",
+                "size": "10",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "transformations": []
+    },
+    {
+      "id": 10,
+      "title": "클라이언트 에러 총 건수",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 41 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "fixedColor": "purple", "mode": "fixed" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["sum"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "alias": "클라이언트 에러",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "app_logs",
+          "query": "event:client_error",
+          "metrics": [{ "type": "count", "id": "1" }],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "date_histogram",
+              "field": "timestamp",
+              "id": "2",
+              "settings": { "interval": "auto", "min_doc_count": "0" }
+            }
+          ]
+        }
+      ],
+      "transformations": [{ "id": "reduce", "options": { "reducers": ["sum"] } }]
+    },
+    {
+      "id": 11,
+      "title": "클라이언트 에러 타입별 (timeout / network / 4xx / 5xx)",
+      "type": "bargauge",
+      "gridPos": { "h": 4, "w": 10, "x": 6, "y": 41 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": { "fixedColor": "purple", "mode": "fixed" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "values": true, "limit": 10, "calcs": ["sum"] },
+        "displayMode": "gradient"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "app_logs",
+          "query": "event:client_error",
+          "metrics": [{ "type": "count", "id": "1" }],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "terms",
+              "field": "error_type.keyword",
+              "id": "2",
+              "settings": { "order": "desc", "orderBy": "1", "size": "10", "min_doc_count": "1" }
+            }
+          ]
+        }
+      ],
+      "transformations": [
+        { "id": "rowsToFields", "options": { "nameField": "error_type.keyword", "valueField": "Count" } }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "클라이언트 에러 기능별",
+      "type": "bargauge",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 41 },
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": { "fixedColor": "purple", "mode": "fixed" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "values": true, "limit": 10, "calcs": ["sum"] },
+        "displayMode": "gradient"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "index": "app_logs",
+          "query": "event:client_error",
+          "metrics": [{ "type": "count", "id": "1" }],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "terms",
+              "field": "feature.keyword",
+              "id": "2",
+              "settings": { "order": "desc", "orderBy": "1", "size": "10", "min_doc_count": "1" }
+            }
+          ]
+        }
+      ],
+      "transformations": [
+        { "id": "rowsToFields", "options": { "nameField": "feature.keyword", "valueField": "Count" } }
+      ]
+    }
+  ]
+}

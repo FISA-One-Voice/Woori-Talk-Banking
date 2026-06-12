@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Woori-Talk-Banking",
+    "slug": "woori-talk-banking",
+    "version": "1.0.0",
+    "scheme": "wooritalk",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "음성 명령을 입력하기 위해 마이크가 필요합니다."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "앱 잠금 해제를 위해 Face ID를 사용합니다."
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "ios": {
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "앱 잠금 해제를 위해 Face ID를 사용합니다."
+      },
+      "bundleIdentifier": "com.anonymous.woori-talk-banking"
+    }
+  }
+}

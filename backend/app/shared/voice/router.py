@@ -1,0 +1,204 @@
+"""
+stt_service, tts_service의 로직을 HTTP로 노출하는 창구 역할입니다.
+비즈니스 로직은 없고 요청을 받아서 서비스에 넘기고 결과를 포장해서 돌려줍니다.
+
+엔드포인트:
+    POST /api/voice         — 통합 음성 파이프라인 (Issue #7)
+    POST /api/voice/stt     — STT 단독 변환
+    POST /api/voice/tts     — TTS 단독 변환
+"""
+
+import base64
+
+from fastapi import APIRouter, Depends, File, UploadFile
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.core.exception import AppError, TTSError
+from app.core.jwt_utils import get_current_user_id
+from app.shared.voice.schema import (
+    ApiResponse,
+    STTResult,
+    TTSRequest,
+    TTSResult,
+    VoiceResponseData,
+)
+from app.shared.voice.service import (
+    execute_pending_transfer,
+    process_voice_pipeline,
+    reset_voice_state,
+)
+from app.shared.voice.stt_service import transcribe_audio
+from app.shared.voice.tts_service import synthesize_speech
+
+router = APIRouter(prefix="/api/voice", tags=["voice"])
+
+
+@router.post("/voice", response_model=ApiResponse)
+async def voice_pipeline(
+    audio: UploadFile = File(..., description="음성 파일 (wav/mp3/m4a 등)"),
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+) -> ApiResponse:
+    """음성 파이프라인 통합 엔드포인트 (Issue #7).
+
+    STT → LangGraph 에이전트 → TTS 흐름을 조율하며,
+    ASV 인증이 필요한 경우 ASV EC2 호출로 분기한다.
+
+    LangGraph MemorySaver 기반 멀티턴 상태(thread_id=user_id)를 유지하므로
+    프론트엔드는 별도의 상태 플래그 없이 오디오만 전송하면 된다.
+
+    Args:
+        audio: 업로드된 음성 파일 (multipart/form-data).
+        user_id: JWT Bearer 토큰에서 추출한 사용자 ID.
+        db: DB 세션 (ASV 흐름에서 users.embedding_vector 조회에 사용).
+
+    Returns:
+        ApiResponse — data 필드에 VoiceResponseData 포함:
+            - audio: base64 인코딩된 MP3 TTS 응답
+            - navigate_to: 화면 이동 신호 (Expo Router 경로, 없으면 null)
+            - collected_slots: 현재 수집된 슬롯 현황
+            - awaiting_confirmation: True이면 '네/아니오' 대기 중
+            - awaiting_asv_audio: True이면 다음 오디오가 ASV 검증용
+
+    Raises:
+        401 Unauthorized: JWT 토큰이 없거나 유효하지 않은 경우.
+        400 Bad Request: 오디오 형식 오류 또는 용량 초과.
+        422 Unprocessable Entity: 사용자 음성 미등록.
+        502 Bad Gateway: ASV EC2 서버 통신 오류.
+        503 Service Unavailable: STT/TTS 외부 API 장애.
+    """
+    audio_bytes = await audio.read()
+    content_type = audio.content_type or "audio/wav"
+    try:
+        data = await process_voice_pipeline(audio_bytes, user_id, db, content_type)
+        return ApiResponse(
+            success=True,
+            data=data.model_dump(),
+            message="음성 처리가 완료되었습니다.",
+        )
+    except TTSError:
+        raise  # global handler로 폴백 — TTS 자체 불가, 프론트 expo-speech 처리
+    except AppError as exc:
+        audio_mp3 = await synthesize_speech(exc.user_message or exc.message)
+        error_data = VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to=None,
+            collected_slots={},
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            transcript=None,
+        )
+        return ApiResponse(
+            success=False,
+            data=error_data.model_dump(),
+            message=exc.message,
+            code=exc.code,
+        )
+
+
+@router.post("/proceed", response_model=ApiResponse)
+async def proceed_execution(
+    user_id: str = Depends(get_current_user_id),
+) -> ApiResponse:
+    """ASV 인증 성공 후 실제 이체를 실행하는 엔드포인트.
+
+    프론트엔드가 execution_pending=True 응답 수신 후 TTS 재생을 마치고 자동 호출한다.
+    오디오 업로드 없이 JWT 인증만 필요하다.
+
+    Args:
+        user_id: JWT Bearer 토큰에서 추출한 사용자 ID.
+
+    Returns:
+        ApiResponse — data 필드에 VoiceResponseData 포함 (이체 결과 TTS + 상태 플래그).
+    """
+    try:
+        data = await execute_pending_transfer(user_id)
+        return ApiResponse(
+            success=True,
+            data=data.model_dump(),
+            message="이체 처리가 완료되었습니다.",
+        )
+    except TTSError:
+        raise
+    except AppError as exc:
+        audio_mp3 = await synthesize_speech(exc.user_message or exc.message)
+        error_data = VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to=None,
+            collected_slots={},
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            awaiting_memo_decision=False,
+            transcript=None,
+        )
+        return ApiResponse(
+            success=False,
+            data=error_data.model_dump(),
+            message=exc.message,
+            code=exc.code,
+        )
+
+
+@router.post("/reset-state", response_model=ApiResponse)
+async def reset_voice_session(
+    user_id: str = Depends(get_current_user_id),
+) -> ApiResponse:
+    """LangGraph 음성 세션(슬롯·대기 상태)을 초기화한다.
+
+    홈 이동·취소 후 프론트엔드가 호출해 이전 송금 컨텍스트를 제거한다.
+    """
+    await reset_voice_state(user_id)
+    return ApiResponse(
+        success=True,
+        data=None,
+        message="음성 세션이 초기화되었습니다.",
+    )
+
+
+@router.post("/stt", response_model=ApiResponse)
+async def speech_to_text(file: UploadFile) -> ApiResponse:
+    """업로드된 음성 파일을 텍스트로 변환합니다.
+
+    Args:
+        file: 변환할 음성 파일 (wav, mp3, m4a, flac, ogg 등).
+
+    Returns:
+        ApiResponse — data.transcript에 인식된 텍스트 포함.
+
+    Raises:
+        STTError: 용량 초과, 지원하지 않는 포맷, 또는 Clova Speech API 장애 시.
+    """
+    audio_bytes = await file.read()
+    content_type = file.content_type or "audio/wav"
+    transcript = await transcribe_audio(audio_bytes, content_type)
+
+    return ApiResponse(
+        success=True,
+        data=STTResult(transcript=transcript).model_dump(),
+        message="음성 변환이 완료되었습니다.",
+    )
+
+
+@router.post("/tts", response_model=ApiResponse)
+async def text_to_speech(body: TTSRequest) -> ApiResponse:
+    """텍스트를 MP3 음성으로 변환합니다.
+
+    Args:
+        body: 변환할 텍스트와 재생 속도.
+
+    Returns:
+        ApiResponse — data.audio_base64에 MP3 Base64 인코딩 데이터 포함.
+
+    Raises:
+        TTSError: tts_speed 범위 초과, 또는 Azure TTS API 장애 시.
+    """
+    audio_bytes = await synthesize_speech(body.text, body.speed)
+
+    return ApiResponse(
+        success=True,
+        data=TTSResult(
+            audio_base64=base64.b64encode(audio_bytes).decode()
+        ).model_dump(),
+        message="음성 변환이 완료되었습니다.",
+    )
