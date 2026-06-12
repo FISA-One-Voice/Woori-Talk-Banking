@@ -44,7 +44,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     응답 헤더에도 X-Request-ID를 포함시켜 클라이언트가 추적 가능하게 합니다.
     """
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         token = request_id_var.set(request_id)
         feature = _extract_feature(request.url.path)

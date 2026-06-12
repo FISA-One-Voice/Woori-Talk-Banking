@@ -13,12 +13,15 @@ from app.models.transaction import Transaction
 logger = logging.getLogger(__name__)
 
 # 슬롯에서 허용되는 기간 값 (STT 정규화 후 이 셋 중 하나여야 유효)
-VALID_PERIODS: frozenset[str] = frozenset({"이번달", "지난달", "이번주", "지난주", "오늘", "어제"})
+VALID_PERIODS: frozenset[str] = frozenset(
+    {"이번달", "지난달", "이번주", "지난주", "오늘", "어제"}
+)
 
 
 # ── DB 조회 ──────────────────────────────────────────────────────────────────
 # 아래 함수들은 순수 DB 조회만 담당한다.
 # 비즈니스 로직(TTS 문자열 생성 등)은 하단 TTS 응답 생성 섹션에서 처리한다.
+
 
 def get_asset_summary(db: Session, user_id: str) -> list[Account]:
     """사용자의 전체 계좌 목록과 잔액을 조회합니다.
@@ -159,9 +162,9 @@ def get_expense_summary(
         HistoryError: 지출 거래 내역이 없을 때.
     """
     if since is None:
-        since = datetime.now(timezone(timedelta(hours=9))).replace(tzinfo=None) - timedelta(
-            days=days
-        )
+        since = datetime.now(timezone(timedelta(hours=9))).replace(
+            tzinfo=None
+        ) - timedelta(days=days)
     filters = [
         Transaction.user_id == uuid.UUID(user_id),
         Transaction.created_at >= since,
@@ -173,11 +176,7 @@ def get_expense_summary(
     ]
     if until is not None:
         filters.append(Transaction.created_at < until)
-    transactions = (
-        db.query(Transaction)
-        .filter(*filters)
-        .all()
-    )
+    transactions = db.query(Transaction).filter(*filters).all()
     if not transactions:
         raise HistoryError(
             code="TX_NOT_FOUND",
@@ -224,8 +223,7 @@ def _format_amount(amount: int) -> str:
 def build_summary_tts(accounts: list, total_asset: int) -> str:
     """자산 요약 화면 진입 시 재생할 TTS 문구를 생성한다."""
     account_voice = ", ".join(
-        f"{a.alias or a.account_type} {_format_amount(a.balance)}"
-        for a in accounts
+        f"{a.alias or a.account_type} {_format_amount(a.balance)}" for a in accounts
     )
     return (
         f"총 자산은 {_format_amount(total_asset)}입니다. "
@@ -253,6 +251,7 @@ def build_transaction_tts(t) -> str:
 # STT 음성 인식 결과를 시스템 내부 값으로 정규화하는 유틸 함수 모음.
 # tools/asset.py의 @tool 함수에서 슬롯 값을 전처리할 때 사용한다.
 
+
 def normalize_period(period: str | None) -> str | None:
     """STT 오인식 보정 — '최근 7일', '최근칠일', '최근 N일' 등을 정규화."""
     if not period:
@@ -268,11 +267,11 @@ def normalize_period(period: str | None) -> str | None:
         return "이번달"
     if p in ("지난달", "저번달", "지난월", "전달", "저번월"):
         return "지난달"
-    m = re.match(r'최근(\d+)일', p)
+    m = re.match(r"최근(\d+)일", p)
     if m:
         return f"최근{m.group(1)}일"
     # "5월달", "5월" → "5월"
-    m = re.match(r'(\d+)월', p)
+    m = re.match(r"(\d+)월", p)
     if m:
         return f"{m.group(1)}월"
     return period
@@ -295,15 +294,17 @@ def period_to_date_range(period: str | None) -> tuple[datetime, datetime | None]
     now_kst = datetime.now(timezone(timedelta(hours=9))).replace(tzinfo=None)
     p = normalize_period(period)
 
-    m = re.match(r'최근(\d+)일$', p or "")
+    m = re.match(r"최근(\d+)일$", p or "")
     if m:
         return now_kst - timedelta(days=int(m.group(1))), None
 
-    m = re.match(r'^(\d+)월$', p or "")
+    m = re.match(r"^(\d+)월$", p or "")
     if m:
         month = int(m.group(1))
         year = now_kst.year if month <= now_kst.month else now_kst.year - 1
-        first_day = now_kst.replace(year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0)
+        first_day = now_kst.replace(
+            year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
         next_month = month % 12 + 1
         next_year = year + 1 if month == 12 else year
         last_day = first_day.replace(year=next_year, month=next_month)
@@ -312,7 +313,9 @@ def period_to_date_range(period: str | None) -> tuple[datetime, datetime | None]
     if p == "지난달":
         first_this = now_kst.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         last_day_prev = first_this - timedelta(days=1)
-        first_prev = last_day_prev.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        first_prev = last_day_prev.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
         return first_prev, first_this
 
     if p == "오늘":
@@ -320,15 +323,21 @@ def period_to_date_range(period: str | None) -> tuple[datetime, datetime | None]
         return today, today + timedelta(days=1)
 
     if p == "어제":
-        yesterday = (now_kst - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday = (now_kst - timedelta(days=1)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         return yesterday, yesterday + timedelta(days=1)
 
     if p == "이번주":
-        monday = (now_kst - timedelta(days=now_kst.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        monday = (now_kst - timedelta(days=now_kst.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         return monday, None
 
     if p == "지난주":
-        this_monday = (now_kst - timedelta(days=now_kst.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        this_monday = (now_kst - timedelta(days=now_kst.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
         last_monday = this_monday - timedelta(weeks=1)
         return last_monday, this_monday
 
@@ -389,14 +398,54 @@ def number_to_korean(n: int) -> str:
 
 
 _MONTH_KOREAN = {
-    1: "일월", 2: "이월", 3: "삼월", 4: "사월", 5: "오월", 6: "유월",
-    7: "칠월", 8: "팔월", 9: "구월", 10: "시월", 11: "십일월", 12: "십이월",
+    1: "일월",
+    2: "이월",
+    3: "삼월",
+    4: "사월",
+    5: "오월",
+    6: "유월",
+    7: "칠월",
+    8: "팔월",
+    9: "구월",
+    10: "시월",
+    11: "십일월",
+    12: "십이월",
 }
 
-_DAY_KOREAN = ["", "일", "이", "삼", "사", "오", "육", "칠", "팔", "구",
-               "십", "십일", "십이", "십삼", "십사", "십오", "십육", "십칠", "십팔", "십구",
-               "이십", "이십일", "이십이", "이십삼", "이십사", "이십오", "이십육", "이십칠", "이십팔", "이십구",
-               "삼십", "삼십일"]
+_DAY_KOREAN = [
+    "",
+    "일",
+    "이",
+    "삼",
+    "사",
+    "오",
+    "육",
+    "칠",
+    "팔",
+    "구",
+    "십",
+    "십일",
+    "십이",
+    "십삼",
+    "십사",
+    "십오",
+    "십육",
+    "십칠",
+    "십팔",
+    "십구",
+    "이십",
+    "이십일",
+    "이십이",
+    "이십삼",
+    "이십사",
+    "이십오",
+    "이십육",
+    "이십칠",
+    "이십팔",
+    "이십구",
+    "삼십",
+    "삼십일",
+]
 
 
 def date_to_korean(month: int, day: int) -> str:
@@ -416,7 +465,12 @@ def query_transaction_list_tts(
 ) -> str:
     """거래내역 목록을 TTS 문자열로 반환한다 (최대 10건 읽어줌)."""
     period = normalize_period(period)
-    if period and period not in VALID_PERIODS and not re.match(r'최근\d+일$', period) and not re.match(r'^\d+월$', period):
+    if (
+        period
+        and period not in VALID_PERIODS
+        and not re.match(r"최근\d+일$", period)
+        and not re.match(r"^\d+월$", period)
+    ):
         raise HistoryError(
             code="INVALID_PERIOD",
             message="유효하지 않은 조회 기간입니다.",
@@ -460,7 +514,9 @@ def query_transaction_list_tts(
         sign = "입금" if t.category == "수입" else "출금"
         name = t.to_name or t.category or ""
         memo_str = f" 메모 {t.memo}" if t.memo else ""
-        items.append(f"{date_str} {name} {sign} {number_to_korean(abs(t.amount))} 원{memo_str}")
+        items.append(
+            f"{date_str} {name} {sign} {number_to_korean(abs(t.amount))} 원{memo_str}"
+        )
 
     result += ". ".join(items) + "."
     return result
@@ -478,7 +534,12 @@ def query_history_tts(
     filter_type: "income"=수입만, "expense"=지출만, None/"both"=둘다
     """
     period = normalize_period(period)
-    if period and period not in VALID_PERIODS and not re.match(r'최근\d+일$', period) and not re.match(r'^\d+월$', period):
+    if (
+        period
+        and period not in VALID_PERIODS
+        and not re.match(r"최근\d+일$", period)
+        and not re.match(r"^\d+월$", period)
+    ):
         raise HistoryError(
             code="INVALID_PERIOD",
             message="유효하지 않은 조회 기간입니다.",
@@ -515,7 +576,9 @@ def query_history_tts(
             summary = get_expense_summary(db, user_id, since=since, until=until)
             top = summary["top_categories"][:3]
             if top:
-                cat_text = ", ".join(f"{c['category']} {number_to_korean(c['amount'])} 원" for c in top)
+                cat_text = ", ".join(
+                    f"{c['category']} {number_to_korean(c['amount'])} 원" for c in top
+                )
                 result += f" 주요 지출은 {cat_text}입니다."
         except Exception as e:
             logger.warning("카테고리 요약 조회 실패 (비필수): %s", e)
@@ -530,7 +593,9 @@ def query_history_tts(
         summary = get_expense_summary(db, user_id, since=since, until=until)
         top = summary["top_categories"][:3]
         if top:
-            cat_text = ", ".join(f"{c['category']} {number_to_korean(c['amount'])} 원" for c in top)
+            cat_text = ", ".join(
+                f"{c['category']} {number_to_korean(c['amount'])} 원" for c in top
+            )
             result += f" 주요 지출은 {cat_text}입니다."
     except Exception as e:
         logger.warning("카테고리 요약 조회 실패 (비필수): %s", e)
@@ -550,7 +615,9 @@ def query_category_tts(
         )
     since, until = period_to_date_range(period)
     label = normalize_period(period) or "이번달"
-    txs = get_transaction_history(db, user_id, since=since, until=until, category=category)
+    txs = get_transaction_history(
+        db, user_id, since=since, until=until, category=category
+    )
     total = sum(t.amount for t in txs)
     return f"{label} {category} 내역 알려드리겠습니다. 총 {len(txs)}건, {number_to_korean(total)} 원 지출하셨습니다."
 
@@ -577,7 +644,9 @@ def query_compare_tts(
     def _get_amount(since, until) -> int:
         try:
             if category:
-                txs = get_transaction_history(db, user_id, since=since, until=until, category=category)
+                txs = get_transaction_history(
+                    db, user_id, since=since, until=until, category=category
+                )
                 return sum(t.amount for t in txs if t.status == "completed")
             else:
                 summary = get_expense_summary(db, user_id, since=since, until=until)
@@ -616,7 +685,9 @@ def get_compare_data(
     def _get_amount(since, until) -> int:
         try:
             if category:
-                txs = get_transaction_history(db, user_id, since=since, until=until, category=category)
+                txs = get_transaction_history(
+                    db, user_id, since=since, until=until, category=category
+                )
                 return sum(t.amount for t in txs if t.status == "completed")
             else:
                 summary = get_expense_summary(db, user_id, since=since, until=until)

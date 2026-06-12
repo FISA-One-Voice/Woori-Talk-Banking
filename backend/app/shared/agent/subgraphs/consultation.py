@@ -9,14 +9,20 @@ from app.shared.agent.prompts import RAG_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
-RAG_DOMAIN_ACTIONS: frozenset[str] = frozenset({
-    "financial_qa", "exchange_rate", "interest_rate",
-})
+RAG_DOMAIN_ACTIONS: frozenset[str] = frozenset(
+    {
+        "financial_qa",
+        "exchange_rate",
+        "interest_rate",
+    }
+)
 
 
 def build_rag_graph(tools: list):
     """RAG 에이전트 그래프를 빌드한다. tools는 외부(supervisor)에서 주입된다."""
-    llm = ChatOpenAI(model=settings.OPENAI_MODEL, api_key=settings.OPENAI_CHAT_API_KEY, temperature=0)
+    llm = ChatOpenAI(
+        model=settings.OPENAI_MODEL, api_key=settings.OPENAI_CHAT_API_KEY, temperature=0
+    )
     agent = create_react_agent(
         model=llm,
         tools=tools,
@@ -30,7 +36,8 @@ def build_rag_graph(tools: list):
         result = await agent.ainvoke(state)
         logger.info(
             "[RAG] invoke complete user_id=%s messages=%d",
-            user_id, len(result.get("messages", [])),
+            user_id,
+            len(result.get("messages", [])),
         )
         return {
             "messages": result["messages"],

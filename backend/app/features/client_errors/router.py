@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/client-errors", tags=["ClientErrors"])
 
 class ClientErrorRequest(BaseModel):
     feature: str
-    error_type: str        # "timeout" | "network" | "http_4xx" | "http_5xx" | "unknown"
+    error_type: str  # "timeout" | "network" | "http_4xx" | "http_5xx" | "unknown"
     error_message: str
     url: str | None = None
     method: str | None = None

@@ -26,13 +26,13 @@ KST = timezone(timedelta(hours=9))
 logger = logging.getLogger(__name__)
 
 _NAVIGATE_MAP: dict[str, str] = {
-    "balance":          "asset",
-    "history":          "asset/history",
-    "category":         "asset/history",
-    "top_category":     "asset/history",
+    "balance": "asset",
+    "history": "asset/history",
+    "category": "asset/history",
+    "top_category": "asset/history",
     "transaction_list": "asset/history",
-    "spending_report":  "report",
-    "compare":          "asset/compare",
+    "spending_report": "report",
+    "compare": "asset/compare",
 }
 
 
@@ -89,7 +89,10 @@ def build_asset_graph(tools: list):
         intent: AssetIntent = llm_structured.invoke(chat_msgs)
         logger.info(
             "[Asset →intent] tool=%s period=%s filter_type=%s direct_response=%s",
-            intent.tool, intent.period, intent.filter_type, bool(intent.direct_response),
+            intent.tool,
+            intent.period,
+            intent.filter_type,
+            bool(intent.direct_response),
         )
 
         # history 기간 되묻기
@@ -131,7 +134,9 @@ def build_asset_graph(tools: list):
         if intent.tool not in tool_map:
             logger.error("AssetAgent 알 수 없는 tool: %s", intent.tool)
             return {
-                "messages": [AIMessage(content="죄송합니다. 요청을 처리할 수 없습니다.")],
+                "messages": [
+                    AIMessage(content="죄송합니다. 요청을 처리할 수 없습니다.")
+                ],
                 "navigate_to": "asset",
                 "analytics_period": None,
                 "collected_slots": {},
@@ -141,7 +146,12 @@ def build_asset_graph(tools: list):
         _tool_success = True
         logger.info(
             "agent_tool_call_start",
-            extra={"event": "agent_tool_call_start", "tool": intent.tool, "action": intent.tool, "user_id": user_id},
+            extra={
+                "event": "agent_tool_call_start",
+                "tool": intent.tool,
+                "action": intent.tool,
+                "user_id": user_id,
+            },
         )
         try:
             tts_text: str = tool_map[intent.tool].invoke(invoke_args)
@@ -162,7 +172,9 @@ def build_asset_graph(tools: list):
                 },
             )
             agent_node_executions_total.labels(node=intent.tool).inc()
-            agent_tool_duration_seconds.labels(node=intent.tool).observe(_duration_ms / 1000)
+            agent_tool_duration_seconds.labels(node=intent.tool).observe(
+                _duration_ms / 1000
+            )
 
         # navigate_to 결정
         navigate_to = _NAVIGATE_MAP.get(intent.tool, "asset")

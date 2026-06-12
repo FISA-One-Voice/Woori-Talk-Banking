@@ -100,7 +100,6 @@ class TestSlotSchema:
             assert slot in SLOT_QUESTIONS, f"SLOT_QUESTIONS에 '{slot}'가 없습니다."
 
 
-
 class TestBuildGraphWithTools:
     """build_graph(ALL_TOOLS) 초기화 검증 (LLM mock 없이)."""
 
@@ -253,7 +252,10 @@ class TestStateTransitionLogic:
 
         with (
             patch("langchain_openai.ChatOpenAI.with_structured_output") as mock_struct,
-            patch("app.shared.agent.graph.find_recipient_by_voice", return_value=mock_resolved),
+            patch(
+                "app.shared.agent.graph.find_recipient_by_voice",
+                return_value=mock_resolved,
+            ),
         ):
             mock_llm = MagicMock()
             mock_llm.invoke.return_value = intent_result

@@ -54,7 +54,9 @@ def get_monthly_analytics(
     )
 
 
-def query_spending_analysis_tts(db: Session, user_id: str, period: str = "이번달") -> str:
+def query_spending_analysis_tts(
+    db: Session, user_id: str, period: str = "이번달"
+) -> str:
     """지출 분석 리포트를 TTS 문자열로 반환한다.
 
     Raises:

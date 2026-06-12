@@ -35,7 +35,7 @@ services:
       - /home/ubuntu/.env
     depends_on:
       - woori-backend
-
+      
   node-exporter:
     image: prom/node-exporter:v1.8.0
     container_name: node-exporter

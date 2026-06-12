@@ -121,7 +121,7 @@ def _resolve_navigate_to(result: dict) -> str | None:
     if result.get("awaiting_confirmation") and pending in SCREEN_MAP:
         return SCREEN_MAP[pending]
 
-    if pending in ("balance", "history", "event", "auto_transfer"):
+    if pending in ("balance", "history", "event", "auto_transfer", "transfer"):
         return SCREEN_MAP.get(pending)
 
     return None
@@ -810,7 +810,7 @@ async def _call_asv_ec2(
         ASVError: HTTP 오류 또는 타임아웃.
     """
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 f"{settings.ASV_SERVER_URL}/verify",
                 files={"file": ("audio.wav", audio_bytes, "audio/wav")},

@@ -60,20 +60,20 @@ _CHATBOT_LOGS_MAPPING: dict[str, Any] = {
 _APP_LOGS_MAPPING: dict[str, Any] = {
     "mappings": {
         "properties": {
-            "timestamp":   {"type": "date"},
-            "level":       {"type": "keyword"},
-            "logger":      {"type": "keyword"},
-            "request_id":  {"type": "keyword"},
-            "feature":     {"type": "keyword"},
-            "event":       {"type": "keyword"},
-            "message":     {"type": "text", "analyzer": "standard"},
+            "timestamp": {"type": "date"},
+            "level": {"type": "keyword"},
+            "logger": {"type": "keyword"},
+            "request_id": {"type": "keyword"},
+            "feature": {"type": "keyword"},
+            "event": {"type": "keyword"},
+            "message": {"type": "text", "analyzer": "standard"},
             "duration_ms": {"type": "integer"},
             "status_code": {"type": "integer"},
-            "method":      {"type": "keyword"},
-            "path":        {"type": "keyword"},
-            "code":        {"type": "keyword"},
-            "service":     {"type": "keyword"},
-            "status":      {"type": "keyword"},
+            "method": {"type": "keyword"},
+            "path": {"type": "keyword"},
+            "code": {"type": "keyword"},
+            "service": {"type": "keyword"},
+            "status": {"type": "keyword"},
         }
     },
 }
@@ -81,17 +81,17 @@ _APP_LOGS_MAPPING: dict[str, Any] = {
 _VOICE_PIPELINE_MAPPING: dict[str, Any] = {
     "mappings": {
         "properties": {
-            "timestamp":   {"type": "date"},
-            "request_id":  {"type": "keyword"},
-            "user_id":     {"type": "keyword"},
-            "stt_ms":      {"type": "integer"},
-            "agent_ms":    {"type": "integer"},
-            "tts_ms":      {"type": "integer"},
-            "total_ms":    {"type": "integer"},
-            "intent":      {"type": "keyword"},
+            "timestamp": {"type": "date"},
+            "request_id": {"type": "keyword"},
+            "user_id": {"type": "keyword"},
+            "stt_ms": {"type": "integer"},
+            "agent_ms": {"type": "integer"},
+            "tts_ms": {"type": "integer"},
+            "total_ms": {"type": "integer"},
+            "intent": {"type": "keyword"},
             "navigate_to": {"type": "keyword"},
-            "success":     {"type": "boolean"},
-            "asv_result":  {"type": "keyword"},
+            "success": {"type": "boolean"},
+            "asv_result": {"type": "keyword"},
         }
     },
 }
@@ -99,15 +99,15 @@ _VOICE_PIPELINE_MAPPING: dict[str, Any] = {
 _TRANSFER_AUDIT_MAPPING: dict[str, Any] = {
     "mappings": {
         "properties": {
-            "timestamp":         {"type": "date"},
-            "request_id":        {"type": "keyword"},
-            "user_id":           {"type": "keyword"},
-            "tx_id":             {"type": "keyword"},
-            "amount":            {"type": "integer"},
-            "to_bank":           {"type": "keyword"},
+            "timestamp": {"type": "date"},
+            "request_id": {"type": "keyword"},
+            "user_id": {"type": "keyword"},
+            "tx_id": {"type": "keyword"},
+            "amount": {"type": "integer"},
+            "to_bank": {"type": "keyword"},
             "to_account_masked": {"type": "keyword"},
-            "status":            {"type": "keyword"},
-            "duration_ms":       {"type": "integer"},
+            "status": {"type": "keyword"},
+            "duration_ms": {"type": "integer"},
         }
     },
 }

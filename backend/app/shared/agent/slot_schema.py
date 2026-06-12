@@ -139,6 +139,7 @@ def transfer_missing_slots(collected_slots: dict) -> list[str]:
 
 # ── 슬롯 유효성 검사 ─────────────────────────────────────────────────────────────
 
+
 def valid_scheduled_day(value: object, cycle: object) -> bool:
     """자동이체 주기에 맞는 scheduled_day 값인지 확인한다."""
     if value is None or cycle is None:
@@ -173,13 +174,20 @@ def missing_slots(pending_action: str, collected_slots: dict) -> list[str]:
 # ── STT·한국어 금액·요일 파싱 ────────────────────────────────────────────────────
 
 KOR_DOW_MAP: dict[str, int] = {
-    "월": 0, "월요일": 0,
-    "화": 1, "화요일": 1,
-    "수": 2, "수요일": 2,
-    "목": 3, "목요일": 3,
-    "금": 4, "금요일": 4,
-    "토": 5, "토요일": 5,
-    "일": 6, "일요일": 6,
+    "월": 0,
+    "월요일": 0,
+    "화": 1,
+    "화요일": 1,
+    "수": 2,
+    "수요일": 2,
+    "목": 3,
+    "목요일": 3,
+    "금": 4,
+    "금요일": 4,
+    "토": 5,
+    "토요일": 5,
+    "일": 6,
+    "일요일": 6,
 }
 
 STT_AMOUNT_ALIASES: dict[str, int] = {
@@ -194,8 +202,15 @@ STT_AMOUNT_ALIASES: dict[str, int] = {
 def _kor_to_int(text: str) -> int | None:
     """순수 한국어 숫자 문자열을 정수로 변환한다."""
     _DIGIT = {
-        "일": 1, "이": 2, "삼": 3, "사": 4, "오": 5,
-        "육": 6, "칠": 7, "팔": 8, "구": 9,
+        "일": 1,
+        "이": 2,
+        "삼": 3,
+        "사": 4,
+        "오": 5,
+        "육": 6,
+        "칠": 7,
+        "팔": 8,
+        "구": 9,
     }
     _SMALL = {"십": 10, "백": 100, "천": 1000}
 
@@ -230,6 +245,7 @@ def parse_korean_amount(raw: str) -> str | None:
     변환 불가 시 None을 반환한다.
     """
     import re as _re
+
     text = str(raw).strip().replace(" ", "").replace(",", "")
     if not text:
         return None

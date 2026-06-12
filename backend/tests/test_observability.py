@@ -11,6 +11,7 @@
     cd backend
     CRYPTO_NOOP=true pytest tests/test_observability.py -v
 """
+
 import asyncio
 import json
 import logging
@@ -89,8 +90,13 @@ def test_request_id_filter_injects_field():
 
     flt = _RequestIdFilter()
     record = logging.LogRecord(
-        name="test", level=logging.INFO, pathname="",
-        lineno=0, msg="hello", args=(), exc_info=None,
+        name="test",
+        level=logging.INFO,
+        pathname="",
+        lineno=0,
+        msg="hello",
+        args=(),
+        exc_info=None,
     )
     token = request_id_var.set("inject-test-id")
     try:
@@ -136,6 +142,7 @@ def test_json_formatter_includes_required_fields(capsys):
 
 def test_setup_logging_runs_without_error():
     from app.core.logging_config import setup_logging
+
     setup_logging()  # 예외 없이 완료되어야 함
 
 
@@ -144,20 +151,23 @@ def test_setup_logging_runs_without_error():
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("path,expected", [
-    ("/api/voice/record", "voice"),
-    ("/api/voice", "voice"),
-    ("/api/transfer/execute", "transfer"),
-    ("/api/auto-transfer/list", "auto_transfer"),
-    ("/api/auto-transfer", "auto_transfer"),
-    ("/api/asset/balance", "asset"),
-    ("/api/auth/login", "auth"),
-    ("/api/event/join", "event"),
-    ("/api/recipients", "recipients"),
-    ("/health", "unknown"),
-    ("/metrics", "unknown"),
-    ("/api/unknown-feature/x", "unknown"),
-])
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        ("/api/voice/record", "voice"),
+        ("/api/voice", "voice"),
+        ("/api/transfer/execute", "transfer"),
+        ("/api/auto-transfer/list", "auto_transfer"),
+        ("/api/auto-transfer", "auto_transfer"),
+        ("/api/asset/balance", "asset"),
+        ("/api/auth/login", "auth"),
+        ("/api/event/join", "event"),
+        ("/api/recipients", "recipients"),
+        ("/health", "unknown"),
+        ("/metrics", "unknown"),
+        ("/api/unknown-feature/x", "unknown"),
+    ],
+)
 def test_extract_feature(path: str, expected: str):
     assert _extract_feature(path) == expected
 
@@ -219,21 +229,37 @@ def test_all_metrics_importable():
         transfer_total,
         voice_stage_duration,
     )
+
     for metric in [
-        agent_node_executions_total, agent_tool_duration_seconds,
-        app_error_total, asv_verification_total,
-        auto_transfer_scheduler_runs_total, external_api_calls_total,
-        transfer_total, voice_stage_duration,
+        agent_node_executions_total,
+        agent_tool_duration_seconds,
+        app_error_total,
+        asv_verification_total,
+        auto_transfer_scheduler_runs_total,
+        external_api_calls_total,
+        transfer_total,
+        voice_stage_duration,
     ]:
         assert metric is not None
 
 
-@pytest.mark.parametrize("code", [
-    "TOKEN_INVALID", "UNAUTHORIZED", "USER_NOT_FOUND",
-    "STT_FAILED", "ASV_TIMEOUT", "INSUFFICIENT_BALANCE",
-    "AGENT_CONFIG_ERROR", "EVENT_NOT_FOUND", "INTERNAL_ERROR",
-    "AUTO_ORDER_NOT_FOUND", "SEARCH_FAILED", "SERVICE_UNAVAILABLE",
-])
+@pytest.mark.parametrize(
+    "code",
+    [
+        "TOKEN_INVALID",
+        "UNAUTHORIZED",
+        "USER_NOT_FOUND",
+        "STT_FAILED",
+        "ASV_TIMEOUT",
+        "INSUFFICIENT_BALANCE",
+        "AGENT_CONFIG_ERROR",
+        "EVENT_NOT_FOUND",
+        "INTERNAL_ERROR",
+        "AUTO_ORDER_NOT_FOUND",
+        "SEARCH_FAILED",
+        "SERVICE_UNAVAILABLE",
+    ],
+)
 def test_app_error_total_preinitialized(code: str):
     """지정 에러 코드가 metrics.py 임포트 시점에 사전 등록되어야 한다."""
     from app.core.metrics import app_error_total
@@ -274,6 +300,7 @@ async def test_opensearch_writer_success_does_not_raise(monkeypatch):
     monkeypatch.setattr("app.core.opensearch.get_os_client", lambda: mock_client)
 
     from app.core import opensearch_writer
+
     # 모듈 캐시 갱신을 위해 reload가 아닌 직접 임포트
     from app.core.opensearch_writer import write_voice_pipeline_record_async
 
