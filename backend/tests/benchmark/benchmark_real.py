@@ -42,6 +42,7 @@ REPORT_DIR = Path(__file__).resolve().parents[3] / "docs" / "report"
 
 # ── 시나리오 ───────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class Scenario:
     name: str
@@ -121,6 +122,7 @@ def _lookup_recipient_alias() -> str:
 
 # ── 헬퍼 ───────────────────────────────────────────────────────────────────────
 
+
 def _rebuild_consultation(model: str) -> None:
     """consultation.py의 module-level rag_agent를 새 모델로 교체한다."""
     import app.shared.agent.subgraphs.consultation as _mod
@@ -129,7 +131,9 @@ def _rebuild_consultation(model: str) -> None:
     from app.shared.agent.tools.financial_qa import search_financial_docs
     from app.shared.agent.tools.market_info import get_exchange_rate, get_base_rate
 
-    new_llm = ChatOpenAI(model=model, api_key=settings.OPENAI_CHAT_API_KEY, temperature=0)
+    new_llm = ChatOpenAI(
+        model=model, api_key=settings.OPENAI_CHAT_API_KEY, temperature=0
+    )
     _mod._llm = new_llm
     _mod.rag_agent = create_react_agent(
         model=new_llm,
@@ -154,6 +158,7 @@ def _check_keywords(text: str, keywords: list[str]) -> bool:
 
 # ── 핵심 실행 함수 ─────────────────────────────────────────────────────────────
 
+
 async def _run_scenario(graph, scenario: Scenario) -> None:
     success_elapsed: list[float] = []
     last_result: dict = {}
@@ -162,7 +167,10 @@ async def _run_scenario(graph, scenario: Scenario) -> None:
         config = {"configurable": {"thread_id": str(uuid.uuid4())}}
         t0 = time.perf_counter()
         result = await graph.ainvoke(
-            {"messages": [HumanMessage(content=scenario.utterance)], "user_id": BENCH_USER_ID},
+            {
+                "messages": [HumanMessage(content=scenario.utterance)],
+                "user_id": BENCH_USER_ID,
+            },
             config=config,
         )
         elapsed = time.perf_counter() - t0
@@ -175,10 +183,14 @@ async def _run_scenario(graph, scenario: Scenario) -> None:
             success_elapsed.append(elapsed)
         else:
             scenario.fail_count += 1
-        print(f"  [{scenario.name}] run {i + 1}/{REPEAT}: {elapsed:.2f}s  {'✓' if kw_ok else '✗'}")
+        print(
+            f"  [{scenario.name}] run {i + 1}/{REPEAT}: {elapsed:.2f}s  {'✓' if kw_ok else '✗'}"
+        )
 
     # 성공한 run만 평균 (실패 run은 제외)
-    scenario.elapsed_s = sum(success_elapsed) / len(success_elapsed) if success_elapsed else 0.0
+    scenario.elapsed_s = (
+        sum(success_elapsed) / len(success_elapsed) if success_elapsed else 0.0
+    )
     scenario.response_text = _extract_response_text(last_result)
     scenario.collected_slots = last_result.get("collected_slots") or {}
 
@@ -207,6 +219,7 @@ async def _run_model(model: str, scenarios: list[Scenario]) -> list[Scenario]:
 
 
 # ── 결과 출력 및 저장 ───────────────────────────────────────────────────────────
+
 
 def _print_and_save_summary(
     all_results: dict[str, list[Scenario]], recipient_alias: str
@@ -262,7 +275,8 @@ def _print_and_save_summary(
         avg_cells.append(f"**{avg:.2f}s**")
     md_rows.append(f"| **전체 평균** | " + " | ".join(avg_cells) + " |")
 
-    content = f"""# LLM 벤치마크 결과 [REAL]
+    content = (
+        f"""# LLM 벤치마크 결과 [REAL]
 
 - **모델 비교**: {", ".join(models)}
 - **반복**: {REPEAT}회
@@ -274,7 +288,10 @@ def _print_and_save_summary(
 
 | 시나리오 | {col_header} |
 | {sep} |
-""" + "\n".join(md_rows) + "\n"
+"""
+        + "\n".join(md_rows)
+        + "\n"
+    )
 
     for model, scenarios in all_results.items():
         content += f"\n## {model} 시나리오별 상세\n\n"
@@ -294,6 +311,7 @@ def _print_and_save_summary(
 
 
 # ── 진입점 ─────────────────────────────────────────────────────────────────────
+
 
 async def main() -> None:
     recipient_alias = _lookup_recipient_alias()

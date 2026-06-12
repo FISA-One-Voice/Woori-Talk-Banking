@@ -91,6 +91,7 @@ TRANSFER_WRITE: frozenset[str] = frozenset(
         "draft_recipient",
         "last_tx_id",
         "last_order_id",
+        "tool_execution_ms",
     }
 )
 
@@ -387,9 +388,17 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         ):
             return _clean_transfer_delta(build_transfer_clarification_offer(user_text))
 
-        result = llm_structured.invoke(
-            _chat_messages_for_llm(state, _build_system_content(state))
-        )
+        if not state.get("pending_action"):
+            _state_for_llm = {**state, "messages": [HumanMessage(content=user_text)]}
+            result = llm_structured.invoke(
+                _chat_messages_for_llm(
+                    _state_for_llm, _build_system_content(_state_for_llm)
+                )
+            )
+        else:
+            result = llm_structured.invoke(
+                _chat_messages_for_llm(state, _build_system_content(state))
+            )
         logger.info(
             "[Transfer] intent=%s slots=%s confirmed=%s cancelled=%s",
             result.intent,
@@ -404,7 +413,9 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         pending = state.get("pending_action", "")
         slots = state.get("collected_slots", {})
         missing = missing_slots(pending, slots)
-        logger.info("[Transfer →slot_fill_node] pending=%s missing=%s", pending, missing)
+        logger.info(
+            "[Transfer →slot_fill_node] pending=%s missing=%s", pending, missing
+        )
 
         if missing:
             slot_name = missing[0]
@@ -427,7 +438,11 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
     def confirm_node(state: VoiceState) -> dict:
         """슬롯 수집 완료 후 사용자 확인 메시지를 생성한다."""
         pending = state.get("pending_action", "")
-        logger.info("[Transfer →confirm_node] pending=%s slots=%s", pending, state.get("collected_slots", {}))
+        logger.info(
+            "[Transfer →confirm_node] pending=%s slots=%s",
+            pending,
+            state.get("collected_slots", {}),
+        )
         confirm_message = format_confirm_message(
             pending, state.get("collected_slots", {})
         )
@@ -448,7 +463,10 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         kind = classify_recipient_input(recipient_input) if recipient_input else "name"
         logger.info(
             "[Transfer →resolve_node] recipient=%s bank=%s kind=%s user_id=%s",
-            recipient_input, bank_name, kind, user_id,
+            recipient_input,
+            bank_name,
+            kind,
+            user_id,
         )
 
         resolved = find_recipient_by_voice(
@@ -540,7 +558,9 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             logger.info("[Transfer route] intent_node → END (awaiting_memo_decision)")
             return END
         if state.get("awaiting_transfer_clarification"):
-            logger.info("[Transfer route] intent_node → END (awaiting_transfer_clarification)")
+            logger.info(
+                "[Transfer route] intent_node → END (awaiting_transfer_clarification)"
+            )
             return END
         if state.get("execution_ready"):
             logger.info("[Transfer route] intent_node → execute_node (execution_ready)")
@@ -557,18 +577,26 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             and slots.get("recipient")
             and not state.get("recipient_validated")
         ):
-            logger.info("[Transfer route] intent_node → resolve_node (recipient unvalidated)")
+            logger.info(
+                "[Transfer route] intent_node → resolve_node (recipient unvalidated)"
+            )
             return "resolve_node"
 
         missing = missing_slots(pending, slots)
         if missing:
-            logger.info("[Transfer route] intent_node → slot_fill_node (missing=%s)", missing)
+            logger.info(
+                "[Transfer route] intent_node → slot_fill_node (missing=%s)", missing
+            )
             return "slot_fill_node"
         if pending not in SLOT_SCHEMA:
-            logger.info("[Transfer route] intent_node → execute_node (no slots required)")
+            logger.info(
+                "[Transfer route] intent_node → execute_node (no slots required)"
+            )
             return "execute_node"
         if not state.get("awaiting_confirmation"):
-            logger.info("[Transfer route] intent_node → confirm_node (all slots filled)")
+            logger.info(
+                "[Transfer route] intent_node → confirm_node (all slots filled)"
+            )
             return "confirm_node"
         logger.info("[Transfer route] intent_node → END (awaiting_confirmation)")
         return END
@@ -584,15 +612,22 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
             return END
         if not state.get("recipient_validated"):
             if missing == ["amount"]:
-                logger.info("[Transfer route] resolve_node → END (unvalidated, only amount missing)")
+                logger.info(
+                    "[Transfer route] resolve_node → END (unvalidated, only amount missing)"
+                )
                 return END
             if missing:
-                logger.info("[Transfer route] resolve_node → slot_fill_node (missing=%s)", missing)
+                logger.info(
+                    "[Transfer route] resolve_node → slot_fill_node (missing=%s)",
+                    missing,
+                )
                 return "slot_fill_node"
             logger.info("[Transfer route] resolve_node → END (unvalidated)")
             return END
         if missing:
-            logger.info("[Transfer route] resolve_node → slot_fill_node (missing=%s)", missing)
+            logger.info(
+                "[Transfer route] resolve_node → slot_fill_node (missing=%s)", missing
+            )
             return "slot_fill_node"
         logger.info("[Transfer route] resolve_node → confirm_node")
         return "confirm_node"
@@ -743,7 +778,11 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
             "tool": tool_obj.name,
             "action": pending,
             "user_id": user_id,
-            **({"amount": slots.get("amount")} if pending in ("transfer", "auto_transfer") else {}),
+            **(
+                {"amount": slots.get("amount")}
+                if pending in ("transfer", "auto_transfer")
+                else {}
+            ),
         },
     )
     try:
@@ -783,14 +822,23 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
             post_execute_navigate = COMPLETE_SCREEN_MAP["transfer"]
             logger.info(
                 "agent_transfer_completed",
-                extra={"event": "agent_transfer_completed", "tx_id": tx_id, "user_id": user_id, "amount": slots.get("amount")},
+                extra={
+                    "event": "agent_transfer_completed",
+                    "tx_id": tx_id,
+                    "user_id": user_id,
+                    "amount": slots.get("amount"),
+                },
             )
         else:
             completed_slots = {**slots, "transfer_error_message": response_text}
             post_execute_navigate = "home"
             logger.warning(
                 "agent_transfer_failed",
-                extra={"event": "agent_transfer_failed", "user_id": user_id, "reason": response_text},
+                extra={
+                    "event": "agent_transfer_failed",
+                    "user_id": user_id,
+                    "reason": response_text,
+                },
             )
     elif pending == "auto_transfer" and order_id:
         last_order_id = order_id
@@ -822,6 +870,7 @@ def _execute_transfer_tool(state: VoiceState, tool_obj: object, slots: dict) -> 
         "messages": [AIMessage(content=response_text)],
         "last_tx_id": None if note_consumed else last_tx_id,
         "last_order_id": None if note_consumed else last_order_id,
+        "tool_execution_ms": _duration_ms,
     }
     if note_consumed:
         updates["awaiting_memo_decision"] = False

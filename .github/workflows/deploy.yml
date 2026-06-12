@@ -10,7 +10,7 @@ on:
         required: true
         default: 'all'
         type: choice
-        options: [all, backend, asv, monitoring]
+        options: [all, backend, monitoring]
 
 env:
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
@@ -22,7 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
-      asv: ${{ steps.filter.outputs.asv }}
       monitoring: ${{ steps.filter.outputs.monitoring }}
     steps:
       - uses: actions/checkout@v4
@@ -32,8 +31,6 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
-            asv:
-              - 'ai/asv/**'
             monitoring:
               - 'infra/**'
 
@@ -73,48 +70,18 @@ jobs:
 
       - name: Deploy to Backend EC2 via SSM
         run: |
-          SCRIPT=$(cat infra/scripts/deploy.sh | base64 -w 0)
+          REPO_RAW="https://raw.githubusercontent.com/${{ github.repository }}/main"
           aws ssm send-command \
             --region '${{ secrets.AWS_REGION }}' \
             --document-name 'AWS-RunShellScript' \
             --targets 'Key=tag:App,Values=woori-backend' \
             --parameters "commands=[
-              \"echo \$SCRIPT | base64 -d > /home/ubuntu/deploy.sh && chmod +x /home/ubuntu/deploy.sh\",
+              \"curl -fsSL ${REPO_RAW}/infra/scripts/deploy.sh -o /home/ubuntu/deploy.sh\",
+              \"chmod +x /home/ubuntu/deploy.sh\",
               \"bash /home/ubuntu/deploy.sh\"
             ]" \
             --comment 'Deploy ${{ github.sha }} by ${{ github.actor }}'
 
-  # ── Job 2: ASV ────────────────────────────────────────────────────────────
-  deploy-asv:
-    name: ASV — Docker Hub → SSM
-    needs: changes
-    if: |
-      needs.changes.outputs.asv == 'true' ||
-      github.event.inputs.target == 'asv' ||
-      github.event.inputs.target == 'all'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Restart ASV container via SSM
-        run: |
-          aws ssm send-command \
-            --region '${{ secrets.AWS_REGION }}' \
-            --document-name 'AWS-RunShellScript' \
-            --targets 'Key=tag:Name,Values=woori-asv' \
-            --parameters 'commands=[
-              "docker pull southgiri/asv:1.0",
-              "docker rm -f asv-server || true",
-              "docker run -d --name asv-server --restart unless-stopped -p 8001:8000 southgiri/asv:1.0",
-              "sleep 10 && curl -sf http://localhost:8001/health || (docker logs asv-server && exit 1)"
-            ]' \
-            --comment 'ASV deploy by ${{ github.actor }}'
 
   # ── Job 3: Monitoring ─────────────────────────────────────────────────────
   deploy-monitoring:

@@ -121,7 +121,9 @@ class TestAllTools:
 
     def test_all_tools_is_non_empty(self) -> None:
         """TC-10: ALL_TOOLS 는 비어 있으면 안 된다."""
-        assert len(ALL_TOOLS) > 0, f"ALL_TOOLS 가 비어 있습니다. (현재: {len(ALL_TOOLS)}개)"
+        assert len(ALL_TOOLS) > 0, (
+            f"ALL_TOOLS 가 비어 있습니다. (현재: {len(ALL_TOOLS)}개)"
+        )
 
     def test_all_tools_contains_event_tool(self) -> None:
         """TC-11: ALL_TOOLS 는 get_event_list 실제 tool 을 포함해야 한다."""

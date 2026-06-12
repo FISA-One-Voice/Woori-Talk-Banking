@@ -19,17 +19,52 @@ kiwi = Kiwi()
 # 검색에 유의미한 품사 목록 (명사, 동사, 형용사, 부사, 외국어, 한자, 숫자)
 # NNB(의존명사), NP(대명사), VX(보조용언), MM(관형사) 제거
 VALID_POS_TAGS = {
-    "NNG", "NNP", "NR",               # 일반명사, 고유명사, 수사
-    "VV", "VA", "VV-I", "VV-R", "VA-I", "VA-R",  # 동사, 형용사 (불규칙/규칙 포함)
-    "MAG", "MAJ",                     # 일반부사, 접속부사
-    "SL", "SH", "SN"                  # 외국어(알파벳), 한자, 숫자
+    "NNG",
+    "NNP",
+    "NR",  # 일반명사, 고유명사, 수사
+    "VV",
+    "VA",
+    "VV-I",
+    "VV-R",
+    "VA-I",
+    "VA-R",  # 동사, 형용사 (불규칙/규칙 포함)
+    "MAG",
+    "MAJ",  # 일반부사, 접속부사
+    "SL",
+    "SH",
+    "SN",  # 외국어(알파벳), 한자, 숫자
 }
 
 # 수동 불용어 사전 (품사 필터를 뚫고 들어오는 무의미한 단어들)
 STOP_WORDS = {
-    "있", "없", "않", "이", "그", "저", "것", "수", 
-    "등", "및", "따르", "되", "하", "같", "보", "주", 
-    "대하", "위하", "관하", "알려주", "알리", "무엇", "뭐", "어떻", "많", "할", "할수", "경우"
+    "있",
+    "없",
+    "않",
+    "이",
+    "그",
+    "저",
+    "것",
+    "수",
+    "등",
+    "및",
+    "따르",
+    "되",
+    "하",
+    "같",
+    "보",
+    "주",
+    "대하",
+    "위하",
+    "관하",
+    "알려주",
+    "알리",
+    "무엇",
+    "뭐",
+    "어떻",
+    "많",
+    "할",
+    "할수",
+    "경우",
 }
 
 import json
@@ -45,6 +80,7 @@ try:
 except Exception as e:
     print(f"동의어 사전 로드 실패: {e}")
 
+
 def tokenize_korean(text: str) -> str:
     """
     텍스트를 입력받아 불용어(조사, 어미, 기호 등)를 제거하고
@@ -53,22 +89,22 @@ def tokenize_korean(text: str) -> str:
     """
     if not text:
         return ""
-        
+
     tokens: list[Token] = kiwi.tokenize(text)
-    
+
     result_words = []
     for t in tokens:
         if t.tag in VALID_POS_TAGS:
             word = t.form.lower()
-            
+
             # 불용어(Stopwords) 필터링
             if word in STOP_WORDS:
                 continue
-                
+
             result_words.append(word)
-            
+
             # 동의어가 있다면 함께 추가
             if word in SYNONYMS:
                 result_words.extend(SYNONYMS[word])
-                
+
     return " ".join(result_words)

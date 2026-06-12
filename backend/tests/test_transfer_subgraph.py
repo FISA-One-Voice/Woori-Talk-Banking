@@ -117,11 +117,13 @@ def test_awaiting_asv_audio_ends_without_llm_call() -> None:
     ):
         graph = build_transfer_graph(TRANSFER_TOOLS)
         state = _minimal_transfer_state("인증용 음성")
-        state.update({
-            "pending_action": "transfer",
-            "awaiting_asv_audio": True,
-            "collected_slots": {"recipient": "엄마", "amount": 50000},
-        })
+        state.update(
+            {
+                "pending_action": "transfer",
+                "awaiting_asv_audio": True,
+                "collected_slots": {"recipient": "엄마", "amount": 50000},
+            }
+        )
         result = graph.invoke(state, config=_thread_config())
 
     mock_llm.invoke.assert_not_called()
@@ -137,7 +139,9 @@ def test_execution_ready_routes_to_execute_without_llm_call() -> None:
     def _fake_get_db():
         yield _mock_db()
 
-    with patch("langchain_openai.ChatOpenAI.with_structured_output", return_value=mock_llm):
+    with patch(
+        "langchain_openai.ChatOpenAI.with_structured_output", return_value=mock_llm
+    ):
         with patch("app.core.database.get_db", side_effect=_fake_get_db):
             with patch(
                 "app.features.transfer.service.execute_transfer",
@@ -145,18 +149,20 @@ def test_execution_ready_routes_to_execute_without_llm_call() -> None:
             ):
                 graph = build_transfer_graph(TRANSFER_TOOLS)
                 state = _minimal_transfer_state("인증 완료")
-                state.update({
-                    "pending_action": "transfer",
-                    "execution_ready": True,
-                    "recipient_validated": True,
-                    "collected_slots": {
-                        "recipient": "엄마",
-                        "amount": 50000,
-                        "recipient_id": "rec-001",
-                        "account_number": "1002-123-456789",
-                        "bank_name": "우리은행",
-                    },
-                })
+                state.update(
+                    {
+                        "pending_action": "transfer",
+                        "execution_ready": True,
+                        "recipient_validated": True,
+                        "collected_slots": {
+                            "recipient": "엄마",
+                            "amount": 50000,
+                            "recipient_id": "rec-001",
+                            "account_number": "1002-123-456789",
+                            "bank_name": "우리은행",
+                        },
+                    }
+                )
                 result = graph.invoke(state, config=_thread_config())
 
     mock_llm.invoke.assert_not_called()

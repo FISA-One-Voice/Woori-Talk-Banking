@@ -132,7 +132,9 @@ def query_transaction_list(
     try:
         return query_transaction_list_tts(db, user_id, period, date_range)
     except AppError as e:
-        logger.warning("query_transaction_list AppError: user=%s code=%s", user_id, e.code)
+        logger.warning(
+            "query_transaction_list AppError: user=%s code=%s", user_id, e.code
+        )
         return e.user_message or e.message
     finally:
         db.close()
@@ -152,7 +154,9 @@ def query_spending_report(user_id: str, period: str = "이번달") -> str:
     try:
         return query_spending_analysis_tts(db, user_id, period)
     except AppError as e:
-        logger.warning("query_spending_report AppError: user=%s code=%s", user_id, e.code)
+        logger.warning(
+            "query_spending_report AppError: user=%s code=%s", user_id, e.code
+        )
         return e.user_message or e.message
     finally:
         db.close()

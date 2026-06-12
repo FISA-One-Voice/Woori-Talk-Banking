@@ -63,7 +63,14 @@ async def synthesize_speech(
             )
     except httpx.TimeoutException as exc:
         external_api_calls_total.labels(service="azure_tts", status="error").inc()
-        logger.warning("external_api_call", extra={"event": "external_api_call", "service": "azure_tts", "status": "error"})
+        logger.warning(
+            "external_api_call",
+            extra={
+                "event": "external_api_call",
+                "service": "azure_tts",
+                "status": "error",
+            },
+        )
         raise TTSError(
             code="SERVICE_UNAVAILABLE",
             message="Azure TTS API 요청 시간이 초과됐습니다.",
@@ -71,7 +78,14 @@ async def synthesize_speech(
         ) from exc
     except httpx.RequestError as exc:
         external_api_calls_total.labels(service="azure_tts", status="error").inc()
-        logger.warning("external_api_call", extra={"event": "external_api_call", "service": "azure_tts", "status": "error"})
+        logger.warning(
+            "external_api_call",
+            extra={
+                "event": "external_api_call",
+                "service": "azure_tts",
+                "status": "error",
+            },
+        )
         raise TTSError(
             code="SERVICE_UNAVAILABLE",
             message="Azure TTS API에 연결할 수 없습니다.",
@@ -80,7 +94,14 @@ async def synthesize_speech(
 
     if response.status_code != 200:
         external_api_calls_total.labels(service="azure_tts", status="error").inc()
-        logger.warning("external_api_call", extra={"event": "external_api_call", "service": "azure_tts", "status": "error"})
+        logger.warning(
+            "external_api_call",
+            extra={
+                "event": "external_api_call",
+                "service": "azure_tts",
+                "status": "error",
+            },
+        )
         raise TTSError(
             code="SERVICE_UNAVAILABLE",
             message=f"Azure TTS API 오류: status={response.status_code}",
@@ -88,7 +109,14 @@ async def synthesize_speech(
         )
 
     external_api_calls_total.labels(service="azure_tts", status="success").inc()
-    logger.info("external_api_call", extra={"event": "external_api_call", "service": "azure_tts", "status": "success"})
+    logger.info(
+        "external_api_call",
+        extra={
+            "event": "external_api_call",
+            "service": "azure_tts",
+            "status": "success",
+        },
+    )
     return response.content
 
 

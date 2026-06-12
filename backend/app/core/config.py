@@ -160,7 +160,7 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "JWT_SECRET_KEY가 기본값입니다. "
                     ".env에서 교체하세요: "
-                    "python -c \"import secrets; print(secrets.token_hex(32))\""
+                    'python -c "import secrets; print(secrets.token_hex(32))"'
                 )
 
 

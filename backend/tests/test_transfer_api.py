@@ -262,11 +262,7 @@ class TestCreateTransferAPI:
         assert body["success"] is True
         assert body["data"]["status"] == "completed"
 
-        tx = (
-            db.query(Transaction)
-            .filter(Transaction.idempotency_key == key)
-            .first()
-        )
+        tx = db.query(Transaction).filter(Transaction.idempotency_key == key).first()
         assert tx is not None
         assert tx.status == "completed"
         assert str(tx.recipient_id) == str(registered_recipient.recipient_id)
@@ -368,11 +364,7 @@ class TestCreateTransferAPI:
         assert resp2.status_code == 200
         assert resp1.json()["data"]["txId"] == resp2.json()["data"]["txId"]
 
-        count = (
-            db.query(Transaction)
-            .filter(Transaction.idempotency_key == key)
-            .count()
-        )
+        count = db.query(Transaction).filter(Transaction.idempotency_key == key).count()
         assert count == 1
 
         db.query(Transaction).filter(Transaction.idempotency_key == key).delete()

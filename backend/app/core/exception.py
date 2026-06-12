@@ -113,6 +113,8 @@ class AgentError(AppError):
     """
 
     pass
+
+
 class EventError(AppError):
     """이벤트 기능(features/event/) 관련 커스텀 에러 기반 클래스."""
 

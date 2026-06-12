@@ -41,6 +41,7 @@ def _make_state(utterance: str, period: str | None = None) -> dict:
 # 1. 잔액 조회
 # =============================================================================
 
+
 class TestBalanceQuery:
     """패스트패스 경로: "잔액" 키워드 → LLM 없이 즉시 balance action."""
 
@@ -53,7 +54,9 @@ class TestBalanceQuery:
     @pytest.mark.asyncio
     async def test_balance_message_exists(self):
         """잔액 발화 시 AIMessage가 반환되는지 확인."""
-        result = await asset_graph.ainvoke(_make_state("통장에 돈 얼마 있어"), TEST_CONFIG)
+        result = await asset_graph.ainvoke(
+            _make_state("통장에 돈 얼마 있어"), TEST_CONFIG
+        )
         messages = result.get("messages", [])
         assert len(messages) > 0
 
@@ -69,8 +72,10 @@ class TestBalanceQuery:
         result = await asset_graph.ainvoke(_make_state("전체 잔액 알려줘"), TEST_CONFIG)
         # Dev-C 출력 계약 외 필드가 있으면 안 됨
         forbidden_fields = {
-            "pending_action", "collected_slots",
-            "awaiting_confirmation", "awaiting_asv_audio",
+            "pending_action",
+            "collected_slots",
+            "awaiting_confirmation",
+            "awaiting_asv_audio",
         }
         for field in forbidden_fields:
             assert field not in result, f"출력 계약 위반: '{field}' 필드가 반환됨"
@@ -80,13 +85,16 @@ class TestBalanceQuery:
 # 2. 거래내역 조회
 # =============================================================================
 
+
 class TestHistoryQuery:
     """history action: 거래내역 관련 발화 처리."""
 
     @pytest.mark.asyncio
     async def test_history_navigate_to(self):
         """거래내역 발화 시 navigate_to가 'balance'인지 확인."""
-        result = await asset_graph.ainvoke(_make_state("이번달 거래내역 보여줘"), TEST_CONFIG)
+        result = await asset_graph.ainvoke(
+            _make_state("이번달 거래내역 보여줘"), TEST_CONFIG
+        )
         assert result.get("navigate_to") == "balance"
 
     @pytest.mark.asyncio
@@ -101,19 +109,24 @@ class TestHistoryQuery:
 # 3. 지출 분석
 # =============================================================================
 
+
 class TestSpendingAnalysis:
     """spending_analysis action: 분석/리포트 발화 → navigate_to='report'."""
 
     @pytest.mark.asyncio
     async def test_analysis_navigate_to(self):
         """지출 분석 발화 시 navigate_to가 'report'인지 확인."""
-        result = await asset_graph.ainvoke(_make_state("이번달 지출 분석해줘"), TEST_CONFIG)
+        result = await asset_graph.ainvoke(
+            _make_state("이번달 지출 분석해줘"), TEST_CONFIG
+        )
         assert result.get("navigate_to") == "report"
 
     @pytest.mark.asyncio
     async def test_analysis_period_set(self):
         """지출 분석 시 analytics_period가 설정되는지 확인."""
-        result = await asset_graph.ainvoke(_make_state("지난달 소비 리포트 보여줘"), TEST_CONFIG)
+        result = await asset_graph.ainvoke(
+            _make_state("지난달 소비 리포트 보여줘"), TEST_CONFIG
+        )
         assert result.get("analytics_period") is not None
 
     @pytest.mark.asyncio
@@ -127,6 +140,7 @@ class TestSpendingAnalysis:
 # =============================================================================
 # 4. navigate_to 계약 검증
 # =============================================================================
+
 
 class TestNavigateToContract:
     """ASSET_NAVIGATE_VALUES 계약: 'balance', 'report', None 만 허용."""
@@ -152,6 +166,7 @@ class TestNavigateToContract:
 # =============================================================================
 # 5. analytics API 엔드포인트 테스트
 # =============================================================================
+
 
 class TestAnalyticsAPI:
     """GET /api/analytics/monthly 엔드포인트 테스트."""
