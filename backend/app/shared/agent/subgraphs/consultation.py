@@ -2,6 +2,7 @@ import logging
 import time
 
 from langchain_openai import ChatOpenAI
+from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import create_react_agent
 
 from app.core.config import settings
@@ -22,7 +23,7 @@ RAG_DOMAIN_ACTIONS: frozenset[str] = frozenset(
 def build_rag_graph(tools: list):
     """RAG 에이전트 그래프를 빌드한다. tools는 외부(supervisor)에서 주입된다."""
     llm = ChatOpenAI(
-        model=settings.OPENAI_MODEL, api_key=settings.OPENAI_CHAT_API_KEY, temperature=0
+        model=settings.OPENAI_MODEL_LITE, api_key=settings.OPENAI_CHAT_API_KEY, temperature=0
     )
     agent = create_react_agent(
         model=llm,
@@ -31,7 +32,7 @@ def build_rag_graph(tools: list):
         state_schema=VoiceState,
     )
 
-    async def _rag_graph(state: VoiceState) -> dict:
+    async def rag_node(state: VoiceState) -> dict:
         user_id = state.get("user_id", "")
         logger.info("[RAG] invoke start user_id=%s", user_id)
         t0 = time.monotonic()
@@ -49,4 +50,8 @@ def build_rag_graph(tools: list):
             "tool_execution_ms": None,
         }
 
-    return _rag_graph
+    builder = StateGraph(VoiceState)
+    builder.add_node("rag_node", rag_node)
+    builder.set_entry_point("rag_node")
+    builder.add_edge("rag_node", END)
+    return builder.compile(checkpointer=None)
