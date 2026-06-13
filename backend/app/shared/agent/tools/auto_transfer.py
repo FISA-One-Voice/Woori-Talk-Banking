@@ -18,7 +18,7 @@ import uuid
 from langchain_core.tools import tool
 from sqlalchemy import and_
 
-from app.core.database import SessionLocal, get_db  # noqa: F401
+from app.core.database import SessionLocal
 from app.core.exception import AppError, AutoTransferError, RecipientError
 from app.features.auto_transfer.schema import AutoTransferRequest
 from app.features.auto_transfer.service import (
@@ -336,7 +336,7 @@ def add_auto_transfer_note(user_id: str, memo: str, order_id: str) -> str:
     from app.features.auto_transfer import service as auto_transfer_service
     from app.features.auto_transfer.schema import AutoTransferMemoRequest
 
-    db = next(get_db())
+    db = SessionLocal()
     try:
         auto_transfer_service.update_memo(
             db=db,

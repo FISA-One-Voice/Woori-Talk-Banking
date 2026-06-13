@@ -6,7 +6,7 @@ import uuid
 
 from langchain_core.tools import tool
 
-from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.core.exception import AppError
 from app.features.transfer import service as transfer_service
 
@@ -39,7 +39,7 @@ def execute_transfer(
         JSON: {"tts_text": str, "tx_id": str | None, "success": bool}
     """
     display_name = str(recipient or "수취인")
-    db = next(get_db())
+    db = SessionLocal()
     try:
         if not account_number and not recipient_id:
             return json.dumps(
@@ -111,7 +111,7 @@ def add_note(user_id: str, memo: str, tx_id: str) -> str:
     Returns:
         TTS 친화적 카테고리 등록 안내 문자열.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         transfer_service.update_category(db=db, user_id=user_id, tx_id=tx_id, category=memo)
         return f"'{memo}'로 카테고리가 등록되었습니다."

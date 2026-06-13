@@ -12,7 +12,7 @@ import logging
 
 from langchain_core.tools import tool
 
-from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.core.exception import AppError
 from app.features.asset.service import get_asset_summary, get_account_balance
 
@@ -34,7 +34,7 @@ def get_total_balance(user_id: str) -> str:  # noqa: D401
     Raises:
         BalanceError: 계좌를 찾을 수 없을 때.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         accounts = get_asset_summary(db, user_id)
         total = sum(a.balance for a in accounts)
@@ -65,7 +65,7 @@ def get_account_balance_by_id(user_id: str, account_id: str) -> str:  # noqa: D4
     Raises:
         BalanceError: 계좌를 찾을 수 없을 때.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         account = get_account_balance(db, user_id, account_id)
         return f"{account.bank_name} 계좌 잔액은 {account.balance:,}원입니다."
