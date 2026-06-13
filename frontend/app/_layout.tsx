@@ -9,7 +9,7 @@ import type { VoiceResponseData } from '@/types/voice';
 import { playBase64Audio } from '@/utils/audioPlayer';
 import { FALLBACK_MESSAGE } from '@/utils/errorHandler';
 import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
-import { speakText, stopAllTts } from '@/utils/ttsManager';
+import { speakText, startNewAudioSession, resolveCurrentAudioEnd, stopAllTts } from '@/utils/ttsManager';
 import { agentPathFromNavigateTo, shouldNavigateToRoute } from '@/utils/voiceNavigation';
 import { Audio } from 'expo-av';
 import { Href, Stack, useRouter, useSegments } from 'expo-router';
@@ -96,6 +96,10 @@ function buildAutoTransferReceiptFromSlots(prevSlots: Record<string, unknown>) {
     bankName: (s.bank_name as string) ?? (s.bankName as string) ?? '',
   });
 }
+
+const PROTECTED_ROUTE_SEGMENTS = new Set([
+  'home', 'transfer', 'auto-transfer', 'history', 'asset', 'event', 'report', 'balance',
+]);
 
 // ── 루트 레이아웃 ─────────────────────────────────────────────────────────────
 
@@ -227,6 +231,7 @@ export default function RootLayout() {
         navigateFromAgent(router, 'auto-transfer/complete', currentPathRef);
         useVoiceResponseStore.getState().setLastResponse(data);
       } else {
+        startNewAudioSession();
         useVoiceResponseStore.getState().setLastResponse(data);
       }
 
@@ -242,7 +247,11 @@ export default function RootLayout() {
 
       if (data.audio && !isFailedNav) {
         await stopAllTts();
-        playBase64Audio(data.audio).catch(() => undefined); // 음성과 함께 이동
+        playBase64Audio(data.audio)
+          .then(resolveCurrentAudioEnd)
+          .catch(resolveCurrentAudioEnd);
+      } else if (!isFailedNav) {
+        resolveCurrentAudioEnd();
       }
 
       if (needsYesNoVoicePrompt(data) && !data.audio) {
@@ -262,7 +271,7 @@ export default function RootLayout() {
 
   const handleError = useCallback((message: string) => {
     setVoiceState('idle');
-    speakText(message);
+    stopAllTts().then(() => speakText(message));
   }, []);
 
   const { handleLongPress, handlePressOut } = useVoiceInput(
@@ -272,12 +281,22 @@ export default function RootLayout() {
   );
 
   const hasVoiceRegistered = useAuthStore((state) => state.hasVoiceRegistered);
+  const token = useAuthStore((state) => state.token);
 
   useEffect(() => {
     if (hasVoiceRegistered) {
       Audio.requestPermissionsAsync();
     }
   }, [hasVoiceRegistered]);
+
+  // Silent refresh 실패(refresh token 만료) → clearTokens() → token null 시 로그인으로 강제 이동
+  useEffect(() => {
+    const isProtectedRoute = (segments as string[]).length > 0 &&
+      PROTECTED_ROUTE_SEGMENTS.has((segments as string[])[0]);
+    if (!token && isProtectedRoute) {
+      router.replace('/login');
+    }
+  }, [token, segments, router]);
 
   return (
     <Pressable
