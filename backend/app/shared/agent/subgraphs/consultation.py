@@ -23,7 +23,9 @@ RAG_DOMAIN_ACTIONS: frozenset[str] = frozenset(
 def build_rag_graph(tools: list):
     """RAG 에이전트 그래프를 빌드한다. tools는 외부(supervisor)에서 주입된다."""
     llm = ChatOpenAI(
-        model=settings.OPENAI_MODEL_LITE, api_key=settings.OPENAI_CHAT_API_KEY, temperature=0
+        model=settings.OPENAI_MODEL_LITE,
+        api_key=settings.OPENAI_CHAT_API_KEY,
+        temperature=0,
     )
     agent = create_react_agent(
         model=llm,
