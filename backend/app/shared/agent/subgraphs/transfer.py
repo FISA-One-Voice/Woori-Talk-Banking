@@ -673,7 +673,11 @@ def _build_intent_update(
             }
         return {"awaiting_confirmation": False, "execution_ready": True}
 
-    if state.get("awaiting_confirmation") and result.user_cancelled and not result.extracted_slots:
+    if (
+        state.get("awaiting_confirmation")
+        and result.user_cancelled
+        and not result.extracted_slots
+    ):
         return {
             "messages": [
                 *clear_conversation_messages(),

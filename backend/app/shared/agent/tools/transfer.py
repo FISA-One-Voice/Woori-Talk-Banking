@@ -113,7 +113,9 @@ def add_note(user_id: str, memo: str, tx_id: str) -> str:
     """
     db = SessionLocal()
     try:
-        transfer_service.update_category(db=db, user_id=user_id, tx_id=tx_id, category=memo)
+        transfer_service.update_category(
+            db=db, user_id=user_id, tx_id=tx_id, category=memo
+        )
         return f"'{memo}'로 카테고리가 등록되었습니다."
     except AppError as e:
         logger.warning(
