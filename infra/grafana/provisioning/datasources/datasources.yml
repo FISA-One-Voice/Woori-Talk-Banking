@@ -14,7 +14,7 @@ datasources:
     url: https://${OPENSEARCH_HOST}:${OPENSEARCH_PORT}
     editable: false
     jsonData:
-      version: "2.17.0"
+      version: "3.0.0"
       flavor: opensearch
       database: "app_logs"
       timeField: timestamp
@@ -39,6 +39,7 @@ datasources:
       connMaxLifetime: 14400
       postgresVersion: 1500
       timescaledb: false
+      timezone: "Asia/Seoul"
     secureJsonData:
       password: "${POSTGRES_PASSWORD}"
     user: ${POSTGRES_USER}
