@@ -215,6 +215,31 @@ def update_memo(db: Session, user_id: str, tx_id: str, memo: str) -> dict:
     return {"txId": tx_id, "memo": memo}
 
 
+def update_category(db: Session, user_id: str, tx_id: str, category: str) -> dict:
+    """본인 소유 트랜잭션의 카테고리를 업데이트합니다.
+
+    음성 이체 후 add_note 흐름에서 식비·교통비 등 카테고리 선택 시 호출합니다.
+    지출 집계(get_expense_summary)가 category 컬럼을 기준으로 동작하므로
+    memo가 아닌 category에 씁니다.
+    """
+    user_uuid = uuid.UUID(user_id)
+    tx = (
+        db.query(Transaction)
+        .filter(Transaction.tx_id == tx_id, Transaction.user_id == user_uuid)
+        .first()
+    )
+    if tx is None:
+        raise TransferError(
+            code="TRANSACTION_NOT_FOUND",
+            message="트랜잭션을 찾을 수 없습니다.",
+            status_code=404,
+            user_message="해당 거래를 찾을 수 없습니다.",
+        )
+    tx.category = category
+    db.commit()
+    return {"txId": tx_id, "category": category}
+
+
 # ── API 3: 최근 수취인 조회 ─────────────────────────────────────────────────
 
 

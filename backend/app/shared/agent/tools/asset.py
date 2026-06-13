@@ -9,7 +9,7 @@ import logging
 
 from langchain_core.tools import tool
 
-from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.core.exception import AppError
 from app.features.analytics.service import query_spending_analysis_tts
 from app.features.asset.service import (
@@ -33,7 +33,7 @@ def query_balance(user_id: str) -> str:
     Args:
         user_id: JWT에서 추출한 사용자 ID.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         return query_balance_tts(db, user_id)
     except AppError as e:
@@ -58,7 +58,7 @@ def query_history(
         period: 조회 기간. 예: "이번달", "지난달", "최근7일".
         filter_type: "income"=수입만, "expense"=지출만, None=둘 다.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         return query_history_tts(db, user_id, period, None, filter_type)
     except AppError as e:
@@ -83,7 +83,7 @@ def query_category(
         period: 조회 기간.
         category: 조회할 카테고리. 예: "식비", "교통", "쇼핑".
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         return query_category_tts(db, user_id, period, category)
     except AppError as e:
@@ -103,7 +103,7 @@ def query_top_category(user_id: str, period: str = "이번달") -> str:
         user_id: JWT에서 추출한 사용자 ID.
         period: 조회 기간.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         return query_top_category_tts(db, user_id, period)
     except AppError as e:
@@ -128,7 +128,7 @@ def query_transaction_list(
         period: 조회 기간. "이번달" | "지난달" | "이번주" | "지난주" | "오늘" | "최근N일" | "N월".
         date_range: 특정 날짜 조회 시 "YYYY-MM-DD" 형식. 예: "2026-06-08". period보다 우선 적용됩니다.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         return query_transaction_list_tts(db, user_id, period, date_range)
     except AppError as e:
@@ -150,7 +150,7 @@ def query_spending_report(user_id: str, period: str = "이번달") -> str:
         user_id: JWT에서 추출한 사용자 ID.
         period: 조회 기간. "이번달" | "지난달" | "3개월".
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         return query_spending_analysis_tts(db, user_id, period)
     except AppError as e:
@@ -179,7 +179,7 @@ def query_compare(
         compare_period: 비교 기간 (과거). 예: "지난달", "지난주".
         category: 특정 카테고리만 비교할 경우. None이면 전체 지출 비교.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         return query_compare_tts(db, user_id, period, compare_period, category)
     except AppError as e:

@@ -6,7 +6,7 @@ import uuid
 
 from langchain_core.tools import tool
 
-from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.core.exception import AppError
 from app.features.transfer import service as transfer_service
 
@@ -39,7 +39,7 @@ def execute_transfer(
         JSON: {"tts_text": str, "tx_id": str | None, "success": bool}
     """
     display_name = str(recipient or "수취인")
-    db = next(get_db())
+    db = SessionLocal()
     try:
         if not account_number and not recipient_id:
             return json.dumps(
@@ -98,23 +98,23 @@ def execute_transfer(
 
 @tool
 def add_note(user_id: str, memo: str, tx_id: str) -> str:
-    """지정한 이체 거래(tx_id)에 메모를 추가합니다.
+    """지정한 이체 거래(tx_id)에 카테고리를 추가합니다.
 
-    '방금 이체에 메모 달아줘' 등의 말에 사용합니다.
+    이체 직후 '식비', '교통비' 등 카테고리 발화에 사용합니다.
     tx_id는 이체 직후 세션(last_tx_id) 또는 슬롯에서 전달받습니다.
 
     Args:
         user_id: 현재 로그인한 사용자 ID.
-        memo: 추가할 메모 내용.
-        tx_id: 메모를 붙일 트랜잭션 ID (UUID 문자열).
+        memo: 카테고리 값 (식비·교통비·쇼핑·의료비·문화생활·기타 중 하나).
+        tx_id: 카테고리를 붙일 트랜잭션 ID (UUID 문자열).
 
     Returns:
-        TTS 친화적 메모 완료 안내 문자열.
+        TTS 친화적 카테고리 등록 안내 문자열.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
-        transfer_service.update_memo(db=db, user_id=user_id, tx_id=tx_id, memo=memo)
-        return f"'{memo}' 메모가 추가되었습니다."
+        transfer_service.update_category(db=db, user_id=user_id, tx_id=tx_id, category=memo)
+        return f"'{memo}'로 카테고리가 등록되었습니다."
     except AppError as e:
         logger.warning(
             "add_note_error",
@@ -131,6 +131,6 @@ def add_note(user_id: str, memo: str, tx_id: str) -> str:
                 "error": str(e),
             },
         )
-        return "메모 추가 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+        return "카테고리 등록 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
     finally:
         db.close()

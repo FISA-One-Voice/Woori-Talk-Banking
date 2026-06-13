@@ -10,7 +10,7 @@ tool이 에이전트에 연결되는 방식:
 
 from langchain_core.tools import tool
 
-from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.core.exception import AppError
 from app.features.asset.service import get_expense_summary, get_transaction_history
 
@@ -31,7 +31,7 @@ def get_recent_history(user_id: str, days: int = 7) -> str:  # noqa: D401
     Raises:
         HistoryError: 거래 내역이 없을 때.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         transactions = get_transaction_history(db, user_id, days=days)
         total = sum(t.amount for t in transactions)
@@ -61,7 +61,7 @@ def get_category_history(user_id: str, category: str, days: int = 30) -> str:  #
     Raises:
         HistoryError: 거래 내역이 없을 때.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         transactions = get_transaction_history(
             db, user_id, days=days, category=category
@@ -92,7 +92,7 @@ def get_monthly_expense(user_id: str, days: int = 30) -> str:  # noqa: D401
     Raises:
         HistoryError: 지출 거래 내역이 없을 때.
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         summary = get_expense_summary(db, user_id, days)
         total = summary["total"]

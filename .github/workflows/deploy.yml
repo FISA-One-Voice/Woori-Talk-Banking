@@ -109,9 +109,19 @@ jobs:
             --document-name 'AWS-RunShellScript' \
             --targets 'Key=tag:Name,Values=woori-monitoring-01' \
             --parameters "commands=[
+              \"mkdir -p /home/ubuntu/prometheus /home/ubuntu/grafana/provisioning/dashboards /home/ubuntu/grafana/provisioning/datasources\",
               \"curl -fsSL ${REPO_RAW}/infra/docker-compose.yml -o /home/ubuntu/docker-compose.yml\",
               \"curl -fsSL ${REPO_RAW}/infra/prometheus/prometheus.yml -o /home/ubuntu/prometheus/prometheus.yml\",
-              \"docker compose -f /home/ubuntu/docker-compose.yml up -d prometheus grafana blackbox-exporter\",
+              \"curl -fsSL ${REPO_RAW}/infra/grafana/provisioning/datasources/datasources.yml -o /home/ubuntu/grafana/provisioning/datasources/datasources.yml\",
+              \"curl -fsSL ${REPO_RAW}/infra/grafana/provisioning/dashboards/dashboards.yml -o /home/ubuntu/grafana/provisioning/dashboards/dashboards.yml\",
+              \"curl -fsSL ${REPO_RAW}/infra/grafana/provisioning/dashboards/asv.json -o /home/ubuntu/grafana/provisioning/dashboards/asv.json\",
+              \"curl -fsSL ${REPO_RAW}/infra/grafana/provisioning/dashboards/errors.json -o /home/ubuntu/grafana/provisioning/dashboards/errors.json\",
+              \"curl -fsSL ${REPO_RAW}/infra/grafana/provisioning/dashboards/external_api.json -o /home/ubuntu/grafana/provisioning/dashboards/external_api.json\",
+              \"curl -fsSL ${REPO_RAW}/infra/grafana/provisioning/dashboards/financial.json -o /home/ubuntu/grafana/provisioning/dashboards/financial.json\",
+              \"curl -fsSL ${REPO_RAW}/infra/grafana/provisioning/dashboards/node_exporter.json -o /home/ubuntu/grafana/provisioning/dashboards/node_exporter.json\",
+              \"curl -fsSL ${REPO_RAW}/infra/grafana/provisioning/dashboards/voice_pipeline.json -o /home/ubuntu/grafana/provisioning/dashboards/voice_pipeline.json\",
+              \"docker compose -f /home/ubuntu/docker-compose.yml up -d prometheus blackbox-exporter\",
+              \"docker compose -f /home/ubuntu/docker-compose.yml up -d --force-recreate grafana\",
               \"docker compose -f /home/ubuntu/docker-compose.yml ps\"
             ]" \
             --comment 'Monitoring deploy by ${{ github.actor }}'

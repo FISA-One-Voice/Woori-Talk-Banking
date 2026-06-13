@@ -192,6 +192,7 @@ def _build_system_content(state: VoiceState) -> str:
         context_lines.append(
             "대기 상태: 사용자 확인 대기 중입니다. "
             "'네', '응', '맞아', '그렇게 해줘'는 user_confirmed=true입니다. "
+            "'아니오', '아니요', '안 할게', '하지 않을게', '취소' 등 수정 없이 거절하면 user_cancelled=true입니다. "
             "'아니 6만원으로'처럼 수정 값이 있으면 user_cancelled=false로 두고 "
             "extracted_slots에 수정할 슬롯만 넣으십시오."
         )
@@ -671,6 +672,25 @@ def _build_intent_update(
                 "messages": [AIMessage(content="목소리로 인증해 주세요.")],
             }
         return {"awaiting_confirmation": False, "execution_ready": True}
+
+    if state.get("awaiting_confirmation") and result.user_cancelled and not result.extracted_slots:
+        return {
+            "messages": [
+                *clear_conversation_messages(),
+                AIMessage(content="취소했습니다. 홈 화면으로 이동합니다."),
+            ],
+            "navigate_to": "home",
+            "pending_action": None,
+            "collected_slots": {},
+            "awaiting_confirmation": False,
+            "awaiting_memo_decision": False,
+            "awaiting_transfer_clarification": False,
+            "draft_recipient": None,
+            "recipient_validated": False,
+            "execution_ready": False,
+            "asv_retry_count": 0,
+            "last_tx_id": None,
+        }
 
     if state.get("awaiting_confirmation") and result.extracted_slots:
         existing = dict(state.get("collected_slots", {}))

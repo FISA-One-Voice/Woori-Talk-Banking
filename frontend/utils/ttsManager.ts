@@ -56,3 +56,26 @@ export async function stopAllTts(): Promise<void> {
     _sound = null;
   }
 }
+
+// ── 에이전트 오디오 완료 대기 ──────────────────────────────────────────────────
+// _layout.tsx가 에이전트 오디오를 시작하기 전에 startNewAudioSession()을 호출해
+// Promise를 세팅한다. 오디오가 끝나면 resolveCurrentAudioEnd()로 완료 신호를 보낸다.
+// transfer/index.tsx는 getCurrentAudioEnd()를 await해 최근 수취인 TTS를 직렬 재생한다.
+
+let _audioEndResolve: (() => void) | null = null;
+let _audioEndPromise: Promise<void> = Promise.resolve();
+
+export function startNewAudioSession(): void {
+  _audioEndPromise = new Promise<void>((resolve) => {
+    _audioEndResolve = resolve;
+  });
+}
+
+export function resolveCurrentAudioEnd(): void {
+  _audioEndResolve?.();
+  _audioEndResolve = null;
+}
+
+export function getCurrentAudioEnd(): Promise<void> {
+  return _audioEndPromise;
+}

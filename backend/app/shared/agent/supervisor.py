@@ -26,6 +26,12 @@ from app.shared.agent.transfer_intent import is_plain_transfer_start
 
 logger = logging.getLogger(__name__)
 
+_classify_llm = ChatOpenAI(
+    model=settings.OPENAI_MODEL_LITE,
+    api_key=settings.OPENAI_CHAT_API_KEY,
+    temperature=0,
+)
+
 # ── 키워드 집합 ──────────────────────────────────────────────────────────────────
 
 CANCEL_KEYWORDS: frozenset[str] = frozenset(
@@ -56,7 +62,7 @@ NAVIGATION_KEYWORDS: frozenset[str] = frozenset(
     }
 )
 
-# gpt-4o-mini 분류에서 허용되는 도메인 — 예상 외 출력은 "unknown"으로 정규화한다.
+# 분류기 허용 도메인 — 예상 외 출력은 "unknown"으로 정규화한다.
 # NodeNotFoundError 방지를 위해 이 집합 외 값은 반드시 "unknown"으로 교체해야 한다.
 _VALID_DOMAINS: frozenset[str] = frozenset({"transfer", "asset", "rag", "unknown"})
 
@@ -108,15 +114,10 @@ def _is_domain_switch_utterance(text: str) -> bool:
 
 
 async def _llm_classify_domain(text: str) -> str:
-    """gpt-4o-mini로 도메인 분류. 실패하거나 예상 외 값이면 'unknown' 반환."""
+    """LLM으로 도메인 분류. 실패하거나 예상 외 값이면 'unknown' 반환."""
     try:
-        llm = ChatOpenAI(
-            model=settings.OPENAI_MODEL,
-            api_key=settings.OPENAI_CHAT_API_KEY,
-            temperature=0,
-        )
         prompt = DOMAIN_CLASSIFY_PROMPT.format(text=text)
-        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        response = await _classify_llm.ainvoke([HumanMessage(content=prompt)])
         domain = response.content.strip().lower()
         if domain not in _VALID_DOMAINS:
             logger.warning("LLM 분류 결과 비정상: %r → unknown 처리", domain)
@@ -323,7 +324,10 @@ def build_supervisor():
     def measure_subgraph(name: str, subgraph):
         async def wrapper(state: VoiceState, config: RunnableConfig):
             t0 = time.monotonic()
-            result = await subgraph.ainvoke(state, config=config)
+            if hasattr(subgraph, "ainvoke"):
+                result = await subgraph.ainvoke(state, config=config)
+            else:
+                result = await subgraph(state)
             duration_ms = int((time.monotonic() - t0) * 1000)
             agent_subgraph_duration_seconds.labels(subgraph=name).observe(
                 duration_ms / 1000

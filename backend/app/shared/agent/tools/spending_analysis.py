@@ -6,7 +6,7 @@
 
 from langchain_core.tools import tool
 
-from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.features.analytics.service import get_monthly_analytics
 
 
@@ -21,7 +21,7 @@ def get_monthly_spending_report(user_id: str, period: str = "이번달") -> str:
         user_id: 사용자 UUID 문자열.
         period: "이번달" | "지난달" | "3개월"
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         result = get_monthly_analytics(db, user_id, period)
         top = result.categories[0] if result.categories else None

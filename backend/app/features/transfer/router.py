@@ -35,7 +35,7 @@ async def get_recent_recipients(
         }
 
     names = "님, ".join(r["toName"] for r in data) + "님"
-    tts_text = f"최근 이체하신 분은 {names}입니다. 누구에게 보낼까요?"
+    tts_text = f"최근 이체하신 분은 {names}입니다."
     audio_bytes = await synthesize_speech(tts_text)
     tts_audio_base64 = base64.b64encode(audio_bytes).decode()
 

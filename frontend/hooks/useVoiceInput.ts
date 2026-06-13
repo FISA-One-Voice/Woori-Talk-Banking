@@ -2,6 +2,7 @@ import type { VoiceState } from '@/components/VoiceStatusOverlay';
 import { sendVoice } from '@/services/voiceService';
 import type { VoiceResponseData } from '@/types/voice';
 import { extractApiErrorMessage, getClientErrorMessage } from '@/utils/errorHandler';
+import { stopAllTts } from '@/utils/ttsManager';
 import { Audio } from 'expo-av';
 import { useCallback, useRef, useState } from 'react';
 
@@ -34,6 +35,7 @@ export function useVoiceInput(
         return;
       }
 
+      await stopAllTts();
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,

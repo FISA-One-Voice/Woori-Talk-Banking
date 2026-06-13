@@ -13,7 +13,7 @@
 
 from langchain_core.tools import tool
 
-from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.core.exception import AppError
 from app.features.event.service import get_events_tts_text
 
@@ -38,7 +38,7 @@ def get_event_list(user_id: str) -> str:  # noqa: D401
         예: "현재 진행 중인 이벤트는 두 개입니다. 첫 번째, 봄맞이 이벤트. 두 번째, 신규 가입 혜택."
 
     """
-    db = next(get_db())
+    db = SessionLocal()
     try:
         result = get_events_tts_text(db)
         return f"이벤트 화면으로 이동합니다. {result}"
