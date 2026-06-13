@@ -9,7 +9,7 @@ import { resetVoiceSessionOnHome } from '@/utils/resetVoiceSession';
 import { useVoiceResponseStore } from '@/store/voiceResponseStore';
 import { fetchRecentRecipients, executeTransfer } from '@/services/transferService';
 import { playBase64Audio } from '@/utils/audioPlayer';
-import { stopAllTts } from '@/utils/ttsManager';
+import { getCurrentAudioEnd } from '@/utils/ttsManager';
 import axios from 'axios';
 import { extractApiErrorMessage } from '@/utils/errorHandler';
 import type { RecipientItem } from '@/components/display';
@@ -81,7 +81,7 @@ export default function TransferScreen() {
       .then(async (list) => {
         setRecentList(list.recipients);
         if (list.tts_audio_base64) {
-          await stopAllTts(); // 에이전트 슬롯 프롬프트 중단 → 최근 수취인 안내만 재생
+          await getCurrentAudioEnd(); // 에이전트 오디오 완료 후 최근 수취인 안내 재생
           playBase64Audio(list.tts_audio_base64).catch(() => undefined);
         }
       })

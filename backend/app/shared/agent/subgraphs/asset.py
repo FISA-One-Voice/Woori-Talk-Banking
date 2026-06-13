@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 from langchain_core.messages import AIMessage
 from langchain_openai import ChatOpenAI
+from langgraph.graph import END, StateGraph
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
@@ -202,4 +203,8 @@ def build_asset_graph(tools: list):
             "tool_execution_ms": _duration_ms,
         }
 
-    return _asset_graph
+    builder = StateGraph(VoiceState)
+    builder.add_node("asset", _asset_graph)
+    builder.set_entry_point("asset")
+    builder.add_edge("asset", END)
+    return builder.compile(checkpointer=None)
