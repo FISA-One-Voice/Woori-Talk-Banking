@@ -8,7 +8,7 @@
     "from": "now-3h",
     "to": "now"
   },
-  "timezone": "UTC",
+  "timezone": "Asia/Seoul",
   "tags": [
     "woori"
   ],
@@ -435,7 +435,7 @@
             "type": "postgres",
             "uid": "postgres"
           },
-          "rawSql": "SELECT created_at AS \"시각\", tx_id AS \"거래ID\", user_id AS \"사용자\", to_bank_name AS \"수취은행\", to_name AS \"수취인\", amount AS \"금액\", tx_type AS \"구분\", status AS \"상태\" FROM transactions WHERE tx_type IN ('transfer', 'auto_transfer') ORDER BY created_at DESC LIMIT 20",
+          "rawSql": "SELECT created_at - INTERVAL '9 hours' AS \"시각\", tx_id AS \"거래ID\", user_id AS \"사용자\", to_bank_name AS \"수취은행\", to_name AS \"수취인\", amount AS \"금액\", tx_type AS \"구분\", status AS \"상태\" FROM transactions WHERE tx_type IN ('transfer', 'auto_transfer') ORDER BY created_at DESC LIMIT 20",
           "format": "table",
           "rawQuery": true
         }
