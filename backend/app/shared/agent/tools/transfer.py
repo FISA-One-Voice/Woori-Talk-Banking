@@ -116,7 +116,7 @@ def add_note(user_id: str, memo: str, tx_id: str) -> str:
         transfer_service.update_category(
             db=db, user_id=user_id, tx_id=tx_id, category=memo
         )
-        return f"'{memo}'로 카테고리가 등록되었습니다."
+        return f"'{memo}' 카테고리로 추가되었습니다."
     except AppError as e:
         logger.warning(
             "add_note_error",
