@@ -34,9 +34,14 @@ interface AuthState {
   refreshToken: string | null;
   hasVoiceRegistered: boolean;
   ttsSpeed: number;
+  userPhone: string | null;
   setTokens: (accessToken: string, refreshToken: string, hasVoiceRegistered?: boolean, ttsSpeed?: number) => void;
   setHasVoiceRegistered: (status: boolean) => void;
+  setUserPhone: (phone: string) => void;
+  /** 토큰 만료 경로: userPhone 유지 → 다음 진입 시 생체인증으로 재인증 */
   clearTokens: () => void;
+  /** 의도적 로그아웃: 모든 정보 초기화 → 다음 진입 시 전화번호 입력부터 */
+  logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -46,6 +51,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       hasVoiceRegistered: false,
       ttsSpeed: 1.7,
+      userPhone: null,
       setTokens: (token, refreshToken, hasVoiceRegistered, ttsSpeed) =>
         set((state) => ({
           token,
@@ -54,7 +60,17 @@ export const useAuthStore = create<AuthState>()(
           ttsSpeed: ttsSpeed ?? state.ttsSpeed,
         })),
       setHasVoiceRegistered: (status) => set({ hasVoiceRegistered: status }),
-      clearTokens: () => set({ token: null, refreshToken: null, hasVoiceRegistered: false, ttsSpeed: 1.7 }),
+      setUserPhone: (phone) => set({ userPhone: phone }),
+      clearTokens: () =>
+        set((state) => ({
+          token: null,
+          refreshToken: null,
+          hasVoiceRegistered: false,
+          ttsSpeed: 1.7,
+          userPhone: state.userPhone,
+        })),
+      logout: () =>
+        set({ token: null, refreshToken: null, hasVoiceRegistered: false, ttsSpeed: 1.7, userPhone: null }),
     }),
     {
       name: 'auth-storage',

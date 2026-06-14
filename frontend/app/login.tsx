@@ -3,30 +3,74 @@ import { TopBar } from '@/components/layout';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import { apiClient, ApiResponse } from '@/utils/api';
+import { speakText } from '@/utils/ttsManager';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
+const PIN_STORE_KEY = 'woori_pin';
+
 export default function DevLoginScreen() {
   const savedToken = useAuthStore((state) => state.token);
+  const userPhone = useAuthStore((state) => state.userPhone);
+  const setUserPhone = useAuthStore((state) => state.setUserPhone);
+
   const [phone, setPhone] = useState('');
-  const [step, setStep] = useState<'PHONE' | 'PIN' | 'BIOMETRIC'>('PHONE');
+  const [step, setStep] = useState<'PHONE' | 'PIN' | 'BIOMETRIC'>(() =>
+    savedToken || userPhone ? 'BIOMETRIC' : 'PHONE',
+  );
 
   useEffect(() => {
-    if (savedToken) {
-      setStep('BIOMETRIC');
-    }
-  }, [savedToken]);
-
-  useEffect(() => {
-    if (step === 'BIOMETRIC') {
-      const timer = setTimeout(() => {
-        triggerBiometric();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
+    if (step !== 'BIOMETRIC') return;
+    const label = Platform.OS === 'ios' ? 'Face ID' : '생체 인증';
+    speakText(`${label}으로 잠금을 해제합니다.`);
+    const timer = setTimeout(triggerBiometric, 500);
+    return () => clearTimeout(timer);
   }, [step]);
+
+  const callLoginApi = async (phoneNum: string, pin: string) => {
+    const response = await apiClient.post<
+      ApiResponse<{
+        accessToken: string;
+        refreshToken: string;
+        hasVoiceRegistered: boolean;
+        ttsSpeed?: number;
+      }>
+    >('/api/users/login', { phone: phoneNum, pin });
+    return response.data;
+  };
+
+  const onBiometricSuccess = async () => {
+    if (savedToken) {
+      router.replace('/home');
+      return;
+    }
+    // 세션 만료: SecureStore에 PIN이 있으면 자동 재로그인
+    try {
+      const storedPin = await SecureStore.getItemAsync(PIN_STORE_KEY);
+      if (storedPin && userPhone) {
+        const result = await callLoginApi(userPhone, storedPin);
+        if (result.success && result.data) {
+          useAuthStore.getState().setTokens(
+            result.data.accessToken,
+            result.data.refreshToken,
+            result.data.hasVoiceRegistered,
+            result.data.ttsSpeed,
+          );
+          router.replace(result.data.hasVoiceRegistered ? '/home' : '/voice-register');
+          return;
+        }
+        // 서버에서 거부됨 (PIN 변경 등) → 삭제 후 수동 입력
+        await SecureStore.deleteItemAsync(PIN_STORE_KEY);
+      }
+    } catch {
+      // SecureStore 또는 네트워크 오류 → 수동 PIN 입력으로 폴백
+    }
+    setPhone(userPhone ?? '');
+    setStep('PIN');
+  };
 
   const triggerBiometric = async () => {
     try {
@@ -42,7 +86,7 @@ export default function DevLoginScreen() {
           disableDeviceFallback: true,
         });
         if (result.success) {
-          router.replace('/home');
+          onBiometricSuccess();
         } else {
           // TS의 엄격한 타입 검사를 피하기 위해 any로 캐스팅하여 에러 코드를 확인합니다.
           const errorCode = (result as any).error;
@@ -52,7 +96,7 @@ export default function DevLoginScreen() {
                 ? 'Face ID 시뮬레이션 (Expo Go)'
                 : '생체 인증 시뮬레이션 (Expo Go)',
               '현재 사용 중인 Expo Go 앱은 애플 정책상 Face ID 테스트를 제한하고 있습니다.\n테스트를 위해 Face ID 인증을 통과한 것으로 처리합니다!',
-              [{ text: '확인', onPress: () => router.replace('/home') }],
+              [{ text: '확인', onPress: onBiometricSuccess }],
             );
           } else {
             setStep('PHONE');
@@ -63,7 +107,7 @@ export default function DevLoginScreen() {
         Alert.alert(
           'Face ID 시뮬레이션',
           '생체 인증 기기가 아닙니다. 테스트를 위해 통과 처리합니다.',
-          [{ text: '확인', onPress: () => router.replace('/home') }],
+          [{ text: '확인', onPress: onBiometricSuccess }],
         );
       }
     } catch (e: any) {
@@ -76,6 +120,7 @@ export default function DevLoginScreen() {
     if (completedPhone.length === 11) {
       formatted = `${completedPhone.slice(0, 3)}-${completedPhone.slice(3, 7)}-${completedPhone.slice(7, 11)}`;
     }
+    setUserPhone(formatted);
     setPhone(formatted);
     setStep('PIN');
   };
@@ -105,7 +150,7 @@ export default function DevLoginScreen() {
             result.data.hasVoiceRegistered,
             result.data.ttsSpeed,
           );
-
+        await SecureStore.setItemAsync(PIN_STORE_KEY, pinValue);
         if (result.data.hasVoiceRegistered) {
           router.replace('/home');
         } else {
@@ -145,9 +190,12 @@ export default function DevLoginScreen() {
               >
                 {Platform.OS === 'ios' ? 'Face ID' : '생체'} 인증을 진행해주세요.
               </Text>
+              <Text style={{ color: COLORS.grayMedium, fontSize: 16, marginBottom: 20 }}>
+                화면에 얼굴을 가까이 가져다주세요.
+              </Text>
               <Pressable onPress={() => setStep('PHONE')} style={{ padding: 16 }}>
-                <Text style={{ color: COLORS.grayMedium, fontSize: 16 }}>
-                  화면에 얼굴을 가까이 가져다주세요.
+                <Text style={{ color: COLORS.grayMedium, fontSize: 14 }}>
+                  전화번호로 다시 로그인
                 </Text>
               </Pressable>
             </View>
