@@ -1,5 +1,6 @@
 import logging
 import logging.handlers
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,7 @@ from pythonjsonlogger.json import JsonFormatter
 from app.core.request_context import get_request_id
 
 _KST = timezone(timedelta(hours=9))
-_LOG_FILE = Path.home() / "woori-logs" / "app.log"
+_LOG_FILE = Path(os.getenv("LOG_DIR", str(Path.home() / "woori-logs"))) / "app.log"
 
 
 class _RequestIdFilter(logging.Filter):

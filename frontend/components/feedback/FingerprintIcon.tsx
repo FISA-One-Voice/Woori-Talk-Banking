@@ -1,4 +1,4 @@
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, Text as RNText, View } from 'react-native';
 import { COLORS, FONT_SIZES } from '@/constants/theme';
 
 export default function FingerprintIcon() {
@@ -7,7 +7,7 @@ export default function FingerprintIcon() {
       <View style={styles.ring}>
         <Image source={require('../../icon-yellow/fingerprint.png')} style={styles.icon} />
       </View>
-      <Text style={styles.label}>생체 인식 대기</Text>
+      <RNText style={styles.label}>생체 인식 대기</RNText>
     </View>
   );
 }

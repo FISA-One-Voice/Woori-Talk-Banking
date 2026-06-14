@@ -2,7 +2,7 @@
   "title": "외부 API 상태",
   "uid": "woori-external-api",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "time": {
     "from": "now-1h",
@@ -340,7 +340,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1h",
                 "min_doc_count": "0"
               }
             }
@@ -368,7 +368,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1h",
                 "min_doc_count": "0"
               }
             }
@@ -396,7 +396,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1h",
                 "min_doc_count": "0"
               }
             }
@@ -424,7 +424,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1h",
                 "min_doc_count": "0"
               }
             }

@@ -14,7 +14,7 @@ datasources:
     url: https://${OPENSEARCH_HOST}:${OPENSEARCH_PORT}
     editable: false
     jsonData:
-      version: "3.0.0"
+      version: "3.3.2"
       flavor: opensearch
       database: "app_logs"
       timeField: timestamp
