@@ -15527,7 +15527,7 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "Asia/Seoul",
   "title": "Node Exporter (서버 리소스)",
   "uid": "woori-node-exporter",
   "version": 101,
