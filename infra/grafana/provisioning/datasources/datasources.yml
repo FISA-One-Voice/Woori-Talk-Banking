@@ -16,7 +16,7 @@ datasources:
     jsonData:
       version: "3.3.2"
       flavor: opensearch
-      database: "app_logs"
+      database: "*"
       timeField: timestamp
       tlsSkipVerify: true
       logMessageField: message
