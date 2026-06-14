@@ -1,11 +1,11 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 import { COLORS, FONT_SIZES } from '@/constants/theme';
 
 export default function FingerprintIcon() {
   return (
     <View style={styles.wrap}>
       <View style={styles.ring}>
-        <Text style={styles.icon}>🫆</Text>
+        <Image source={require('../../icon-yellow/fingerprint.png')} style={styles.icon} />
       </View>
       <Text style={styles.label}>생체 인식 대기</Text>
     </View>
@@ -29,7 +29,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   icon: {
-    fontSize: 48,
+    width: 48,
+    height: 48,
   },
   label: {
     fontSize: FONT_SIZES.body,

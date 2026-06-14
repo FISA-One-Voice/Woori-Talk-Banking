@@ -29,6 +29,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   SafeAreaView,
   StyleSheet,
@@ -152,9 +153,10 @@ function ParticipateModal({ event, modalState, onConfirm, onClose }: Participate
 
           {isDone && (
             <View style={modalStyles.resultRow}>
-              <Text style={modalStyles.resultIcon}>
-                {isSuccess ? '✅' : isDuplicate ? 'ℹ️' : '⚠️'}
-              </Text>
+              <Image
+                source={isSuccess ? require('../../icon-yellow/check.png') : isDuplicate ? require('../../icon-yellow/info.png') : require('../../icon-yellow/warning.png')}
+                style={modalStyles.resultIcon}
+              />
               <Text style={[modalStyles.resultText, isError && { color: COLORS.error }]}>
                 {isSuccess
                   ? '참여가 완료되었습니다!'
@@ -236,7 +238,7 @@ const modalStyles = StyleSheet.create({
     gap: 10,
     paddingVertical: 8,
   },
-  resultIcon: { fontSize: 28 },
+  resultIcon: { width: 28, height: 28 },
   resultText: {
     fontSize: FONT_SIZES.body,
     color: COLORS.textMain,
