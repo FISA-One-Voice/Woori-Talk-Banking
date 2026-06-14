@@ -2,7 +2,7 @@
   "title": "ASV 화자 인증 현황",
   "uid": "woori-asv",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "time": {
     "from": "now-3h",
@@ -86,7 +86,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1h",
                 "min_doc_count": "0"
               }
             }
@@ -114,7 +114,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1h",
                 "min_doc_count": "0"
               }
             }
@@ -421,7 +421,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1h",
                 "min_doc_count": "0"
               }
             }
@@ -449,7 +449,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1h",
                 "min_doc_count": "0"
               }
             }
@@ -548,7 +548,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1h",
                 "min_doc_count": "0"
               }
             }
@@ -577,7 +577,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "auto",
+                "interval": "1h",
                 "min_doc_count": "0"
               }
             }

@@ -17,6 +17,8 @@ services:
       - "8000:8000"
     env_file:
       - /home/ubuntu/.env
+    environment:
+      - LOG_DIR=/app/logs
     volumes:
       - /home/ubuntu/certs:/app/certs:ro
       - /home/ubuntu/woori-logs:/app/logs
