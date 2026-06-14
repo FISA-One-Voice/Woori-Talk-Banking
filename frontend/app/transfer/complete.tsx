@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { TopBar } from '@/components/layout';
@@ -32,17 +32,25 @@ export default function TransferCompleteScreen() {
     router.replace('/home');
   }, []);
 
+  const hasNavigatedRef = useRef(false);
+
   useEffect(() => {
-    if (!txId) {
+    if (!txId && !hasNavigatedRef.current) {
       goHome();
     }
   }, [txId, goHome]);
 
   useEffect(() => {
-    if (lastResponse?.navigate_to === 'home') {
-      resetVoiceSessionOnHome();
+    if (lastResponse?.navigate_to === 'home' && !hasNavigatedRef.current) {
+      goHome();
     }
-  }, [lastResponse?.navigate_to]);
+  }, [lastResponse?.navigate_to, goHome]);
+
+  useEffect(() => {
+    if (localPhase !== 'memo_done') return;
+    const t = setTimeout(goHome, 2500);
+    return () => clearTimeout(t);
+  }, [localPhase, goHome]);
 
   const handleMemoSave = async (category: string) => {
     if (!txId) {

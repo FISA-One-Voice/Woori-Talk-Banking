@@ -71,8 +71,9 @@ export default function HistoryScreen() {
       .map((tx) => {
         const date = new Date(tx.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
         const sign = tx.category === '수입' ? '입금' : '출금';
+        const category = tx.category && tx.category !== '수입' ? `. 카테고리 ${tx.category}` : '';
         const memo = tx.memo ? `. 메모 ${tx.memo}` : '';
-        return `${date} ${tx.to_name ?? ''} ${sign} ${Math.abs(tx.amount).toLocaleString()}원${memo}`;
+        return `${date} ${tx.to_name ?? ''} ${sign} ${Math.abs(tx.amount).toLocaleString()}원${category}${memo}`;
       })
       .join('. ');
     return `최근 거래내역 ${txs.length}건입니다. ` + txText;
@@ -322,6 +323,9 @@ export default function HistoryScreen() {
                       {new Date(tx.created_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })}
                     </Text>
                     <Text style={styles.txName}>{tx.to_name}</Text>
+                    {tx.category && tx.category !== '수입' ? (
+                      <Text style={styles.txCategory}>{tx.category}</Text>
+                    ) : null}
                     {tx.memo ? <Text style={styles.txMemo}>{tx.memo}</Text> : null}
                   </View>
                   <Text style={[
@@ -406,6 +410,7 @@ const styles = StyleSheet.create({
   txLeft: { gap: 4, flex: 1 },
   txDate: { fontSize: FONT_SIZES.caption, color: COLORS.grayLight },
   txName: { fontSize: FONT_SIZES.body, color: COLORS.textMain },
+  txCategory: { fontSize: FONT_SIZES.caption, color: COLORS.highlightYellow },
   txMemo: { fontSize: FONT_SIZES.caption, color: COLORS.grayMedium },
   txAmount: { fontSize: FONT_SIZES.body, fontWeight: 'bold' },
   errorContainer: { justifyContent: 'center', alignItems: 'center' },

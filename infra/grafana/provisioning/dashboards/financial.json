@@ -403,7 +403,8 @@
     },
     {
       "id": 6,
-      "title": "최근 이체 감사 로그 (OpenSearch)",
+      "title": "최근 이체 감사 로그 (PostgreSQL)",
+      "description": "transactions 테이블 기준 최근 20건 이체·자동이체 내역",
       "type": "table",
       "gridPos": {
         "h": 10,
@@ -412,8 +413,8 @@
         "y": 12
       },
       "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
+        "type": "postgres",
+        "uid": "postgres"
       },
       "fieldConfig": {
         "defaults": {},
@@ -423,7 +424,7 @@
         "sortBy": [
           {
             "desc": true,
-            "displayName": "timestamp"
+            "displayName": "시각"
           }
         ]
       },
@@ -431,22 +432,12 @@
         {
           "refId": "A",
           "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
+            "type": "postgres",
+            "uid": "postgres"
           },
-          "index": "transfer_audit",
-          "query": "*",
-          "metrics": [
-            {
-              "type": "raw_data",
-              "id": "1",
-              "settings": {
-                "size": "20"
-              }
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": []
+          "rawSql": "SELECT created_at AS \"시각\", tx_id AS \"거래ID\", user_id AS \"사용자\", to_bank_name AS \"수취은행\", to_name AS \"수취인\", amount AS \"금액\", tx_type AS \"구분\", status AS \"상태\" FROM transactions WHERE tx_type IN ('transfer', 'auto_transfer') ORDER BY created_at DESC LIMIT 20",
+          "format": "table",
+          "rawQuery": true
         }
       ]
     }

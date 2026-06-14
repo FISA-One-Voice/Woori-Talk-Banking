@@ -6,11 +6,14 @@ import { TRANSFER_FAILED_HOME_SUFFIX } from '@/constants/voicePrompts';
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 
 import { useAuthStore } from '@/store/authStore';
+import * as SecureStore from 'expo-secure-store';
+
+const PIN_STORE_KEY = 'woori_pin';
 import { useTransferStore } from '@/store/transferStore';
 import { syncDeviceContactsToBackend } from '@/utils/contactSync';
 
 export default function DevHubScreen() {
-  const clearTokens = useAuthStore((state) => state.clearTokens);
+  const logout = useAuthStore((state) => state.logout);
 
   return (
     <SafeAreaView style={styles.root}>
@@ -28,8 +31,9 @@ export default function DevHubScreen() {
           
           <Pressable 
             style={[styles.link, { backgroundColor: '#3f1a1a', borderColor: '#F87171', marginBottom: 8 }]} 
-            onPress={() => {
-              clearTokens();
+            onPress={async () => {
+              await SecureStore.deleteItemAsync(PIN_STORE_KEY);
+              logout();
               router.replace('/login');
             }}
           >

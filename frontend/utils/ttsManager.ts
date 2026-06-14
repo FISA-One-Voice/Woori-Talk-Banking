@@ -15,6 +15,7 @@
 import { useAuthStore } from '@/store/authStore';
 import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
+import { Platform } from 'react-native';
 
 // ── TTS 속도 ──────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,13 @@ export function getTtsRate(): number {
 }
 
 // ── expo-speech 래퍼 ──────────────────────────────────────────────────────────
+
+// iOS expo-speech: rate 0.5 ≈ normal, 1.0 = maximum.
+// The stored ttsSpeed is calibrated for Android/expo-av (1.0 = normal).
+// Scale it down so 1.0 stored → 0.5 on iOS, 1.7 stored → 0.85 on iOS.
+function platformSpeechRate(rate: number): number {
+  return Platform.OS === 'ios' ? rate * 0.7 : rate;
+}
 
 /**
  * 앱 전체 expo-speech TTS 호출 래퍼.
@@ -35,7 +43,7 @@ export function speakText(
 ): void {
   Speech.speak(message, {
     language: 'ko-KR',
-    rate: getTtsRate(),
+    rate: platformSpeechRate(getTtsRate()),
     volume: 1.0,
     ...opts,
   });

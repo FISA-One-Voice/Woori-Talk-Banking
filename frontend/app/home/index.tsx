@@ -11,6 +11,9 @@ import {
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
 import { navigateHomeMenu } from '@/utils/navigateHomeMenu';
 import { useAuthStore } from '@/store/authStore';
+import * as SecureStore from 'expo-secure-store';
+
+const PIN_STORE_KEY = 'woori_pin';
 
 function HomeMainContent() {
   return (
@@ -32,10 +35,11 @@ function HomeMainContent() {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const clearTokens = useAuthStore((s) => s.clearTokens);
+  const logout = useAuthStore((s) => s.logout);
 
-  function handleLogout() {
-    clearTokens();
+  async function handleLogout() {
+    await SecureStore.deleteItemAsync(PIN_STORE_KEY);
+    logout();
     router.replace('/login');
   }
 
