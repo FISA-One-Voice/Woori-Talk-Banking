@@ -12,13 +12,11 @@ export default function ResultScreen({ type, label, subtitle }: ResultScreenProp
 
   return (
     <View style={styles.container}>
-      <View style={[styles.circle, { borderColor: color }]}>
-        {isSuccess ? (
-          <Image source={require('../../icon-yellow/check.png')} style={styles.icon} />
-        ) : (
-          <Image source={require('../../icon-yellow/close.png')} style={styles.icon} />
-        )}
-      </View>
+      {isSuccess ? (
+        <Image source={require('../../icon-yellow/check.png')} style={styles.icon} />
+      ) : (
+        <Image source={require('../../icon-yellow/close.png')} style={styles.icon} />
+      )}
       <Text style={[styles.label, { color: isSuccess ? '#fff' : color }]}>
         {label}
       </Text>
@@ -32,18 +30,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 16,
   },
-  circle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
   icon: {
-    width: 32,
-    height: 32,
+    width: 64,
+    height: 64,
+    marginBottom: 8,
   },
   label: {
     fontSize: 32,
