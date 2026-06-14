@@ -125,8 +125,8 @@ async def proceed_execution(
         audio_mp3 = await synthesize_speech(exc.user_message or exc.message)
         error_data = VoiceResponseData(
             audio=base64.b64encode(audio_mp3).decode(),
-            navigate_to=None,
-            collected_slots={},
+            navigate_to="transfer/failed",
+            collected_slots={"transfer_error_message": exc.user_message or exc.message},
             awaiting_confirmation=False,
             awaiting_asv_audio=False,
             awaiting_memo_decision=False,

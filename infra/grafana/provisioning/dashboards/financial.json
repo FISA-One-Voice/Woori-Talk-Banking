@@ -82,7 +82,7 @@
             "type": "postgres",
             "uid": "postgres"
           },
-          "rawSql": "SELECT COUNT(*) FILTER (WHERE status = 'completed') AS \"성공\", COUNT(*) FILTER (WHERE status = 'failed') AS \"실패\" FROM transactions WHERE tx_type = 'transfer' AND created_at >= to_timestamp($__unixEpochFrom() + 32400)::timestamp AND created_at <= to_timestamp($__unixEpochTo() + 32400)::timestamp",
+          "rawSql": "SELECT COUNT(*) FILTER (WHERE status = 'completed') AS \"성공\", COUNT(*) FILTER (WHERE status = 'failed') AS \"실패\" FROM transactions WHERE tx_type = 'transfer' AND created_at >= to_timestamp($__unixEpochFrom())::timestamp AND created_at <= to_timestamp($__unixEpochTo())::timestamp",
           "format": "table",
           "rawQuery": true
         }
@@ -157,7 +157,7 @@
             "type": "postgres",
             "uid": "postgres"
           },
-          "rawSql": "SELECT COUNT(*) FILTER (WHERE status = 'completed') AS \"성공\", COUNT(*) FILTER (WHERE status = 'failed') AS \"실패\" FROM transactions WHERE tx_type = 'auto_transfer' AND created_at >= to_timestamp($__unixEpochFrom() + 32400)::timestamp AND created_at <= to_timestamp($__unixEpochTo() + 32400)::timestamp",
+          "rawSql": "SELECT COUNT(*) FILTER (WHERE status = 'completed') AS \"성공\", COUNT(*) FILTER (WHERE status = 'failed') AS \"실패\" FROM transactions WHERE tx_type = 'auto_transfer' AND created_at >= to_timestamp($__unixEpochFrom())::timestamp AND created_at <= to_timestamp($__unixEpochTo())::timestamp",
           "format": "table",
           "rawQuery": true
         }
@@ -395,7 +395,7 @@
             "type": "postgres",
             "uid": "postgres"
           },
-          "rawSql": "SELECT $__timeGroupAlias(created_at - INTERVAL '9 hours', $__interval, 0), COUNT(*) FILTER (WHERE status = 'completed') AS \"성공\", COUNT(*) FILTER (WHERE status = 'failed') AS \"실패\" FROM transactions WHERE tx_type = 'transfer' AND created_at >= to_timestamp($__unixEpochFrom() + 32400)::timestamp AND created_at <= to_timestamp($__unixEpochTo() + 32400)::timestamp GROUP BY 1 ORDER BY 1",
+          "rawSql": "SELECT $__timeGroupAlias(created_at - INTERVAL '9 hours', $__interval, 0), COUNT(*) FILTER (WHERE status = 'completed') AS \"성공\", COUNT(*) FILTER (WHERE status = 'failed') AS \"실패\" FROM transactions WHERE tx_type = 'transfer' AND created_at >= to_timestamp($__unixEpochFrom())::timestamp AND created_at <= to_timestamp($__unixEpochTo())::timestamp GROUP BY 1 ORDER BY 1",
           "format": "time_series",
           "rawQuery": true
         }

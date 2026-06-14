@@ -492,7 +492,23 @@ async def _handle_asv_flow(
     )
 
     # DB에서 사용자 음성 임베딩 조회 (ASV /verify 호출에 필요)
-    reference_embedding = _get_user_embedding(user_id, db)
+    try:
+        reference_embedding = _get_user_embedding(user_id, db)
+    except ASVError as e:
+        # 음성 미등록 → 인증 흐름 취소 후 홈으로 이동
+        await reset_voice_state(user_id)
+        tts_text = e.user_message or "음성 등록이 필요합니다. 앱에서 음성 등록을 먼저 진행해 주세요."
+        audio_mp3 = await synthesize_speech(tts_text)
+        return VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to="home",
+            collected_slots={},
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            awaiting_memo_decision=False,
+            transcript=transcript,
+            pending_action=None,
+        )
 
     # m4a/AAC → WAV 변환 (soundfile은 m4a 디코딩 불가)
     wav_bytes = _to_wav_bytes(audio_bytes)
@@ -506,24 +522,53 @@ async def _handle_asv_flow(
         len(wav_bytes),
     )
 
-    # ASV 호출
+    # ASV 호출 — 서버 오류 시 슬롯·ASV 상태를 보존하고 재시도 안내
+    _asv_error: ASVError | None = None
     t0 = time.monotonic()
     try:
         asv_result = await _call_asv_ec2(wav_bytes, reference_embedding)
-    except ASVError:
-        raise
+    except ASVError as e:
+        _asv_error = e
     except Exception as e:
         logger.error("ASV EC2 호출 중 예기치 못한 오류: %s", e)
-        raise ASVError(
+        _asv_error = ASVError(
             code="ASV_SERVER_ERROR",
             message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
             status_code=502,
-            user_message="화자 인증 서버와 통신 중 오류가 발생했습니다.",
-        ) from e
+            user_message="화자 인증 서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        )
     finally:
         duration_sec = time.monotonic() - t0
         asv_duration_seconds.observe(duration_sec)
         asv_ms = int(duration_sec * 1000)
+
+    if _asv_error is not None:
+        # 서버 오류: 슬롯·ASV 대기 상태를 보존하고 에러 TTS 반환 (슬롯 리셋 방지)
+        current_slots = (
+            state_snapshot.values.get("collected_slots", {})
+            if state_snapshot.values
+            else {}
+        )
+        tts_text = (
+            _asv_error.user_message
+            or "화자 인증 서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+        )
+        logger.warning(
+            "[ASV] 서버 오류 — 슬롯 보존 후 재시도 안내: user_id=%s code=%s",
+            user_id,
+            _asv_error.code,
+        )
+        audio_mp3 = await synthesize_speech(tts_text)
+        return VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to=SCREEN_MAP.get(pending_action) if pending_action else None,
+            collected_slots=current_slots,
+            awaiting_confirmation=False,
+            awaiting_asv_audio=True,
+            awaiting_memo_decision=False,
+            transcript=transcript,
+            pending_action=pending_action,
+        )
 
     asv_ok = isinstance(asv_result, ASVResult) and asv_result.verified
     auth_success = asv_ok
