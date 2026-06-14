@@ -1,4 +1,4 @@
-﻿import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+﻿import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface TabBarProps {
   onLogout: () => void;
@@ -8,7 +8,7 @@ export default function TabBar({ onLogout }: TabBarProps) {
   return (
     <View style={styles.bar}>
       <TouchableOpacity style={styles.item} onPress={onLogout} activeOpacity={0.7}>
-        <Text style={styles.icon}>🚪</Text>
+        <Image source={require('../../icon-yellow/logout.png')} style={styles.icon} />
         <Text style={styles.label}>로그아웃</Text>
       </TouchableOpacity>
     </View>
@@ -27,7 +27,8 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   icon: {
-    fontSize: 24,
+    width: 24,
+    height: 24,
   },
   label: {
     fontSize: 14,
