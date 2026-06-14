@@ -1,8 +1,8 @@
 import { COLORS, FONT_SIZES, LAYOUT } from '@/constants/theme';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export interface VoiceQuickMenuItem {
-  icon: string;
+  icon: number;
   label: string;
   voiceHint: string;
   onPress: () => void;
@@ -22,7 +22,7 @@ export default function VoiceQuickMenuGrid({ items }: VoiceQuickMenuGridProps) {
           onPress={item.onPress}
           activeOpacity={0.7}
         >
-          <Text style={styles.icon}>{item.icon}</Text>
+          <Image source={item.icon} style={styles.icon} />
           <Text style={styles.label}>{item.label}</Text>
         </TouchableOpacity>
       ))}
@@ -47,7 +47,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   icon: {
-    fontSize: 24,
+    width: 28,
+    height: 28,
   },
   label: {
     fontSize: FONT_SIZES.body,

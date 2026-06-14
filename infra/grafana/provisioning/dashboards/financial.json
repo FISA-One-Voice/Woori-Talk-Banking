@@ -2,13 +2,13 @@
   "title": "금융 거래 현황",
   "uid": "woori-financial",
   "schemaVersion": 39,
-  "version": 3,
+  "version": 5,
   "refresh": "30s",
   "time": {
-    "from": "now-1h",
+    "from": "now-3h",
     "to": "now"
   },
-  "timezone": "browser",
+  "timezone": "Asia/Seoul",
   "tags": [
     "woori"
   ],

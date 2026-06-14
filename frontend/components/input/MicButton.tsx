@@ -1,4 +1,4 @@
-﻿import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+﻿import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type MicState = 'idle' | 'listening' | 'error' | 'warning';
 
@@ -29,8 +29,7 @@ export default function MicButton({
         onPress={onPress}
         activeOpacity={0.7}
       >
-        {/* 마이크 아이콘 (텍스트 대체) */}
-        <Text style={[styles.micIcon, { color }]}>🎙</Text>
+        <Image source={require('../../icon-yellow/mic.png')} style={styles.micIcon} />
       </TouchableOpacity>
       {hint && <Text style={[styles.hint, { color }]}>{hint}</Text>}
     </View>
@@ -52,7 +51,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   micIcon: {
-    fontSize: 32,
+    width: 32,
+    height: 32,
   },
   hint: {
     fontSize: 24,

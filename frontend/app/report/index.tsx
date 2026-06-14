@@ -10,7 +10,7 @@ import {
 import { extractApiErrorMessage } from '@/utils/errorHandler';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // ── 금액 포맷 ─────────────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ function CategoryBar({ item, maxAmount }: { item: CategorySpending; maxAmount: n
   return (
     <View style={styles.categoryRow}>
       <View style={styles.categoryLabel}>
-        <Text style={styles.categoryIcon}>{theme.icon}</Text>
+        <Image source={theme.icon} style={styles.categoryIcon} />
         <Text style={styles.categoryName}>{item.category}</Text>
       </View>
       <View style={styles.barContainer}>
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   categoryLabel: { flexDirection: 'row', alignItems: 'center', gap: 4, width: 80 },
-  categoryIcon: { fontSize: 18 },
+  categoryIcon: { width: 18, height: 18 },
   categoryName: { fontSize: FONT_SIZES.caption, color: COLORS.textMain, flex: 1 },
   barContainer: { flex: 1, gap: 4 },
   barBg: {
