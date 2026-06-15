@@ -1,4 +1,4 @@
-﻿import { StyleSheet, Text, View } from 'react-native';
+﻿import { Image, StyleSheet, Text, View } from 'react-native';
 
 interface ResultScreenProps {
   type: 'success' | 'error';
@@ -12,13 +12,11 @@ export default function ResultScreen({ type, label, subtitle }: ResultScreenProp
 
   return (
     <View style={styles.container}>
-      <View style={[styles.circle, { borderColor: color }]}>
-        {isSuccess ? (
-          <Text style={[styles.icon, { color }]}>✓</Text>
-        ) : (
-          <Text style={[styles.icon, { color }]}>✕</Text>
-        )}
-      </View>
+      {isSuccess ? (
+        <Image source={require('../../icon-yellow/check.png')} style={styles.icon} />
+      ) : (
+        <Image source={require('../../icon-yellow/close.png')} style={styles.icon} />
+      )}
       <Text style={[styles.label, { color: isSuccess ? '#fff' : color }]}>
         {label}
       </Text>
@@ -32,18 +30,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 16,
   },
-  circle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
   icon: {
-    fontSize: 32,
-    fontWeight: '600',
+    width: 64,
+    height: 64,
+    marginBottom: 8,
   },
   label: {
     fontSize: 32,
