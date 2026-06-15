@@ -42,5 +42,13 @@ export function shouldNavigateToRoute(
     return false;
   }
 
+  // auto-transfer 플로우 진행 중 transfer 화면으로 이탈하는 것을 차단한다
+  if (
+    navigateTo === 'transfer' &&
+    (current === '/auto-transfer' || current.startsWith('/auto-transfer/'))
+  ) {
+    return false;
+  }
+
   return true;
 }

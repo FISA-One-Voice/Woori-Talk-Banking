@@ -177,7 +177,7 @@ async def _decide_domain(text: str, state: VoiceState) -> str:
     #       if any(kw in _normalize(text) for kw in kws): return "asset"
     # ─────────────────────────────────────────────────────────────────────────
 
-    # 6. gpt-4o-mini LLM 분류 (폴백: "unknown")
+    # 6. LLM 분류 (폴백: "unknown")
     return await _llm_classify_domain(text)
 
 

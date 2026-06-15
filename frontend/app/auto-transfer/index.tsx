@@ -204,9 +204,6 @@ export default function AutoTransferScreen() {
   }, []);
 
   useEffect(() => {
-    if (phase === 'list-view') {
-      apiClient.post('/api/voice/reset-state').catch(() => undefined);
-    }
     if (phase === 'list-view' || isCancel) {
       fetchList();
     }

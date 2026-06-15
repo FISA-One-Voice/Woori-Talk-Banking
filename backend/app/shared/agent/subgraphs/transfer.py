@@ -191,8 +191,10 @@ def _build_system_content(state: VoiceState) -> str:
     if state.get("awaiting_confirmation"):
         context_lines.append(
             "대기 상태: 사용자 확인 대기 중입니다. "
-            "'네', '응', '맞아', '그렇게 해줘'는 user_confirmed=true입니다. "
-            "'아니오', '아니요', '안 할게', '하지 않을게', '취소' 등 수정 없이 거절하면 user_cancelled=true입니다. "
+            "'네', '응', '맞아', '그렇게 해줘', '보내줘', '할게', "
+            "'진행해줘', '등록해줘', '해줘'는 user_confirmed=true입니다. "
+            "'아니오', '아니요', '안 할게', '하지 않을게', '취소' 등 "
+            "수정 없이 거절하면 user_cancelled=true입니다. "
             "'아니 6만원으로'처럼 수정 값이 있으면 user_cancelled=false로 두고 "
             "extracted_slots에 수정할 슬롯만 넣으십시오."
         )
@@ -215,7 +217,7 @@ def _transfer_response_rules() -> list[str]:
         '  "direct_response": ""',
         "}",
         "- intent는 진행 중인 액션이 없을 때만 설정하십시오.",
-        "- transfer: 일회성 이체, 송금, 보내줘 요청입니다.",
+        "- transfer: 일회성 이체, 송금 요청입니다.",
         "- auto_transfer: 자동이체, 정기 이체, 매월, 매주 요청입니다.",
         "- cancel_auto_transfer: 자동이체 해지·삭제·취소 요청입니다. (예: '자동이체 삭제할래', '자동이체 해지할게', '자동이체 끊을래', '자동이체 없애줘')",
         "- list_auto_transfer: 자동이체 목록 조회·확인 요청입니다. (예: '자동이체 확인할게', '자동이체 목록 볼게', '자동이체 보여줘', '자동이체 조회해줘')",
