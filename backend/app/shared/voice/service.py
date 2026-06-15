@@ -46,10 +46,6 @@ from app.core.request_context import get_request_id
 from app.models.user import User
 from app.shared.agent.slot_schema import SCREEN_MAP
 from app.shared.agent.supervisor import build_supervisor
-from app.shared.agent.transfer_clarification import (
-    is_clarification_no,
-    is_home_request,
-)
 from app.shared.voice.message_utils import tts_text_from_messages
 from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.stt_service import transcribe_audio
@@ -462,27 +458,6 @@ async def _handle_asv_flow(
     Raises:
         ASVError: 사용자 음성 미등록 또는 ASV EC2 서버 통신 오류.
     """
-    # ASV 인증음은 짧아 STT가 텍스트를 못 뽑을 수 있으므로 실패 시 무시하고 ASV로 진행
-    try:
-        transcript = await transcribe_audio(audio_bytes, content_type)
-    except Exception:
-        transcript = ""
-
-    if transcript and (is_home_request(transcript) or is_clarification_no(transcript)):
-        await reset_voice_state(user_id)
-        tts_text = "홈 화면으로 이동합니다."
-        audio_mp3 = await synthesize_speech(tts_text)
-        return VoiceResponseData(
-            audio=base64.b64encode(audio_mp3).decode(),
-            navigate_to="home",
-            collected_slots={},
-            awaiting_confirmation=False,
-            awaiting_asv_audio=False,
-            awaiting_memo_decision=False,
-            transcript=transcript,
-            pending_action=None,
-        )
-
     state_snapshot = graph.get_state(config)
     pending_action = (
         state_snapshot.values.get("pending_action") if state_snapshot.values else None
@@ -506,7 +481,7 @@ async def _handle_asv_flow(
             awaiting_confirmation=False,
             awaiting_asv_audio=False,
             awaiting_memo_decision=False,
-            transcript=transcript,
+            transcript=None,
             pending_action=None,
         )
 
@@ -566,7 +541,7 @@ async def _handle_asv_flow(
             awaiting_confirmation=False,
             awaiting_asv_audio=True,
             awaiting_memo_decision=False,
-            transcript=transcript,
+            transcript=None,
             pending_action=pending_action,
         )
 
@@ -655,7 +630,8 @@ async def _handle_asv_flow(
             f"본인 확인에 실패했습니다. {remaining}번 더 시도하실 수 있습니다. "
             "다시 한번 말씀해 주세요."
         )
-        navigate_to_next = SCREEN_MAP.get(pending_action) if pending_action else None
+        # ASV 재시도 중 화면 이동 없음 — 수취인 입력 화면으로 되돌아가는 버그 방지
+        navigate_to_next = None
         awaiting_asv_next = True
 
     fail_slots = (
@@ -671,7 +647,7 @@ async def _handle_asv_flow(
         awaiting_confirmation=False,
         awaiting_asv_audio=awaiting_asv_next,
         awaiting_memo_decision=False,
-        transcript=transcript,
+        transcript=None,
         pending_action=pending_action if awaiting_asv_next else None,
     )
 
