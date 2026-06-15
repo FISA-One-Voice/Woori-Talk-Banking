@@ -286,53 +286,6 @@
       ]
     },
     {
-      "id": 4,
-      "title": "이체 실패율 시계열 (임계값 5%)",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent",
-          "custom": {
-            "lineWidth": 2,
-            "thresholdsStyle": {
-              "mode": "line"
-            }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "transparent",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "expr": "rate(transfer_total{status=\"failed\"}[5m]) / (rate(transfer_total{status=\"success\"}[5m]) + rate(transfer_total{status=\"failed\"}[5m])) * 100",
-          "legendFormat": "실패율 %",
-          "refId": "A"
-        }
-      ]
-    },
-    {
       "id": 5,
       "title": "시간대별 이체 건수 (PostgreSQL)",
       "description": "transactions 테이블 tx_type=transfer 기준 — 성공/실패 시계열",

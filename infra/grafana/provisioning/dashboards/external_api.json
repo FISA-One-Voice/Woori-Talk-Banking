@@ -64,7 +64,7 @@
       },
       "targets": [
         {
-          "expr": "rate(external_api_calls_total{service=\"clova_stt\",status=\"error\"}[5m]) / rate(external_api_calls_total{service=\"clova_stt\"}[5m]) * 100",
+          "expr": "sum(rate(external_api_calls_total{service=\"clova_stt\",status=\"error\"}[5m])) / sum(rate(external_api_calls_total{service=\"clova_stt\"}[5m])) * 100",
           "legendFormat": "STT 에러율",
           "refId": "A"
         }
@@ -121,7 +121,7 @@
       },
       "targets": [
         {
-          "expr": "rate(external_api_calls_total{service=\"azure_tts\",status=\"error\"}[5m]) / rate(external_api_calls_total{service=\"azure_tts\"}[5m]) * 100",
+          "expr": "sum(rate(external_api_calls_total{service=\"azure_tts\",status=\"error\"}[5m])) / sum(rate(external_api_calls_total{service=\"azure_tts\"}[5m])) * 100",
           "legendFormat": "TTS 에러율",
           "refId": "A"
         }

@@ -24,8 +24,8 @@
         "y": 0
       },
       "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -65,84 +65,17 @@
       },
       "targets": [
         {
-          "refId": "Pass",
-          "alias": "통과",
+          "refId": "A",
           "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          "index": "voice_pipeline",
-          "query": "asv_result:pass",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "Total",
-          "alias": "전체",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:*",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
+          "expr": "sum(asv_verification_total{result=\"pass\"}) / sum(asv_verification_total)",
+          "legendFormat": "통과율",
+          "instant": true
         }
       ],
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
-        },
-        {
-          "id": "calculateField",
-          "options": {
-            "alias": "통과율",
-            "mode": "binary",
-            "binary": {
-              "left": "통과",
-              "right": "전체",
-              "operator": "/"
-            }
-          }
-        }
-      ]
+      "transformations": []
     },
     {
       "id": 2,
@@ -176,9 +109,10 @@
       },
       "targets": [
         {
-          "expr": "sum(asv_verification_total)",
-          "legendFormat": "누적 시도",
-          "refId": "A"
+          "expr": "sum(increase(asv_verification_total[$__range]))",
+          "legendFormat": "시도 수",
+          "refId": "A",
+          "instant": true
         }
       ]
     },
@@ -198,7 +132,9 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ms"
+          "unit": "ms",
+          "min": 0,
+          "max": 500
         },
         "overrides": []
       },
@@ -210,7 +146,7 @@
         },
         "orientation": "horizontal",
         "colorMode": "value",
-        "graphMode": "none"
+        "graphMode": "area"
       },
       "targets": [
         {
