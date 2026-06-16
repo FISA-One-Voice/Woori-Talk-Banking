@@ -94,13 +94,13 @@
         },
         {
           "refId": "B",
-          "alias": "total",
+          "alias": "fail",
           "datasource": {
             "type": "grafana-opensearch-datasource",
             "uid": "opensearch"
           },
           "index": "voice_pipeline",
-          "query": "asv_result:pass OR asv_result:fail",
+          "query": "asv_result:fail",
           "metrics": [
             {
               "type": "count",
@@ -128,6 +128,18 @@
             "reducers": [
               "sum"
             ]
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binaryOperation",
+            "binary": {
+              "left": "pass",
+              "right": "fail",
+              "operator": "+"
+            },
+            "alias": "total"
           }
         },
         {
@@ -177,7 +189,7 @@
       "options": {
         "reduceOptions": {
           "calcs": [
-            "sum"
+            "lastNotNull"
           ]
         },
         "colorMode": "value",
@@ -187,13 +199,41 @@
       "targets": [
         {
           "refId": "A",
-          "alias": "총 인증 시도",
+          "alias": "pass",
           "datasource": {
             "type": "grafana-opensearch-datasource",
             "uid": "opensearch"
           },
           "index": "voice_pipeline",
-          "query": "asv_result:pass OR asv_result:fail",
+          "query": "asv_result:pass",
+          "metrics": [
+            {
+              "type": "count",
+              "id": "1"
+            }
+          ],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "date_histogram",
+              "field": "timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "1h",
+                "min_doc_count": "0"
+              }
+            }
+          ]
+        },
+        {
+          "refId": "B",
+          "alias": "fail",
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "query": "asv_result:fail",
           "metrics": [
             {
               "type": "count",
@@ -221,6 +261,28 @@
             "reducers": [
               "sum"
             ]
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binaryOperation",
+            "binary": {
+              "left": "pass",
+              "right": "fail",
+              "operator": "+"
+            },
+            "alias": "총 인증 시도"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "총 인증 시도"
+              ]
+            }
           }
         }
       ]
