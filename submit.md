@@ -4,8 +4,7 @@
 
 - 주제 : 시각장애인을 위한 음성 AI 멀티 에이전트 기반 뱅킹 앱
 
-- 프로젝트 기획 배경
-: 시각장애인은 기존 모바일 뱅킹 앱의 복잡한 화면 구성, 작은 버튼, 보안매체 사ㄴ용 등으로 인해 송금이나 계좌 조회 같은 기본적인 금융 거래조차 큰 불편을 겪는다. 스크린리더만으로는 여러 단계로 이어지는 이체 흐름을 온전히 따라가기 어렵고, 특히 본인인증 단계에서는 타인의 도움이 필요한 경우가 잦아 금융 자립성과 보안이 동시에 제약된다. 본 프로젝트는 이러한 문제를 해결하기 위해, 음성만으로 뱅킹 앱의 핵심 기능을 수행할 수 있는 배리어프리 뱅킹 서비스를 구축하였다.
+- 프로젝트 기획 배경 : 시각장애인은 기존 모바일 뱅킹 앱의 복잡한 화면 구성, 작은 버튼, 보안매체 사ㄴ용 등으로 인해 송금이나 계좌 조회 같은 기본적인 금융 거래조차 큰 불편을 겪는다. 스크린리더만으로는 여러 단계로 이어지는 이체 흐름을 온전히 따라가기 어렵고, 특히 본인인증 단계에서는 타인의 도움이 필요한 경우가 잦아 금융 자립성과 보안이 동시에 제약된다. 본 프로젝트는 이러한 문제를 해결하기 위해, 음성만으로 뱅킹 앱의 핵심 기능을 수행할 수 있는 배리어프리 뱅킹 서비스를 구축하였다.
 
 - 기술 스택
 
@@ -162,26 +161,30 @@ def _validate_audio(audio_bytes: bytes, content_type: str) -> None:
 
 ---
 
-#### [기능 5] Azure TTS SSML 속도 제어
+#### [기능 5] 프론트엔드 TTS 재생 속도 제어
 
-- **파일:** `backend/app/shared/voice/tts_service.py`
-- **설명:** 시각장애인 대상 앱이므로 TTS 속도 조절이 핵심 UX. float 속도값을 SSML prosody rate 포맷(+50%, -20%)으로 변환해 Azure TTS에 전달. 속도 범위 0.25~4.0 검증 포함
+- **파일:** `frontend/utils/audioPlayer.ts` · `frontend/utils/ttsManager.ts`
+- **설명:** 시각장애인 대상 앱이므로 TTS 속도 조절이 핵심 UX. Azure TTS는 1.0배속으로 음성을 생성하고, 프론트엔드에서 expo-av의 `setRateAsync()`로 재생 시점에 사용자 설정 속도(authStore.ttsSpeed, 기본 1.0)를 적용. iOS는 expo-av rate 스케일이 Android와 달라 0.7 보정 계수를 곱해 플랫폼 간 체감 속도를 통일
 
 **핵심 코드**
 
-```python
-def _build_ssml(text: str, voice_name: str, speed: float) -> str:
-    rate = _speed_to_rate(speed)   # 1.5 → "+50%", 0.8 → "-20%"
-    return (
-        "<speak version='1.0' xml:lang='ko-KR'>"
-        f"<voice name='{voice_name}'>"
-        f"<prosody rate='{rate}'>{text}</prosody>"
-        "</voice></speak>"
-    )
+```typescript
+// frontend/utils/audioPlayer.ts
+export async function playBase64Audio(base64: string, ...): Promise<void> {
+  const { sound } = await Audio.Sound.createAsync({
+    uri: `data:audio/mpeg;base64,${base64}`,  // 1.0배속으로 생성된 Azure TTS 음성
+  });
+  await sound.setRateAsync(getTtsRate(), true); // 재생 시 사용자 설정 속도 적용
+  // ...
+}
 
-def _speed_to_rate(speed: float) -> str:
-    percentage = round((speed - 1.0) * 100)
-    return f"+{percentage}%" if percentage >= 0 else f"{percentage}%"
+// frontend/utils/ttsManager.ts
+function platformSpeechRate(rate: number): number {
+  return Platform.OS === 'ios' ? rate * 0.7 : rate; // iOS 보정 (1.0 → 0.5≈normal)
+}
+export function getTtsRate(): number {
+  return useAuthStore.getState().ttsSpeed ?? 1.0;   // authStore에서 사용자 설정 속도 반환
+}
 ```
 
 ---
