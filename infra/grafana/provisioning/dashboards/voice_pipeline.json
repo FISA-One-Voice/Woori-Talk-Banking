@@ -18,10 +18,10 @@
       "title": "파이프라인 성공률",
       "type": "stat",
       "gridPos": {
-        "h": 4,
-        "w": 6,
         "x": 0,
-        "y": 0
+        "y": 0,
+        "w": 8,
+        "h": 4
       },
       "datasource": {
         "type": "prometheus",
@@ -76,10 +76,10 @@
       "title": "전체 P50 / P95 / P99 응답시간",
       "type": "stat",
       "gridPos": {
-        "h": 4,
-        "w": 10,
-        "x": 6,
-        "y": 0
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 4
       },
       "datasource": {
         "type": "prometheus",
@@ -124,10 +124,10 @@
       "title": "STT / Agent / TTS 단계별 평균 레이턴시",
       "type": "bargauge",
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 16,
-        "y": 0
+        "y": 0,
+        "w": 8,
+        "h": 4
       },
       "datasource": {
         "type": "prometheus",
@@ -172,10 +172,10 @@
       "title": "단계별 레이턴시 시계열",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 4
+        "y": 4,
+        "w": 12,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -213,10 +213,10 @@
       "title": "초당 음성 요청 수",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
-        "y": 4
+        "y": 4,
+        "w": 12,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -246,10 +246,10 @@
       "description": "각 서브그래프(도메인)의 누적 호출 횟수",
       "type": "bargauge",
       "gridPos": {
-        "h": 8,
-        "w": 24,
         "x": 0,
-        "y": 20
+        "y": 12,
+        "w": 24,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -289,10 +289,10 @@
       "description": "음성 파이프라인 전체 소요 시간 (실행시간 1번)",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 0,
-        "y": 28
+        "y": 20,
+        "w": 8,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -326,10 +326,10 @@
       "description": "에이전트 라우팅(Tool 선택 전) 소요 시간 (실행시간 2번)",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 8,
-        "y": 28
+        "y": 20,
+        "w": 8,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -363,10 +363,10 @@
       "description": "에이전트 전체(Supervisor -> Tool -> DB적재) 소요 시간 (실행시간 3번)",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 16,
-        "y": 28
+        "y": 20,
+        "w": 8,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
