@@ -24,12 +24,12 @@
         "y": 0
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "percentunit",
           "color": {
             "mode": "thresholds"
           },
@@ -42,11 +42,11 @@
               },
               {
                 "color": "yellow",
-                "value": 5
+                "value": 0.05
               },
               {
                 "color": "red",
-                "value": 10
+                "value": 0.10
               }
             ]
           }
@@ -64,9 +64,56 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(external_api_calls_total{service=\"clova_stt\",status=\"error\"}[5m])) / sum(rate(external_api_calls_total{service=\"clova_stt\"}[5m])) * 100",
-          "legendFormat": "STT 에러율",
-          "refId": "A"
+          "refId": "A",
+          "panelId": 6,
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "sum"
+            ]
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binaryOperation",
+            "binary": {
+              "left": "Clova STT 성공",
+              "right": "Clova STT 실패",
+              "operator": "+"
+            },
+            "alias": "total"
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binaryOperation",
+            "binary": {
+              "left": "Clova STT 실패",
+              "right": "total",
+              "operator": "/"
+            },
+            "alias": "STT 에러율"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "STT 에러율"
+              ]
+            }
+          }
         }
       ]
     },
@@ -81,12 +128,12 @@
         "y": 0
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
+          "unit": "percentunit",
           "color": {
             "mode": "thresholds"
           },
@@ -99,11 +146,11 @@
               },
               {
                 "color": "yellow",
-                "value": 5
+                "value": 0.05
               },
               {
                 "color": "red",
-                "value": 10
+                "value": 0.10
               }
             ]
           }
@@ -121,9 +168,56 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(external_api_calls_total{service=\"azure_tts\",status=\"error\"}[5m])) / sum(rate(external_api_calls_total{service=\"azure_tts\"}[5m])) * 100",
-          "legendFormat": "TTS 에러율",
-          "refId": "A"
+          "refId": "A",
+          "panelId": 6,
+          "datasource": {
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          }
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "sum"
+            ]
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binaryOperation",
+            "binary": {
+              "left": "Azure TTS 성공",
+              "right": "Azure TTS 실패",
+              "operator": "+"
+            },
+            "alias": "total"
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binaryOperation",
+            "binary": {
+              "left": "Azure TTS 실패",
+              "right": "total",
+              "operator": "/"
+            },
+            "alias": "TTS 에러율"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "TTS 에러율"
+              ]
+            }
+          }
         }
       ]
     },
