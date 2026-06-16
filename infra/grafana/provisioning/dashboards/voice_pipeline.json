@@ -18,10 +18,10 @@
       "title": "파이프라인 성공률",
       "type": "stat",
       "gridPos": {
-        "h": 4,
-        "w": 6,
         "x": 0,
-        "y": 0
+        "y": 0,
+        "w": 8,
+        "h": 4
       },
       "datasource": {
         "type": "prometheus",
@@ -76,10 +76,10 @@
       "title": "전체 P50 / P95 / P99 응답시간",
       "type": "stat",
       "gridPos": {
-        "h": 4,
-        "w": 10,
-        "x": 6,
-        "y": 0
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 4
       },
       "datasource": {
         "type": "prometheus",
@@ -124,10 +124,10 @@
       "title": "STT / Agent / TTS 단계별 평균 레이턴시",
       "type": "bargauge",
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 16,
-        "y": 0
+        "y": 0,
+        "w": 8,
+        "h": 4
       },
       "datasource": {
         "type": "prometheus",
@@ -172,10 +172,10 @@
       "title": "단계별 레이턴시 시계열",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 4
+        "y": 4,
+        "w": 12,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -213,10 +213,10 @@
       "title": "초당 음성 요청 수",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
-        "y": 4
+        "y": 4,
+        "w": 12,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -241,422 +241,15 @@
       ]
     },
     {
-      "id": 8,
-      "title": "에이전트 액션별 실행 횟수",
-      "description": "LangGraph execute_node에서 tool 호출이 완료된 액션별 누적 횟수 (node=pending_action)",
-      "type": "bargauge",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 12
-      },
-      "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0,
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "values": true,
-          "limit": 10,
-          "calcs": [
-            "sum"
-          ]
-        },
-        "displayMode": "gradient",
-        "showUnfilled": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "alias": "이체",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:transfer",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "B",
-          "alias": "자동이체",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:auto_transfer",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "C",
-          "alias": "잔액조회",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:balance",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "D",
-          "alias": "거래내역",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:history",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "E",
-          "alias": "이벤트",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:event",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "F",
-          "alias": "미분류",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:unknown",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        }
-      ],
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "id": 7,
-      "title": "인텐트 분포 (OpenSearch)",
-      "type": "bargauge",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 12
-      },
-      "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "min": 0,
-          "color": {
-            "mode": "palette-classic"
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "values": true,
-          "limit": 10,
-          "calcs": [
-            "sum"
-          ]
-        },
-        "displayMode": "gradient",
-        "showUnfilled": true
-      },
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
-        }
-      ],
-      "targets": [
-        {
-          "refId": "A",
-          "alias": "이체",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:transfer",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "B",
-          "alias": "자동이체",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:auto_transfer",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "C",
-          "alias": "잔액조회",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:balance",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "D",
-          "alias": "거래내역",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:history",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "E",
-          "alias": "미분류",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "intent:unknown",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": 14,
       "title": "Subagent별 호출 횟수",
       "description": "각 서브그래프(도메인)의 누적 호출 횟수",
       "type": "bargauge",
       "gridPos": {
-        "h": 8,
-        "w": 24,
         "x": 0,
-        "y": 20
+        "y": 12,
+        "w": 24,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -696,10 +289,10 @@
       "description": "음성 파이프라인 전체 소요 시간 (실행시간 1번)",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 0,
-        "y": 28
+        "y": 20,
+        "w": 8,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -733,10 +326,10 @@
       "description": "에이전트 라우팅(Tool 선택 전) 소요 시간 (실행시간 2번)",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 8,
-        "y": 28
+        "y": 20,
+        "w": 8,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",
@@ -770,10 +363,10 @@
       "description": "에이전트 전체(Supervisor -> Tool -> DB적재) 소요 시간 (실행시간 3번)",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 8,
         "x": 16,
-        "y": 28
+        "y": 20,
+        "w": 8,
+        "h": 8
       },
       "datasource": {
         "type": "prometheus",

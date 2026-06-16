@@ -309,8 +309,7 @@
       "options": {
         "orientation": "horizontal",
         "reduceOptions": {
-          "values": true,
-          "limit": 10,
+          "values": false,
           "calcs": [
             "sum"
           ]
@@ -340,7 +339,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "1h",
+                "interval": "auto",
                 "min_doc_count": "0"
               }
             }
@@ -368,7 +367,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "1h",
+                "interval": "auto",
                 "min_doc_count": "0"
               }
             }
@@ -396,7 +395,7 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "1h",
+                "interval": "auto",
                 "min_doc_count": "0"
               }
             }
@@ -424,23 +423,14 @@
               "field": "timestamp",
               "id": "2",
               "settings": {
-                "interval": "1h",
+                "interval": "auto",
                 "min_doc_count": "0"
               }
             }
           ]
         }
       ],
-      "transformations": [
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
-        }
-      ]
+      "transformations": []
     }
   ]
 }
