@@ -7,14 +7,13 @@ import pytest
 from langchain_core.messages import HumanMessage
 
 from app.core.exception import AgentError
-from app.shared.agent.graph import build_graph
 from app.shared.agent.subgraphs.transfer import (
     IntentResult,
     TRANSFER_DOMAIN_ACTIONS,
     build_transfer_graph,
     validate_transfer_delta,
 )
-from app.shared.agent.tools import ALL_TOOLS, TRANSFER_TOOLS
+from app.shared.agent.tools import TRANSFER_TOOLS
 
 
 def _thread_config() -> dict:
@@ -78,13 +77,6 @@ def test_build_transfer_graph_has_no_own_checkpointer() -> None:
     """TransferAgent 서브그래프는 부모 checkpointer를 공유한다."""
     graph = build_transfer_graph(TRANSFER_TOOLS)
     assert getattr(graph, "checkpointer", None) is None
-
-
-def test_existing_build_graph_public_api_is_preserved() -> None:
-    """기존 voice pipeline이 의존하는 build_graph(tools)를 유지한다."""
-    graph = build_graph(ALL_TOOLS)
-    assert hasattr(graph, "invoke")
-    assert hasattr(graph, "ainvoke")
 
 
 def test_transfer_intent_sets_pending_action_and_navigate_to() -> None:

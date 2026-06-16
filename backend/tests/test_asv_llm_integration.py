@@ -36,8 +36,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.config import settings
-from app.shared.agent import build_graph
-from app.shared.agent.tools import ALL_TOOLS
+from app.shared.agent import build_supervisor
 from app.shared.voice.schema import ASVResult, VoiceResponseData
 from app.shared.voice.service import _call_asv_ec2, process_voice_pipeline
 
@@ -123,7 +122,7 @@ def real_graph(llm_api_key):
 
     각 테스트는 고유한 thread_id(uuid)를 사용하므로 그래프 인스턴스 자체는 공유해도 안전하다.
     """
-    return build_graph(ALL_TOOLS)
+    return build_supervisor()
 
 
 def _db_with_embedding(embedding: list[float]) -> MagicMock:
@@ -239,7 +238,7 @@ class TestLlmAsvTrigger:
                 "user_id": uid,
                 "messages": [],
             },
-            as_node="intent_node",
+            as_node="supervisor_node",
         )
 
         # 사용자 확인 발화 → intent_node가 awaiting_confirmation+user_confirmed 처리
@@ -326,7 +325,7 @@ class TestAsvLlmFullPipeline:
         config = {"configurable": {"thread_id": uid}}
 
         # 실제 그래프를 사용하되 _get_graph() 싱글턴을 우회한다
-        real_g = build_graph(ALL_TOOLS)
+        real_g = build_supervisor()
 
         # ASV 대기 상태를 직접 주입 (이전 LLM 턴 없이 격리 가능)
         await real_g.aupdate_state(
@@ -342,7 +341,7 @@ class TestAsvLlmFullPipeline:
                 "user_id": uid,
                 "messages": [],
             },
-            as_node="intent_node",
+            as_node="supervisor_node",
         )
 
         db = _db_with_embedding(FAKE_EMBEDDING_A)
@@ -380,7 +379,7 @@ class TestAsvLlmFullPipeline:
         """
         uid = str(uuid.uuid4())
         config = {"configurable": {"thread_id": uid}}
-        real_g = build_graph(ALL_TOOLS)
+        real_g = build_supervisor()
 
         # ASV 대기 상태 + 슬롯 완전 수집 상태 주입
         await real_g.aupdate_state(
@@ -396,7 +395,7 @@ class TestAsvLlmFullPipeline:
                 "user_id": uid,
                 "messages": [],
             },
-            as_node="intent_node",
+            as_node="supervisor_node",
         )
 
         db = _db_with_embedding(FAKE_EMBEDDING_A)
