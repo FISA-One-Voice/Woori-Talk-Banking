@@ -385,8 +385,8 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byFrameRefID",
-              "options": "B"
+              "id": "byName",
+              "options": "Clova STT 실패"
             },
             "properties": [
               {
@@ -400,8 +400,8 @@
           },
           {
             "matcher": {
-              "id": "byFrameRefID",
-              "options": "D"
+              "id": "byName",
+              "options": "Azure TTS 실패"
             },
             "properties": [
               {
@@ -418,7 +418,8 @@
       "options": {
         "orientation": "horizontal",
         "reduceOptions": {
-          "values": false,
+          "values": true,
+          "limit": 10,
           "calcs": [
             "sum"
           ]
@@ -539,7 +540,16 @@
           ]
         }
       ],
-      "transformations": []
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "sum"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
