@@ -557,17 +557,24 @@ async def _handle_asv_flow(
         )
         tts_text = (
             _asv_error.user_message
-            or "화자 인증 서버와 통신 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+            or "화자 인증 서버에 연결할 수 없습니다. 잠시 후 다시 말씀해 주세요."
         )
         logger.warning(
             "[ASV] 서버 오류 — 슬롯 보존 후 재시도 안내: user_id=%s code=%s",
             user_id,
             _asv_error.code,
         )
-        audio_mp3 = await synthesize_speech(tts_text)
+        # TTS도 실패하면 무음 응답으로 ASV 대기 상태만 유지한다.
+        # TTSError 전파 시 voice router가 collected_slots={}로 리셋하므로 여기서 처리한다.
+        try:
+            audio_mp3 = await synthesize_speech(tts_text)
+        except Exception:
+            logger.error("[ASV] 오류 안내 TTS 합성 실패 — 무음 응답으로 ASV 대기 유지")
+            audio_mp3 = b""
         return VoiceResponseData(
             audio=base64.b64encode(audio_mp3).decode(),
-            navigate_to=SCREEN_MAP.get(pending_action) if pending_action else None,
+            # "transfer" 이동 시 프론트가 초기 상태로 리셋되므로 None
+            navigate_to=None,
             collected_slots=current_slots,
             awaiting_confirmation=False,
             awaiting_asv_audio=True,
@@ -710,9 +717,16 @@ async def _return_processing_tts(
         as_node="supervisor_node",
     )
 
-    audio_mp3 = await synthesize_speech(
-        "인증이 완료되었습니다. 이체 처리와 이체 확인 음성을 업로드 중입니다. 잠시만 기다려주십시오."
-    )
+    # TTS 합성 실패 시 무음 응답으로 execution_pending=True를 유지한다.
+    # TTSError 전파 시 voice router가 collected_slots={}로 리셋하므로 여기서 처리한다.
+    try:
+        audio_mp3 = await synthesize_speech(
+            "인증이 완료되었습니다. "
+            "이체 처리와 이체 확인 음성을 업로드 중입니다. 잠시만 기다려주십시오."
+        )
+    except Exception:
+        logger.error("[ASV] 인증 완료 TTS 합성 실패 — 무음으로 execution_pending 유지")
+        audio_mp3 = b""
     navigate_to = SCREEN_MAP.get(pending_action) if pending_action else None
 
     return VoiceResponseData(
