@@ -109,7 +109,7 @@
       },
       "targets": [
         {
-          "expr": "sum(asv_verification_total)",
+          "expr": "sum(asv_verification_total) - sum(asv_verification_total offset $__range)",
           "legendFormat": "시도 수",
           "refId": "A",
           "instant": true
