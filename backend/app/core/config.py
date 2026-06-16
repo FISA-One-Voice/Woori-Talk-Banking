@@ -130,6 +130,10 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_REGION: str = "ap-northeast-2"
 
+    # ── Redis (LangGraph 멀티 워커 체크포인터) ────────────────────────────────────
+    # 단일 워커 환경이나 테스트에서는 설정하지 않아도 된다 — MemorySaver로 폴백한다.
+    REDIS_URL: str = ""
+
     # ── CORS 허용 출처 ────────────────────────────────────────────────────────────
     # 개발: ["*"] (기본값)
     # 프로덕션 .env 예시: ALLOWED_ORIGINS=["https://api.woori-talk.site"]

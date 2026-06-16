@@ -65,8 +65,18 @@ _background_tasks: set[asyncio.Task] = set()
 _graph = None
 
 
+def initialize_graph(checkpointer=None) -> None:
+    """앱 시작 시 checkpointer를 주입해 그래프를 빌드한다.
+
+    멀티 워커 배포 시 main.py startup 이벤트에서 AsyncRedisSaver를 넘긴다.
+    테스트·단일 워커 환경에서는 호출하지 않아도 _get_graph()가 MemorySaver로 폴백한다.
+    """
+    global _graph
+    _graph = build_supervisor(checkpointer=checkpointer)
+
+
 def _get_graph():
-    """LangGraph 그래프 싱글턴을 반환한다. 최초 호출 시 build_supervisor()를 실행한다."""
+    """LangGraph 그래프 싱글턴을 반환한다. 최초 호출 시 MemorySaver로 빌드한다."""
     global _graph
     if _graph is None:
         _graph = build_supervisor()
@@ -185,6 +195,27 @@ async def process_voice_pipeline(
         awaiting_asv,
         state_snapshot.values if state_snapshot.values else "EMPTY",
     )
+
+    execution_ready = (
+        state_snapshot.values.get("execution_ready", False)
+        if state_snapshot.values
+        else False
+    )
+    if execution_ready:
+        audio_mp3 = await synthesize_speech(
+            "이체를 처리하고 있습니다. 잠시만 기다려주세요."
+        )
+        return VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to=None,
+            collected_slots=state_snapshot.values.get("collected_slots", {}),
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            execution_pending=True,
+            awaiting_memo_decision=False,
+            transcript=None,
+            pending_action=state_snapshot.values.get("pending_action"),
+        )
 
     if awaiting_asv:
         return await _handle_asv_flow(
@@ -710,9 +741,32 @@ async def _execute_pending_transfer(
     # 동의 음성 업로드에 필요한 임시 필드를 읽은 뒤 즉시 초기화한다
     state_snapshot = graph.get_state(config)
     state_vals = state_snapshot.values if state_snapshot.values else {}
+
+    # execution_ready=False 이면 이미 실행됐거나 상태가 손상된 것 — ainvoke를 막는다.
+    # 이를 통과하지 않으면 intent_node LLM이 "인증 완료" 메시지를 처리하면서
+    # 이전 대화 이력의 슬롯(예: 다른 세션의 금액)을 재추출하는 버그가 발생한다.
+    if not state_vals.get("execution_ready"):
+        audio_mp3 = await synthesize_speech("처리할 이체 요청이 없습니다. 홈 화면으로 이동합니다.")
+        return VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to="home",
+            collected_slots={},
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            execution_pending=False,
+            awaiting_memo_decision=False,
+            transcript=None,
+            pending_action=None,
+        )
+
     pending_tts_text: str | None = state_vals.get("pending_consent_tts_text")
     pending_audio_b64: str | None = state_vals.get("pending_consent_audio_b64")
 
+    # pending_consent_* 필드는 읽은 즉시 초기화한다.
+    # execution_ready는 intent_node(line 349)가 "execute_node로 라우팅" 신호로
+    # 사용하므로 ainvoke 전에 클리어하지 않는다.
+    # execute_node 자체가 완료 시 execution_ready=False를 반환하고,
+    # 이 함수 상단의 guard(line 738)가 중복 호출을 차단한다.
     await graph.aupdate_state(
         config,
         {

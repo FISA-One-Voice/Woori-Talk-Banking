@@ -1,4 +1,5 @@
-# Backend EC2에서 실행되는 서비스 3개:
+# Backend EC2에서 실행되는 서비스 4개:
+#   redis          — LangGraph 체크포인터 저장소
 #   woori-backend  — FastAPI 앱 (ECR 이미지)
 #   fluent-bit     — 로그 수집 → Aiven OpenSearch 전송
 #   node-exporter  — 호스트 메트릭 노출 → Monitoring EC2의 Prometheus가 scrape
@@ -9,6 +10,16 @@
 #   fluent-bit /logs                  (컨테이너 내부 — 읽기)
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: woori-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+
   woori-backend:
     image: 974145758017.dkr.ecr.ap-northeast-2.amazonaws.com/woori-backend:latest
     container_name: woori-backend
@@ -19,9 +30,12 @@ services:
       - /home/ubuntu/.env
     environment:
       - LOG_DIR=/app/logs
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - /home/ubuntu/certs:/app/certs:ro
       - /home/ubuntu/woori-logs:/app/logs
+    depends_on:
+      - redis
 
   fluent-bit:
     image: fluent/fluent-bit:3.2
@@ -55,5 +69,6 @@ services:
       - "9100:9100"
 
 volumes:
+  redis-data:
   fluent-bit-db:
   fluent-bit-storage:

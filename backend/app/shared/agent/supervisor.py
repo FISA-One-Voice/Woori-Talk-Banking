@@ -310,10 +310,15 @@ def route_after_supervisor(state: VoiceState) -> str:
 # ── 그래프 빌드 ──────────────────────────────────────────────────────────────────
 
 
-def build_supervisor():
-    """Supervisor StateGraph를 빌드하고 MemorySaver로 컴파일해 반환한다.
+def build_supervisor(checkpointer=None):
+    """Supervisor StateGraph를 빌드하고 컴파일해 반환한다.
 
-    MemorySaver는 이 레벨에만 설정한다. 서브그래프는 checkpointer 없이
+    Args:
+        checkpointer: LangGraph checkpointer 인스턴스.
+            None이면 MemorySaver(단일 프로세스용)를 사용한다.
+            멀티 워커 배포 시 AsyncRedisSaver를 주입한다.
+
+    MemorySaver/Redis는 이 레벨에만 설정한다. 서브그래프는 checkpointer 없이
     builder.compile()만 호출해야 세션 상태가 분리되지 않는다.
     """
     from app.shared.agent.subgraphs.asset import build_asset_graph
@@ -356,4 +361,6 @@ def build_supervisor():
     builder.add_edge("asset", END)
     builder.add_edge("rag", END)
 
-    return builder.compile(checkpointer=MemorySaver())
+    if checkpointer is None:
+        checkpointer = MemorySaver()
+    return builder.compile(checkpointer=checkpointer)
