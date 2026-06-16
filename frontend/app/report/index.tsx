@@ -106,7 +106,7 @@ export default function ReportScreen() {
 
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {/* 헤더 */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -170,7 +170,8 @@ export default function ReportScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { padding: LAYOUT.paddingMedium, gap: 12 },
+  scroll: { flex: 1 },
+  scrollContent: { padding: LAYOUT.paddingMedium, gap: 12, paddingBottom: 32 },
 
   header: {
     flexDirection: 'row',
