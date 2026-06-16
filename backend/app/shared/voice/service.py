@@ -183,7 +183,7 @@ async def process_voice_pipeline(
     config = {"configurable": {"thread_id": user_id}}
 
     # 현재 그래프 상태에서 awaiting_asv_audio 플래그 확인
-    state_snapshot = graph.get_state(config)
+    state_snapshot = await graph.aget_state(config)
     awaiting_asv = (
         state_snapshot.values.get("awaiting_asv_audio", False)
         if state_snapshot.values
@@ -330,7 +330,7 @@ async def _handle_normal_flow(
         VoiceResponseData: TTS 오디오 + 에이전트 상태 반영.
     """
     # 에이전트 호출 전 현재 state에서 awaiting_confirmation 확인
-    state_before = graph.get_state(config)
+    state_before = await graph.aget_state(config)
     was_awaiting_confirmation = (
         state_before.values.get("awaiting_confirmation", False)
         if state_before.values
@@ -489,7 +489,7 @@ async def _handle_asv_flow(
     Raises:
         ASVError: 사용자 음성 미등록 또는 ASV EC2 서버 통신 오류.
     """
-    state_snapshot = graph.get_state(config)
+    state_snapshot = await graph.aget_state(config)
     pending_action = (
         state_snapshot.values.get("pending_action") if state_snapshot.values else None
     )
@@ -701,7 +701,7 @@ async def _return_processing_tts(
     POST /api/voice/proceed를 자동 호출해 실제 이체를 실행한다.
     pending_consent_* 필드는 /proceed 에서 필요하므로 여기서 지우지 않는다.
     """
-    state_snapshot = graph.get_state(config)
+    state_snapshot = await graph.aget_state(config)
     state_vals = state_snapshot.values if state_snapshot.values else {}
     pending_action = state_vals.get("pending_action")
     collected_slots = state_vals.get("collected_slots", {})
@@ -753,7 +753,7 @@ async def _execute_pending_transfer(
     POST /api/voice/proceed 엔드포인트의 실제 처리 함수.
     """
     # 동의 음성 업로드에 필요한 임시 필드를 읽은 뒤 즉시 초기화한다
-    state_snapshot = graph.get_state(config)
+    state_snapshot = await graph.aget_state(config)
     state_vals = state_snapshot.values if state_snapshot.values else {}
 
     # execution_ready=False 이면 이미 실행됐거나 상태가 손상된 것 — ainvoke를 막는다.
