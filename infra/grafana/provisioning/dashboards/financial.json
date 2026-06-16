@@ -19,10 +19,10 @@
       "description": "transactions 테이블 tx_type=transfer 기준 — 대시보드 시간 범위 내 건수",
       "type": "stat",
       "gridPos": {
-        "h": 4,
-        "w": 6,
         "x": 0,
-        "y": 0
+        "y": 0,
+        "w": 6,
+        "h": 4
       },
       "datasource": {
         "type": "postgres",
@@ -94,10 +94,10 @@
       "description": "transactions 테이블 tx_type=auto_transfer 기준 — 대시보드 시간 범위 내 건수",
       "type": "stat",
       "gridPos": {
-        "h": 4,
-        "w": 6,
         "x": 6,
-        "y": 0
+        "y": 0,
+        "w": 6,
+        "h": 4
       },
       "datasource": {
         "type": "postgres",
@@ -169,10 +169,10 @@
       "description": "transactions 테이블 tx_type=auto_transfer 기준 전체 누적 성공/실패 건수",
       "type": "stat",
       "gridPos": {
-        "h": 4,
-        "w": 6,
         "x": 12,
-        "y": 0
+        "y": 0,
+        "w": 6,
+        "h": 4
       },
       "datasource": {
         "type": "postgres",
@@ -244,10 +244,10 @@
       "description": "standing_orders 테이블 전체 등록 건수 — 실제 DB 기준",
       "type": "stat",
       "gridPos": {
-        "h": 4,
-        "w": 6,
         "x": 18,
-        "y": 0
+        "y": 0,
+        "w": 6,
+        "h": 4
       },
       "datasource": {
         "type": "postgres",
@@ -291,10 +291,10 @@
       "description": "transactions 테이블 tx_type=transfer 기준 — 성공/실패 시계열",
       "type": "timeseries",
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 8
       },
       "datasource": {
         "type": "postgres",
@@ -360,10 +360,10 @@
       "description": "transactions 테이블 기준 최근 20건 이체·자동이체 내역",
       "type": "table",
       "gridPos": {
-        "h": 10,
-        "w": 24,
         "x": 0,
-        "y": 12
+        "y": 12,
+        "w": 24,
+        "h": 10
       },
       "datasource": {
         "type": "postgres",
