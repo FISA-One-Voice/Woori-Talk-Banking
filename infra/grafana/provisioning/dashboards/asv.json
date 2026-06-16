@@ -88,8 +88,8 @@
         "y": 0
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "grafana-opensearch-datasource",
+        "uid": "opensearch"
       },
       "fieldConfig": {
         "defaults": {
@@ -100,7 +100,7 @@
       "options": {
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "sum"
           ]
         },
         "colorMode": "value",
@@ -109,10 +109,42 @@
       },
       "targets": [
         {
-          "expr": "sum(asv_verification_total) - sum(asv_verification_total offset $__range)",
-          "legendFormat": "시도 수",
           "refId": "A",
-          "instant": true
+          "alias": "총 인증 시도",
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "query": "asv_result:pass OR asv_result:fail",
+          "metrics": [
+            {
+              "type": "count",
+              "id": "1"
+            }
+          ],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "date_histogram",
+              "field": "timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "1h",
+                "min_doc_count": "0"
+              }
+            }
+          ]
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "sum"
+            ]
+          }
         }
       ]
     },
