@@ -1,4 +1,4 @@
-# [우리FISA 6기] AI 엔지니어링 과정 2팀 <img src="Asset-image/WeBee.png" height="40" alt="WeBee" />
+# [우리FISA 6기] AI 엔지니어링 과정 2팀 <img src="Asset-image/안내견_테두리_색변경.png" height="80" alt="우리톡뱅킹안내견" style="vertical-align: middle; margin-left: 12px;" />
 
 ## 1. 프로젝트 개요
 
