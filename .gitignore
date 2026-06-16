@@ -91,6 +91,7 @@ kill_connections.py
 observability-design.md
 observability-dev-plan.md
 observability-changes.md
+observability-guide.md
 
 # 기타 로컬 파일
 *.rev*.json

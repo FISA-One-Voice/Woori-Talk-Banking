@@ -161,77 +161,106 @@ Rules:
 
 ## 5. Error Code Reference
 
-### 5.1 Voice & NLU
+### 5.1 Voice & STT/TTS
 
 | 에러 코드 | 설명 |
 |-----------|------|
-| `VOICE_AUTH_FAILED` | 음성 인증 실패 (종합) |
-| `STT_FAILED` | STT 변환 자체 실패 (타임아웃 외) |
-| `VOICE_PROFILE_ALREADY_EXISTS` | 음성 프로필 중복 등록 시도 — `unique` 제약 위반 (user_id 1:1) |
+| `STT_FAILED` | Clova Speech STT 호출 실패 |
 | `VOICE_AUDIO_TOO_LONG` | 음성 파일 길이 초과 — CLOVA STT 60초 제한 |
-| `VOICE_AUDIO_TOO_LARGE` | 음성 파일 용량 초과 — STT API 호출 가능 최대 10MB 제한 |
+| `VOICE_AUDIO_TOO_LARGE` | 음성 파일 용량 초과 — STT API 최대 10MB 제한 |
 | `VOICE_AUDIO_INVALID_FORMAT` | 지원하지 않는 오디오 포맷 |
 | `VOICE_VECTOR_EXTRACT_FAILED` | 음성 벡터(embedding) 추출 실패 — pgvector 저장 전 단계 오류 |
-| `ASV_CONFIDENCE_LOW` | ASV confidence 기준 미달 — confidence < 0.66 - 성능평가 시 최적값. 실제로 해보면서 수정 가능 (`VOICE_AUTH_FAILED`와 구분) |
-| `NLU_INTENT_UNRECOGNIZED` | 음성 발화 "의도 인식" 실패 → 재발화 안내 — `/nlu/parse` 422 |
+| `SERVICE_UNAVAILABLE` | 외부 서비스 장애 — Clova / Azure TTS |
 
-### 5.2 Account
+### 5.2 ASV (화자 인증)
+
+| 에러 코드 | 설명 |
+|-----------|------|
+| `ASV_NOT_ENROLLED` | 음성 벡터 미등록 — `users.embedding_vector IS NULL` |
+| `ASV_SERVER_ERROR` | EC2 CAM++ 서버 오류 응답 |
+| `ASV_TIMEOUT` | CAM++ 서버 응답 타임아웃 |
+
+### 5.3 Account & Asset
 
 | 에러 코드 | 설명 |
 |-----------|------|
 | `ACCOUNT_NOT_FOUND` | 계좌를 찾을 수 없음 |
-| `ACCOUNT_INSUFFICIENT_BALANCE` | 잔액 부족 — `balance >= 0` CHECK 위반 방지 |
-| `ACCOUNT_ALIAS_DUPLICATE` | 계좌 별칭 중복 — 음성 발화 매칭 충돌 방지 |
+| `INSUFFICIENT_BALANCE` | 잔액 부족 |
+| `INVALID_PERIOD` | 유효하지 않은 조회 기간 |
+| `MISSING_CATEGORY` | 카테고리 미지정 |
 
-### 5.3 Transfer & Transaction
-
-| 에러 코드 | 설명 |
-|-----------|------|
-| `TRANSFER_AMOUNT_INVALID` | 송금액 0 이하 — `amount > 0` CHECK 위반 |
-| `TRANSFER_RECIPIENT_NOT_FOUND` | 수취인 계좌 조회 실패 — 미등록 수취인 실시간 조회 실패 포함 |
-| `TRANSFER_SESSION_INVALID` | sessionToken 위변조 또는 미존재 |
-| `TRANSFER_IDEMPOTENCY_CONFLICT` | 멱등키 중복 — 동일 송금 재요청 방지 |
-| `TX_NOT_FOUND` | 거래 내역을 찾을 수 없음 |
-| `TX_ALREADY_PROCESSED` | 이미 완료/실패 처리된 거래 — `status: completed / failed` 재처리 시도 |
-
-### 5.4 Standing Order
+### 5.4 Transfer & Transaction
 
 | 에러 코드 | 설명 |
 |-----------|------|
-| `AUTO_ORDER_SCHEDULE_INVALID` | 스케줄 값 오류 — `scheduled_day` (1~31) / `scheduled_dow` (0~6) 범위 위반 |
+| `INVALID_ACCOUNT_FORMAT` | 계좌번호 형식 오류 (400) |
+| `TRANSFER_ACCOUNT_NOT_FOUND` | 출금 계좌 없음 (404) |
+| `TRANSFER_RECIPIENT_NOT_FOUND` | 수취인 계좌 조회 실패 (404) |
+| `TRANSFER_PENDING` | 동일 idempotency_key 이체 처리 중 (409) |
+| `IDEMPOTENCY_KEY_USED` | 동일 key 이체가 이미 실패 처리됨 — 새 key 필요 (409) |
+| `TRANSACTION_NOT_FOUND` | 거래 내역을 찾을 수 없음 (404) |
+| `TX_NOT_FOUND` | 거래·지출 내역 없음 (404) |
+
+### 5.5 Auto Transfer (자동이체)
+
+| 에러 코드 | 설명 |
+|-----------|------|
+| `AUTO_ORDER_ACCOUNT_NOT_FOUND` | 출금 계좌 없음 |
+| `AUTO_ORDER_NOT_FOUND` | 자동이체 건 없음 |
+| `AUTO_ORDER_STATUS_INVALID` | 상태값 오류 (활성/비활성 외 값) |
 | `AUTO_ORDER_TERMS_NOT_AGREED` | 자동이체 약관 미동의 — `terms_agreed_at` 누락 |
-| `AUTO_ORDER_WITHDRAWAL_PASSWORD_INVALID` | 출금 계좌 비밀번호 불일치 — `password_hash` bcrypt 검증 실패 |
-| `AUTO_ORDER_EXECUTION_FAILED` | 자동이체 실행 중 오류 — 잔액 부족 등 실행 시점 실패 |
-| `AUTO_ORDER_INVALID_MONTH_END` | 29~31일 등록 시 말일 처리 예외 |
+| `AUTO_ORDER_WITHDRAWAL_PASSWORD_INVALID` | 출금 계좌 비밀번호 불일치 |
 
-### 5.5 Recipient
+### 5.6 Recipient (수취인)
 
 | 에러 코드 | 설명 |
 |-----------|------|
 | `RECIPIENT_NOT_FOUND` | 등록 수취인을 찾을 수 없음 |
-| `RECIPIENT_ALIAS_DUPLICATE` | 수취인 별칭 중복 — 음성 발화 매칭 충돌 ("엄마" 중복 등) |
-| `CONTACT_AMBIGUOUS` | 동명이인 다중 매칭 → TTS 목록 안내 — `/contacts/match` |
 
-### 5.6 User & Authentication
+### 5.7 Event (이벤트)
+
+| 에러 코드 | 설명 |
+|-----------|------|
+| `EVENT_NOT_FOUND` | 이벤트를 찾을 수 없음 |
+| `INVALID_EVENT_ID` | 유효하지 않은 이벤트 ID |
+| `ALREADY_PARTICIPATED` | 이미 참여한 이벤트 재참여 시도 |
+| `EVENT_FETCH_ERROR` | 이벤트 목록 조회 중 오류 |
+
+### 5.8 Agent & Market
+
+| 에러 코드 | 설명 |
+|-----------|------|
+| `AGENT_CONFIG_ERROR` | LangGraph 에이전트 설정 오류 |
+| `AGENT_CONTRACT_VIOLATION` | 에이전트 상태 계약 위반 |
+| `TRANSFER_AGENT_INIT_FAILED` | 이체 에이전트 초기화 실패 |
+| `TRANSFER_TOOL_FAILED` | 이체 tool 호출 실패 |
+| `TRANSFER_TOOL_NOT_FOUND` | 이체 tool 미등록 |
+| `MARKET_API_FAILED` | 시장 정보 API 호출 실패 |
+| `MARKET_API_HTTP_ERROR` | 시장 정보 HTTP 오류 |
+| `MISSING_API_KEY` | 외부 API 키 누락 |
+
+### 5.9 Search (OpenSearch)
+
+| 에러 코드 | 설명 |
+|-----------|------|
+| `SEARCH_FAILED` | OpenSearch 검색/색인 중 오류 |
+| `INDEX_CREATION_FAILED` | OpenSearch 인덱스 생성 실패 |
+
+### 5.10 User & Authentication
 
 | 에러 코드 | 설명 |
 |-----------|------|
 | `UNAUTHORIZED` | 인증되지 않은 요청 |
 | `USER_NOT_FOUND` | 사용자를 찾을 수 없음 |
-| `USER_PHONE_DUPLICATE` | 이미 가입된 전화번호 — `PUT /users/{userId}` 409 |
 | `TOKEN_INVALID` | 토큰 위변조 또는 유효하지 않음 |
 | `TTS_SPEED_OUT_OF_RANGE` | TTS 속도 범위 초과 — `tts_speed` CHECK (0.25~4.0) 위반 |
 
-### 5.7 Common
+### 5.11 Common
 
 | 에러 코드 | 설명 |
 |-----------|------|
 | `INTERNAL_ERROR` | 서버 내부 오류 |
 | `INVALID_REQUEST` | 요청 파라미터 형식 오류 — Pydantic 검증 실패 |
-| `RESOURCE_NOT_FOUND` | 요청한 리소스 없음 (범용 404) |
-| `FORBIDDEN` | 권한 없음 — 인증됐으나 접근 불가 (403) |
-| `RATE_LIMIT_EXCEEDED` | API 요청 횟수 초과 |
-| `SERVICE_UNAVAILABLE` | 외부 서비스 장애 — CLOVA |
 
 ---
 
@@ -327,7 +356,7 @@ class VoiceAuthService:
         db: 데이터베이스 세션.
         s3_client: S3 클라이언트 인스턴스.
     """
-``
+```
 
 ### 7.4 Common Mistakes
 
@@ -363,31 +392,58 @@ Raises:
 
 ### 8.1 Custom Exception Classes — `core/exception.py`
 
-All domain errors inherit from `AppError`. One subclass per feature module — matching the team's ownership model. Shared services (STT, TTS) use a second level of subclassing under their service base class. `main.py` handles only `AppError`; all subclasses are caught automatically.
+All domain errors inherit from `AppError`. `main.py` handles only `AppError`; all subclasses are caught automatically.
 
 ```python
 # core/exception.py
 class AppError(Exception):
-    def __init__(self, code: str, message: str, status_code: int = 400):
-        self.code, self.message, self.status_code = code, message, status_code
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        status_code: int = 400,
+        user_message: str | None = None,   # TTS 메시지 — 미지정 시 message와 동일
+    ):
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+        self.user_message = user_message if user_message is not None else message
 
-# Level 1 — one class per feature, mirrors features/ directory structure
-class AuthError(AppError): pass          # features/auth/
-class BalanceError(AppError): pass       # features/balance/
+# ── Voice 서비스 계층 ──────────────────────────────────────────────────────────
+class VoiceServiceError(AppError): pass  # shared/voice/ 공통 기반
+class STTError(VoiceServiceError): pass  # stt_service.py — Clova STT 실패
+class TTSError(VoiceServiceError): pass  # tts_service.py — Azure TTS 실패
+class ASVError(VoiceServiceError): pass  # ASV 화자 인증 서버 HTTP 오류 (502 기본)
+
+# ── Feature 계층 (features/ 디렉토리와 1:1 대응) ──────────────────────────────
+class AuthError(AppError): pass          # features/jwt_auth/
+class BalanceError(AppError): pass       # features/asset/ — 잔액 조회
+class HistoryError(AppError): pass       # features/asset/ — 거래 내역 조회
 class TransferError(AppError): pass      # features/transfer/
 class AutoTransferError(AppError): pass  # features/auto_transfer/
-class HistoryError(AppError): pass       # features/history/
-class EventError(AppError): pass         # features/event/
+class RecipientError(AppError): pass     # features/recipients/
+class EventError(AppError): pass         # features/event/ (기반)
+class EventNotFoundError(EventError): pass        # 이벤트 없음
+class AlreadyParticipatedError(EventError): pass  # 중복 참여
 
-# Level 2 — shared voice services use a two-level hierarchy
-class VoiceServiceError(AppError): pass  # shared/voice/ base
-class STTError(VoiceServiceError): pass  # shared/voice/stt_service.py
-class TTSError(VoiceServiceError): pass  # shared/voice/tts_service.py
+# ── Shared 인프라 계층 ────────────────────────────────────────────────────────
+class AgentError(AppError): pass         # shared/agent/ — LangGraph 초기화·실행
+class OpenSearchError(AppError): pass    # core/opensearch.py — 검색·색인
+class OpenSearchIndexError(OpenSearchError): pass  # 인덱스 생성 실패
+class MarketError(AppError): pass        # features/market/ — 환율·금리 조회
 ```
 
-> **설계 근거 (현재 결정)**
-> - 서브클래스별 핸들러는 `main.py`에 추가하지 않는다. `AppError` 핸들러 하나로 충분하며, 서브클래스별 다른 처리(Sentry 알림, 보안 로그 등)가 필요해지면 그때 추가한다.
-> - 2단계 서브클래스(`STTError`, `TTSError`)는 현재 런타임 분기 없이 선언만 한다. 모니터링 필터링과 추후 핸들러 확장을 위해 미리 선언해 둔다.
+> **`user_message` 사용 지침**
+> - 기술적 내부 메시지(`message`)와 사용자에게 읽어줄 TTS 메시지(`user_message`)가 다를 때만 명시한다.
+> - 음성 파이프라인(voice router)이 `AppError.user_message`를 TTS로 변환해 반환하므로 서비스 레이어에서 사용자 친화적 문구를 직접 지정할 수 있다.
+> ```python
+> raise TransferError(
+>     code="INSUFFICIENT_BALANCE",
+>     message="balance < amount",          # 로그·디버그용
+>     status_code=400,
+>     user_message="잔액이 부족합니다.",   # TTS로 변환되는 사용자 메시지
+> )
+> ```
 
 ### 8.2 Rules
 
@@ -452,82 +508,89 @@ async def get_user(user_id: str):
 
 ## 9. Frontend Error Handling (TypeScript)
 
-The two layers are **parallel** — API errors don't reach `ErrorBoundary`, and render crashes don't reach `errorHandler.ts`.
+### 9.1 Architecture Overview
 
-| Layer | File | Responsibility |
+음성 파이프라인(`POST /api/voice`)이 백엔드 `AppError`를 TTS 오디오로 변환해 반환하므로, **프론트엔드는 서버 에러 코드를 TTS 메시지로 변환할 필요가 없다.** `utils/errorHandler.ts`는 백엔드에 도달하지 못하는 **순수 클라이언트 오류**만 관리한다.
+
+| 계층 | 파일 | 책임 |
 |------|------|------|
-| API errors | `utils/errorHandler.ts` | Convert server `code` → TTS message |
-| Render crashes | `components/ErrorBoundary.tsx` | Catch exceptions thrown during React render |
+| 클라이언트 오류 | `utils/errorHandler.ts` | 마이크·네트워크 등 클라이언트 전용 코드 → TTS 메시지 |
+| HTTP 오류 메시지 추출 | `utils/errorHandler.ts` | axios 응답에서 `message` 추출 |
+| 클라이언트 오류 리포팅 | `services/errorReportService.ts` | 분류된 오류를 `POST /api/client-errors/` 로 전송 |
 
-### 9.1 `utils/errorHandler.ts`
-
-Corresponds to `main.py`'s `@app.exception_handler`. All code→message mappings live here only.
+### 9.2 `utils/errorHandler.ts`
 
 ```typescript
-// utils/errorHandler.ts
-const MESSAGES: Record<string, string> = {
-  ASV_CONFIDENCE_LOW:           '목소리가 잘 인식되지 않았습니다. 다시 말씀해 주세요.',
-  ACCOUNT_INSUFFICIENT_BALANCE: '잔액이 부족합니다.',
-  UNAUTHORIZED:                 '로그인이 필요합니다.',
-  INTERNAL_ERROR:               '서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
-  // … all error codes from §5
+// ── 클라이언트 전용 코드 → 메시지 ──────────────────────────────────────────
+const CLIENT_ONLY_ERRORS: Record<string, string> = {
+  MICROPHONE_PERMISSION_DENIED: '마이크 권한이 필요합니다.',
+  NETWORK_ERROR:                '인터넷 연결을 확인해 주세요.',
+  TTS_SERVICE_UNAVAILABLE:      '음성 서비스에 문제가 있습니다.',
+  VOICE_PROCESSING_ERROR:       '음성 처리 중 오류가 발생했습니다.',
 };
-const FALLBACK = '오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
-export const getTtsMessage = (code?: string) => (code && MESSAGES[code]) ?? FALLBACK;
 
-// ✅ Screen — delegate message lookup, own flow control
-if (!response.data.success) {
-  tts(getTtsMessage(response.data.code));
-  if (response.data.code === 'UNAUTHORIZED') router.replace('/auth/login');
+export const FALLBACK_MESSAGE = '오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+
+/** 클라이언트 전용 코드 → TTS 메시지 (음성 훅, useVoiceInput 등에서 사용) */
+export function getClientErrorMessage(code: string): string {
+  return CLIENT_ONLY_ERRORS[code] ?? FALLBACK_MESSAGE;
 }
 
-// ❌ String literal in screen
-tts('목소리가 잘 인식되지 않았습니다. 다시 말씀해 주세요.');
-// ❌ Duplicate switch in every screen
-switch (response.data.code) { case 'ASV_CONFIDENCE_LOW': tts('…'); }
-```
-
-### 9.2 `components/ErrorBoundary.tsx`
-
-For render-time crashes only — do not handle API errors here.
-
-```tsx
-// components/ErrorBoundary.tsx
-export default class ErrorBoundary extends React.Component<
-  { children: React.ReactNode }, { hasError: boolean }
-> {
-  state = { hasError: false };
-  static getDerivedStateFromError = () => ({ hasError: true });
-  componentDidCatch = (e: Error) => console.error('[ErrorBoundary]', e); // TODO: Sentry
-
-  render() {
-    if (this.state.hasError)
-      return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text>예기치 않은 오류가 발생했습니다.</Text>
-          <Pressable onPress={() => this.setState({ hasError: false })}>
-            <Text>다시 시도</Text>
-          </Pressable>
-        </View>
-      );
-    return this.props.children;
+/** axios 오류 / AppError HTTP 응답에서 message 문자열을 추출. 없으면 FALLBACK */
+export function extractApiErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    if (!err.response) return CLIENT_ONLY_ERRORS.NETWORK_ERROR;
+    return (err.response.data as { message?: string })?.message ?? FALLBACK_MESSAGE;
   }
+  return FALLBACK_MESSAGE;
 }
 
-// app/_layout.tsx
-export default function RootLayout() {
-  return <ErrorBoundary><Stack /></ErrorBoundary>;
+/** @deprecated 신규 코드는 extractApiErrorMessage / getClientErrorMessage 사용 */
+export const getTtsMessage = (code?: string): string =>
+  (code && CLIENT_ONLY_ERRORS[code]) ?? FALLBACK_MESSAGE;
+```
+
+### 9.3 `services/errorReportService.ts`
+
+네트워크·HTTP 오류를 분류해 서버로 수집한다. 음성 훅이나 서비스 레이어 `catch` 블록에서 호출한다.
+
+```typescript
+// ✅ axios 오류 분류 후 서버 리포팅
+import { reportClientError } from '@/services/errorReportService';
+
+try {
+  await voiceService.sendAudio(blob);
+} catch (err) {
+  const msg = extractApiErrorMessage(err);
+  speakText(msg);
+  await reportClientError('voice', err);  // 분류·리포팅은 errorReportService가 처리
 }
 ```
 
-### 9.3 Decision Guide
+### 9.4 TTS 출력 — `utils/ttsManager.ts`
 
-| Situation | Handle In |
-|------|----------|
-| Server returns `{ success: false, code: "..." }` | `getTtsMessage(code)` |
-| Network error (no response) | `getTtsMessage('NETWORK_ERROR')` |
-| Component crash during render | `ErrorBoundary.tsx` |
-| Flow control after API error (navigate, retry) | Screen component — don't add to `errorHandler.ts` |
+모든 음성 출력은 `speakText()`를 통한다. 직접 `Speech.speak()`를 호출하지 않는다.
+
+```typescript
+import { speakText } from '@/utils/ttsManager';
+
+// ✅ ttsManager 경유 — 언어·속도 자동 적용
+speakText('마이크 권한이 필요합니다.');
+
+// ❌ 직접 호출 — 사용자 속도 설정 무시됨
+Speech.speak('마이크 권한이 필요합니다.', { language: 'ko-KR' });
+```
+
+### 9.5 Decision Guide
+
+| 상황 | 처리 |
+|------|------|
+| 음성 파이프라인 오류 (백엔드 AppError) | 백엔드가 TTS 오디오로 변환해 반환 — 프론트 처리 불필요 |
+| 마이크 권한 거부 | `getClientErrorMessage('MICROPHONE_PERMISSION_DENIED')` |
+| 네트워크 오류 (응답 없음) | `extractApiErrorMessage(err)` → `NETWORK_ERROR` 문구 |
+| axios HTTP 오류 응답 | `extractApiErrorMessage(err)` → 서버 `message` 추출 |
+| 오류 서버 수집 | `reportClientError(feature, err)` |
+| 화면 이동 등 흐름 제어 | 화면 컴포넌트가 직접 처리 — `errorHandler.ts`에 추가 금지 |
 
 ---
 
@@ -548,3 +611,83 @@ def add_voice_log(user_id: int, logs: list | None = None):
     logs.append(user_id)
     return logs
 ```
+
+---
+
+## 11. Structured Logging (Python)
+
+### 11.1 Setup
+
+`core/logging_config.py`의 `setup_logging()`이 루트 로거를 JSON 포맷으로 교체한다. `main.py` 최상단에서 가장 먼저 호출해야 한다.
+
+출력 JSON 필드: `timestamp` (KST ISO-8601), `level`, `logger`, `request_id`, `message`, `event`, (추가 `extra` 키).
+
+### 11.2 Pattern
+
+```python
+import logging
+logger = logging.getLogger(__name__)
+
+# ✅ 구조화 로그 — event 키를 고정하고 나머지를 extra로 전달
+logger.info(
+    "transfer_executed",
+    extra={
+        "event": "transfer_executed",
+        "user_id": user_id,
+        "amount": amount,
+        "status": "success",
+    },
+)
+
+logger.error(
+    "transfer_executed",
+    extra={
+        "event": "transfer_executed",
+        "user_id": user_id,
+        "status": "failed",
+        "error": str(e),
+    },
+)
+
+# ❌ 비구조화 문자열 — 집계·검색 불가
+logger.info(f"이체 성공: user={user_id} amount={amount}")
+```
+
+### 11.3 Rules
+
+| Rule | Detail |
+|------|--------|
+| `event` 키 필수 | `extra={"event": "snake_case_event_name", ...}` 형식 준수 |
+| `logger.exception()` 사용 | `except` 블록에서 스택트레이스 자동 첨부 |
+| 민감 정보 제외 | 계좌번호·PIN·토큰은 로그에 포함하지 않는다 |
+| `request_id` 자동 주입 | `_RequestIdFilter`가 모든 레코드에 주입 — 별도 전달 불필요 |
+
+---
+
+## 12. Client Error Reporting (TypeScript)
+
+프론트엔드에서 발생한 네트워크·HTTP 오류를 `POST /api/client-errors/`로 수집한다. 분류 로직은 `services/errorReportService.ts`가 담당한다.
+
+```typescript
+// services/errorReportService.ts 내부 분류 기준
+// - ECONNABORTED / "timeout" 포함 → 'timeout'
+// - 응답 없음                       → 'network'
+// - status >= 500                   → 'http_5xx'
+// - status >= 400                   → 'http_4xx'
+// - 그 외                           → 'unknown'
+
+// ✅ 서비스/훅 catch 블록에서 단순 호출
+import { reportClientError } from '@/services/errorReportService';
+
+try {
+  await assetService.getSummary();
+} catch (err) {
+  speakText(extractApiErrorMessage(err));
+  await reportClientError('asset', err);
+}
+```
+
+규칙:
+- `reportClientError` 실패는 무시한다 (무한 루프 방지를 위해 내부에서 catch).
+- 미인증 상태(`token` 없음)에서는 호출을 생략한다.
+- 화면 단위로 `feature` 이름을 명시한다 (`'voice'`, `'asset'`, `'transfer'` 등).
