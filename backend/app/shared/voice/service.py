@@ -752,11 +752,14 @@ async def _execute_pending_transfer(
     pending_tts_text: str | None = state_vals.get("pending_consent_tts_text")
     pending_audio_b64: str | None = state_vals.get("pending_consent_audio_b64")
 
-    # execution_ready를 ainvoke 전에 클리어 — 이중 실행(같은 이체 두 번) 방지
+    # pending_consent_* 필드는 읽은 즉시 초기화한다.
+    # execution_ready는 intent_node(line 349)가 "execute_node로 라우팅" 신호로
+    # 사용하므로 ainvoke 전에 클리어하지 않는다.
+    # execute_node 자체가 완료 시 execution_ready=False를 반환하고,
+    # 이 함수 상단의 guard(line 738)가 중복 호출을 차단한다.
     await graph.aupdate_state(
         config,
         {
-            "execution_ready": False,
             "pending_consent_tts_text": None,
             "pending_consent_audio_b64": None,
         },
