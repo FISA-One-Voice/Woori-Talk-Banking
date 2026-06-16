@@ -222,3 +222,41 @@ def start_scheduler():
 @app.on_event("shutdown")
 def stop_scheduler():
     scheduler.shutdown()
+
+
+# ── Redis Checkpointer (멀티 워커 LangGraph 세션 공유) ──────────────────────────
+# REDIS_URL이 설정된 경우 AsyncRedisSaver로 그래프를 초기화한다.
+# 미설정 시 _get_graph()의 MemorySaver 폴백이 동작하므로 단일 워커 환경은 무변경.
+
+_redis_saver_cm = None
+
+
+@app.on_event("startup")
+async def startup_redis_graph():
+    """Redis checkpointer를 초기화하고 LangGraph 그래프를 빌드한다."""
+    global _redis_saver_cm
+    if not _settings.REDIS_URL:
+        logger.info("[Startup] REDIS_URL 미설정 — MemorySaver 폴백")
+        return
+    try:
+        from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+
+        from app.shared.voice.service import initialize_graph
+
+        _redis_saver_cm = AsyncRedisSaver.from_conn_string(_settings.REDIS_URL)
+        checkpointer = await _redis_saver_cm.__aenter__()
+        await checkpointer.setup()
+        initialize_graph(checkpointer)
+        logger.info("[Startup] Redis checkpointer 초기화 완료: %s", _settings.REDIS_URL)
+    except Exception:
+        logger.exception("[Startup] Redis 연결 실패 — MemorySaver 폴백")
+        _redis_saver_cm = None
+
+
+@app.on_event("shutdown")
+async def shutdown_redis_graph():
+    """Redis 연결을 해제한다."""
+    global _redis_saver_cm
+    if _redis_saver_cm is not None:
+        await _redis_saver_cm.__aexit__(None, None, None)
+        _redis_saver_cm = None

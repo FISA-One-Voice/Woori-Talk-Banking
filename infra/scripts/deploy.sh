@@ -46,6 +46,6 @@ cd "$WORKDIR"
 docker compose pull woori-backend
 
 echo "[deploy] 컨테이너 재시작..."
-docker compose up -d woori-backend node-exporter fluent-bit
+docker compose up -d redis woori-backend node-exporter fluent-bit
 
 echo "[deploy] 완료: $(docker inspect woori-backend --format='{{.Config.Image}}')"

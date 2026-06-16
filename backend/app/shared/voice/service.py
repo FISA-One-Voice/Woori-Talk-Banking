@@ -65,8 +65,18 @@ _background_tasks: set[asyncio.Task] = set()
 _graph = None
 
 
+def initialize_graph(checkpointer=None) -> None:
+    """앱 시작 시 checkpointer를 주입해 그래프를 빌드한다.
+
+    멀티 워커 배포 시 main.py startup 이벤트에서 AsyncRedisSaver를 넘긴다.
+    테스트·단일 워커 환경에서는 호출하지 않아도 _get_graph()가 MemorySaver로 폴백한다.
+    """
+    global _graph
+    _graph = build_supervisor(checkpointer=checkpointer)
+
+
 def _get_graph():
-    """LangGraph 그래프 싱글턴을 반환한다. 최초 호출 시 build_supervisor()를 실행한다."""
+    """LangGraph 그래프 싱글턴을 반환한다. 최초 호출 시 MemorySaver로 빌드한다."""
     global _graph
     if _graph is None:
         _graph = build_supervisor()
