@@ -731,12 +731,32 @@ async def _execute_pending_transfer(
     # 동의 음성 업로드에 필요한 임시 필드를 읽은 뒤 즉시 초기화한다
     state_snapshot = graph.get_state(config)
     state_vals = state_snapshot.values if state_snapshot.values else {}
+
+    # execution_ready=False 이면 이미 실행됐거나 상태가 손상된 것 — ainvoke를 막는다.
+    # 이를 통과하지 않으면 intent_node LLM이 "인증 완료" 메시지를 처리하면서
+    # 이전 대화 이력의 슬롯(예: 다른 세션의 금액)을 재추출하는 버그가 발생한다.
+    if not state_vals.get("execution_ready"):
+        audio_mp3 = await synthesize_speech("처리할 이체 요청이 없습니다. 홈 화면으로 이동합니다.")
+        return VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to="home",
+            collected_slots={},
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            execution_pending=False,
+            awaiting_memo_decision=False,
+            transcript=None,
+            pending_action=None,
+        )
+
     pending_tts_text: str | None = state_vals.get("pending_consent_tts_text")
     pending_audio_b64: str | None = state_vals.get("pending_consent_audio_b64")
 
+    # execution_ready를 ainvoke 전에 클리어 — 이중 실행(같은 이체 두 번) 방지
     await graph.aupdate_state(
         config,
         {
+            "execution_ready": False,
             "pending_consent_tts_text": None,
             "pending_consent_audio_b64": None,
         },

@@ -391,16 +391,19 @@ def build_transfer_graph(tools: list) -> CompiledStateGraph:
         ):
             return _clean_transfer_delta(build_transfer_clarification_offer(user_text))
 
+        _state_for_llm = {**state, "messages": [HumanMessage(content=user_text)]}
         if not state.get("pending_action"):
-            _state_for_llm = {**state, "messages": [HumanMessage(content=user_text)]}
             result = llm_structured.invoke(
                 _chat_messages_for_llm(
                     _state_for_llm, _build_system_content(_state_for_llm)
                 )
             )
         else:
+            # 슬롯은 state.collected_slots에 이미 반영돼 있고 _build_system_content가
+            # pending_action / collected_slots / missing_slots를 시스템 프롬프트에 포함한다.
+            # 현재 발화만 전달해도 나머지 슬롯 추출에 충분하며, 이전 세션 메시지 오염을 방지한다.
             result = llm_structured.invoke(
-                _chat_messages_for_llm(state, _build_system_content(state))
+                _chat_messages_for_llm(_state_for_llm, _build_system_content(state))
             )
         logger.info(
             "[Transfer] intent=%s slots=%s confirmed=%s cancelled=%s",
