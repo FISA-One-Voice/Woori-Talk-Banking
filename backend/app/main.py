@@ -243,7 +243,10 @@ async def startup_redis_graph():
 
         from app.shared.voice.service import initialize_graph
 
-        _redis_saver_cm = AsyncRedisSaver.from_conn_string(_settings.REDIS_URL)
+        _redis_saver_cm = AsyncRedisSaver.from_conn_string(
+            _settings.REDIS_URL,
+            ttl={"default_ttl": 600},
+        )
         checkpointer = await _redis_saver_cm.__aenter__()
         await checkpointer.setup()
         initialize_graph(checkpointer)
