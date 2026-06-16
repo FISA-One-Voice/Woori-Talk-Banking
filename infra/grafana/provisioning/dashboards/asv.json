@@ -24,8 +24,8 @@
         "y": 0
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "grafana-opensearch-datasource",
+        "uid": "opensearch"
       },
       "fieldConfig": {
         "defaults": {
@@ -66,16 +66,93 @@
       "targets": [
         {
           "refId": "A",
+          "alias": "pass",
           "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
           },
-          "expr": "sum(asv_verification_total{result=\"pass\"}) / sum(asv_verification_total)",
-          "legendFormat": "통과율",
-          "instant": true
+          "index": "voice_pipeline",
+          "query": "asv_result:pass",
+          "metrics": [
+            {
+              "type": "count",
+              "id": "1"
+            }
+          ],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "date_histogram",
+              "field": "timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "1h",
+                "min_doc_count": "0"
+              }
+            }
+          ]
+        },
+        {
+          "refId": "B",
+          "alias": "total",
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "query": "asv_result:pass OR asv_result:fail",
+          "metrics": [
+            {
+              "type": "count",
+              "id": "1"
+            }
+          ],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "date_histogram",
+              "field": "timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "1h",
+                "min_doc_count": "0"
+              }
+            }
+          ]
         }
       ],
-      "transformations": []
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "sum"
+            ]
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "binaryOperation",
+            "binary": {
+              "left": "pass",
+              "right": "total",
+              "operator": "/"
+            },
+            "alias": "통과율"
+          }
+        },
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "통과율"
+              ]
+            }
+          }
+        }
+      ]
     },
     {
       "id": 2,
@@ -209,12 +286,12 @@
         "y": 4
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+        "type": "grafana-opensearch-datasource",
+        "uid": "opensearch"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps",
+          "unit": "short",
           "custom": {
             "lineWidth": 2,
             "fillOpacity": 10
@@ -255,14 +332,60 @@
       },
       "targets": [
         {
-          "expr": "rate(asv_verification_total{result=\"pass\"}[$__rate_interval])",
-          "legendFormat": "pass",
-          "refId": "A"
+          "refId": "A",
+          "alias": "pass",
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "query": "asv_result:pass",
+          "metrics": [
+            {
+              "type": "count",
+              "id": "1"
+            }
+          ],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "date_histogram",
+              "field": "timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0"
+              }
+            }
+          ]
         },
         {
-          "expr": "rate(asv_verification_total{result=\"fail\"}[$__rate_interval])",
-          "legendFormat": "fail",
-          "refId": "B"
+          "refId": "B",
+          "alias": "fail",
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "query": "asv_result:fail",
+          "metrics": [
+            {
+              "type": "count",
+              "id": "1"
+            }
+          ],
+          "timeField": "timestamp",
+          "bucketAggs": [
+            {
+              "type": "date_histogram",
+              "field": "timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0"
+              }
+            }
+          ]
         }
       ]
     },
