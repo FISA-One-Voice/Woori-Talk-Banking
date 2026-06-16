@@ -14,7 +14,7 @@ import { agentPathFromNavigateTo, shouldNavigateToRoute } from '@/utils/voiceNav
 import { Audio } from 'expo-av';
 import { Href, Stack, useRouter, useSegments } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { GestureResponderEvent, Pressable, StyleSheet } from 'react-native';
+import { GestureResponderEvent, StyleSheet, View } from 'react-native';
 import { useAutoTransferFlowStore } from './auto-transfer/store';
 
 // ── V 제스처 감지 ─────────────────────────────────────────────────────────────
@@ -299,7 +299,7 @@ export default function RootLayout() {
   }, [token, segments, router]);
 
   return (
-    <Pressable
+    <View
       style={styles.root}
       onTouchStart={hasVoiceRegistered ? handleTouchStart : undefined}
       onTouchMove={hasVoiceRegistered ? handleTouchMove : undefined}
@@ -307,7 +307,7 @@ export default function RootLayout() {
     >
       <Stack screenOptions={{ headerShown: false }} />
       <VoiceStatusOverlay state={voiceState} />
-    </Pressable>
+    </View>
   );
 }
 
