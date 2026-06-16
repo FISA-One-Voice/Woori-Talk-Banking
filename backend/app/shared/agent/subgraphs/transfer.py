@@ -673,6 +673,7 @@ def _build_intent_update(
             return {
                 "awaiting_confirmation": False,
                 "awaiting_asv_audio": True,
+                "asv_retry_count": 0,
                 "navigate_to": SCREEN_MAP.get(action),
                 "messages": [AIMessage(content="목소리로 인증해 주세요.")],
             }

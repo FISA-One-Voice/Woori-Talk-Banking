@@ -380,7 +380,6 @@ async def _handle_normal_flow(
             await graph.aupdate_state(
                 config,
                 {"pending_consent_tts_text": response_text},
-                as_node="supervisor_node",
             )
         except Exception:
             logger.warning("TTS 텍스트 임시 저장 실패 — 계속 진행", exc_info=True)
@@ -662,7 +661,6 @@ async def _handle_asv_flow(
         await graph.aupdate_state(
             config,
             {"asv_retry_count": new_retry},
-            as_node="supervisor_node",
         )
         tts_text = (
             f"본인 확인에 실패했습니다. {remaining}번 더 시도하실 수 있습니다. "
