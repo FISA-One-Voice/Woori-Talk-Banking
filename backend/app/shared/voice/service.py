@@ -186,6 +186,27 @@ async def process_voice_pipeline(
         state_snapshot.values if state_snapshot.values else "EMPTY",
     )
 
+    execution_ready = (
+        state_snapshot.values.get("execution_ready", False)
+        if state_snapshot.values
+        else False
+    )
+    if execution_ready:
+        audio_mp3 = await synthesize_speech(
+            "이체를 처리하고 있습니다. 잠시만 기다려주세요."
+        )
+        return VoiceResponseData(
+            audio=base64.b64encode(audio_mp3).decode(),
+            navigate_to=None,
+            collected_slots=state_snapshot.values.get("collected_slots", {}),
+            awaiting_confirmation=False,
+            awaiting_asv_audio=False,
+            execution_pending=True,
+            awaiting_memo_decision=False,
+            transcript=None,
+            pending_action=state_snapshot.values.get("pending_action"),
+        )
+
     if awaiting_asv:
         return await _handle_asv_flow(
             audio_bytes, user_id, config, db, graph, content_type
