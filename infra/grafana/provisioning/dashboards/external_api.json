@@ -1,38 +1,39 @@
 {
-  "title": "외부 API 상태",
-  "uid": "woori-external-api",
-  "schemaVersion": 39,
-  "version": 3,
-  "refresh": "30s",
-  "time": {
-    "from": "now-1h",
-    "to": "now"
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
   },
-  "timezone": "Asia/Seoul",
-  "tags": [
-    "woori"
-  ],
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 12,
+  "links": [],
   "panels": [
     {
-      "id": 1,
-      "title": "Clova STT 에러율",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 0,
-        "y": 0
-      },
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
           "color": {
             "mode": "thresholds"
           },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -46,67 +47,78 @@
               },
               {
                 "color": "red",
-                "value": 0.10
+                "value": 0.1
               }
             ]
-          }
+          },
+          "unit": "percentunit"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
       "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
-          ]
+            "mean"
+          ],
+          "fields": "",
+          "values": false
         },
-        "colorMode": "background",
-        "graphMode": "none"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
+      "pluginVersion": "10.4.2",
       "targets": [
         {
-          "refId": "A",
-          "panelId": 6,
           "datasource": {
             "type": "datasource",
             "uid": "-- Dashboard --"
-          }
+          },
+          "panelId": 6,
+          "refId": "A"
         }
       ],
+      "title": "Clova STT 에러율",
       "transformations": [
         {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
-        },
-        {
           "id": "calculateField",
           "options": {
-            "mode": "binaryOperation",
+            "alias": "total",
             "binary": {
               "left": "Clova STT 성공",
-              "right": "Clova STT 실패",
-              "operator": "+"
+              "operator": "+",
+              "right": "Clova STT 실패"
             },
-            "alias": "total"
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
           }
         },
         {
           "id": "calculateField",
           "options": {
-            "mode": "binaryOperation",
+            "alias": "STT 에러율",
             "binary": {
               "left": "Clova STT 실패",
-              "right": "total",
-              "operator": "/"
+              "operator": "/",
+              "right": "total"
             },
-            "alias": "STT 에러율"
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
           }
         },
         {
@@ -119,28 +131,22 @@
             }
           }
         }
-      ]
+      ],
+      "type": "stat"
     },
     {
-      "id": 2,
-      "title": "Azure TTS 에러율",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 8,
-        "y": 0
-      },
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
           "color": {
             "mode": "thresholds"
           },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -154,67 +160,78 @@
               },
               {
                 "color": "red",
-                "value": 0.10
+                "value": 0.1
               }
             ]
-          }
+          },
+          "unit": "percentunit"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      },
+      "id": 2,
       "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
-          ]
+            "mean"
+          ],
+          "fields": "",
+          "values": false
         },
-        "colorMode": "background",
-        "graphMode": "none"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
+      "pluginVersion": "10.4.2",
       "targets": [
         {
-          "refId": "A",
-          "panelId": 6,
           "datasource": {
             "type": "datasource",
             "uid": "-- Dashboard --"
-          }
+          },
+          "panelId": 6,
+          "refId": "A"
         }
       ],
+      "title": "Azure TTS 에러율",
       "transformations": [
         {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
-        },
-        {
           "id": "calculateField",
           "options": {
-            "mode": "binaryOperation",
+            "alias": "total",
             "binary": {
               "left": "Azure TTS 성공",
-              "right": "Azure TTS 실패",
-              "operator": "+"
+              "operator": "+",
+              "right": "Azure TTS 실패"
             },
-            "alias": "total"
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
           }
         },
         {
           "id": "calculateField",
           "options": {
-            "mode": "binaryOperation",
+            "alias": "TTS 에러율",
             "binary": {
               "left": "Azure TTS 실패",
-              "right": "total",
-              "operator": "/"
+              "operator": "/",
+              "right": "total"
             },
-            "alias": "TTS 에러율"
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
           }
         },
         {
@@ -227,44 +244,36 @@
             }
           }
         }
-      ]
+      ],
+      "type": "stat"
     },
     {
-      "id": 3,
-      "title": "/health 엔드포인트 상태",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 8,
-        "x": 16,
-        "y": 0
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": {
-                  "text": "DOWN",
-                  "color": "red",
-                  "index": 0
-                },
-                "1": {
-                  "text": "UP",
-                  "color": "green",
-                  "index": 1
-                }
-              }
-            }
-          ],
           "color": {
             "mode": "thresholds"
           },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "index": 0,
+                  "text": "DOWN"
+                },
+                "1": {
+                  "color": "green",
+                  "index": 1,
+                  "text": "UP"
+                }
+              },
+              "type": "value"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -281,46 +290,118 @@
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "id": 3,
       "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value"
+        "showPercentChange": false,
+        "textMode": "value",
+        "wideLayout": true
       },
+      "pluginVersion": "10.4.2",
       "targets": [
         {
           "expr": "probe_success{job=\"woori-healthcheck\"}",
           "legendFormat": "Health",
           "refId": "A"
         }
-      ]
+      ],
+      "title": "/health 엔드포인트 상태",
+      "type": "stat"
     },
     {
-      "id": 4,
-      "title": "Clova STT 응답시간",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
-            "lineWidth": 2
-          }
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
         },
         "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
@@ -333,30 +414,88 @@
           "legendFormat": "STT P95",
           "refId": "B"
         }
-      ]
+      ],
+      "title": "Clova STT 응답시간",
+      "type": "timeseries"
     },
     {
-      "id": 5,
-      "title": "Azure TTS 응답시간",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 4
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
-            "lineWidth": 2
-          }
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
         },
         "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
@@ -369,26 +508,33 @@
           "legendFormat": "TTS P95",
           "refId": "B"
         }
-      ]
+      ],
+      "title": "Azure TTS 응답시간",
+      "type": "timeseries"
     },
     {
-      "id": 6,
-      "title": "서비스별 성공 / 실패 누적 (OpenSearch)",
-      "type": "bargauge",
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 12
-      },
       "datasource": {
         "type": "grafana-opensearch-datasource",
         "uid": "opensearch"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "min": 0
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
         },
         "overrides": [
           {
@@ -423,137 +569,177 @@
           }
         ]
       },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 6,
       "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
         "orientation": "horizontal",
         "reduceOptions": {
-          "values": true,
-          "limit": 10,
           "calcs": [
             "sum"
-          ]
+          ],
+          "fields": "",
+          "limit": 10,
+          "values": true
         },
-        "displayMode": "gradient"
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
       },
+      "pluginVersion": "10.4.2",
       "targets": [
         {
-          "refId": "A",
           "alias": "Clova STT 성공",
+          "bucketAggs": [
+            {
+              "field": "timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0"
+              },
+              "type": "date_histogram"
+            }
+          ],
           "datasource": {
             "type": "grafana-opensearch-datasource",
             "uid": "opensearch"
           },
           "index": "app_logs",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
           "query": "event:external_api_call AND service:clova_stt AND status:success",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
+          "refId": "A",
+          "timeField": "timestamp"
         },
         {
-          "refId": "B",
           "alias": "Clova STT 실패",
+          "bucketAggs": [
+            {
+              "field": "timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0"
+              },
+              "type": "date_histogram"
+            }
+          ],
           "datasource": {
             "type": "grafana-opensearch-datasource",
             "uid": "opensearch"
           },
           "index": "app_logs",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
           "query": "event:external_api_call AND service:clova_stt AND status:error",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
+          "refId": "B",
+          "timeField": "timestamp"
         },
         {
-          "refId": "C",
           "alias": "Azure TTS 성공",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "app_logs",
-          "query": "event:external_api_call AND service:azure_tts AND status:success",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
           "bucketAggs": [
             {
-              "type": "date_histogram",
               "field": "timestamp",
               "id": "2",
               "settings": {
                 "interval": "auto",
                 "min_doc_count": "0"
-              }
+              },
+              "type": "date_histogram"
             }
-          ]
+          ],
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "app_logs",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "event:external_api_call AND service:azure_tts AND status:success",
+          "refId": "C",
+          "timeField": "timestamp"
         },
         {
-          "refId": "D",
           "alias": "Azure TTS 실패",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "app_logs",
-          "query": "event:external_api_call AND service:azure_tts AND status:error",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
           "bucketAggs": [
             {
-              "type": "date_histogram",
               "field": "timestamp",
               "id": "2",
               "settings": {
                 "interval": "auto",
                 "min_doc_count": "0"
-              }
+              },
+              "type": "date_histogram"
             }
-          ]
+          ],
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "app_logs",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "event:external_api_call AND service:azure_tts AND status:error",
+          "refId": "D",
+          "timeField": "timestamp"
         }
       ],
+      "title": "서비스별 성공 / 실패 누적 (OpenSearch)",
       "transformations": [
         {
-          "id": "merge",
-          "options": {}
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "sum"
+            ]
+          }
         }
-      ]
+      ],
+      "type": "bargauge"
     }
-  ]
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "woori"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "Asia/Seoul",
+  "title": "외부 API 상태g",
+  "uid": "woori-external-api24",
+  "version": 3,
+  "weekStart": ""
 }
