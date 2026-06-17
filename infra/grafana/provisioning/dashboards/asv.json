@@ -1,38 +1,39 @@
 {
-  "title": "ASV 화자 인증 현황",
-  "uid": "woori-asv",
-  "schemaVersion": 39,
-  "version": 3,
-  "refresh": "30s",
-  "time": {
-    "from": "now-3h",
-    "to": "now"
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
   },
-  "timezone": "Asia/Seoul",
-  "tags": [
-    "woori"
-  ],
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 11,
+  "links": [],
   "panels": [
     {
-      "id": 1,
-      "title": "ASV 통과율",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 0
-      },
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percentunit",
           "color": {
             "mode": "thresholds"
           },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -49,188 +50,227 @@
                 "value": 0.8
               }
             ]
-          }
+          },
+          "unit": "percentunit"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
         "colorMode": "background",
         "graphMode": "none",
-        "textMode": "value_and_name"
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "wideLayout": true
       },
+      "pluginVersion": "10.4.2",
       "targets": [
         {
-          "refId": "A",
-          "panelId": 6,
           "datasource": {
             "type": "datasource",
             "uid": "-- Dashboard --"
-          }
+          },
+          "panelId": 6,
+          "refId": "A"
         }
       ],
+      "title": "ASV 통과율",
       "transformations": [
         {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "reduce",
+          "id": "calculateField",
           "options": {
-            "reducers": [
-              "sum"
-            ]
+            "alias": "total1",
+            "binary": {
+              "left": "pass",
+              "operator": "+",
+              "right": "fail"
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
           }
         },
         {
           "id": "calculateField",
           "options": {
-            "mode": "binaryOperation",
+            "alias": "total",
             "binary": {
               "left": "pass",
-              "right": "fail",
-              "operator": "+"
+              "operator": "/",
+              "right": "total1"
             },
-            "alias": "total"
-          }
-        },
-        {
-          "id": "calculateField",
-          "options": {
-            "mode": "binaryOperation",
-            "binary": {
-              "left": "pass",
-              "right": "total",
-              "operator": "/"
-            },
-            "alias": "통과율"
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
           }
         },
         {
           "id": "filterFieldsByName",
           "options": {
             "include": {
-              "names": [
-                "통과율"
-              ]
+              "pattern": "total"
             }
           }
         }
-      ]
+      ],
+      "type": "stat"
     },
     {
-      "id": 2,
-      "title": "총 인증 시도 수",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 0
-      },
       "datasource": {
         "type": "datasource",
         "uid": "-- Dashboard --"
       },
       "fieldConfig": {
         "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
           "unit": "short"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
       "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        },
         "colorMode": "value",
         "graphMode": "none",
-        "orientation": "auto"
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
+      "pluginVersion": "10.4.2",
       "targets": [
         {
-          "refId": "A",
-          "panelId": 6,
           "datasource": {
             "type": "datasource",
             "uid": "-- Dashboard --"
-          }
+          },
+          "panelId": 6,
+          "refId": "A"
         }
       ],
+      "title": "총 인증 시도 수",
       "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        },
-        {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
-        },
         {
           "id": "calculateField",
           "options": {
-            "mode": "binaryOperation",
+            "alias": "total",
             "binary": {
               "left": "pass",
-              "right": "fail",
-              "operator": "+"
+              "operator": "+",
+              "right": "fail"
             },
-            "alias": "총 인증 시도"
+            "mode": "binary",
+            "reduce": {
+              "include": [],
+              "reducer": "sum"
+            }
           }
         },
         {
           "id": "filterFieldsByName",
           "options": {
             "include": {
-              "names": [
-                "총 인증 시도"
-              ]
+              "pattern": "total"
             }
           }
         }
-      ]
+      ],
+      "type": "stat"
     },
     {
-      "id": 3,
-      "title": "P50 / P95 / P99 소요시간",
-      "type": "stat",
-      "gridPos": {
-        "h": 4,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ms",
+          "mappings": [],
+          "max": 500,
           "min": 0,
-          "max": 500
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
       "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
-          ]
+          ],
+          "fields": "",
+          "values": false
         },
-        "orientation": "horizontal",
-        "colorMode": "value",
-        "graphMode": "area"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
+      "pluginVersion": "10.4.2",
       "targets": [
         {
           "expr": "histogram_quantile(0.50, rate(asv_duration_seconds_bucket[$__rate_interval])) * 1000",
@@ -247,29 +287,67 @@
           "legendFormat": "P99",
           "refId": "C"
         }
-      ]
+      ],
+      "title": "P50 / P95 / P99 소요시간",
+      "type": "stat"
     },
     {
-      "id": 4,
-      "title": "pass / fail 인증 시계열",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 4
-      },
       "datasource": {
         "type": "grafana-opensearch-datasource",
         "uid": "opensearch"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
             "lineWidth": 2,
-            "fillOpacity": 10
-          }
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
         },
         "overrides": [
           {
@@ -304,88 +382,165 @@
           }
         ]
       },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
       "targets": [
         {
-          "refId": "A",
           "alias": "pass",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:pass",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
           "bucketAggs": [
             {
-              "type": "date_histogram",
               "field": "timestamp",
               "id": "2",
               "settings": {
                 "interval": "auto",
                 "min_doc_count": "0"
-              }
+              },
+              "type": "date_histogram"
             }
-          ]
+          ],
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "asv_result:pass",
+          "refId": "A",
+          "timeField": "timestamp"
         },
         {
-          "refId": "B",
           "alias": "fail",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:fail",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
           "bucketAggs": [
             {
-              "type": "date_histogram",
               "field": "timestamp",
               "id": "2",
               "settings": {
                 "interval": "auto",
                 "min_doc_count": "0"
-              }
+              },
+              "type": "date_histogram"
             }
-          ]
+          ],
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "asv_result:fail",
+          "refId": "B",
+          "timeField": "timestamp"
         }
-      ]
+      ],
+      "title": "pass / fail 인증 시계열",
+      "type": "timeseries"
     },
     {
-      "id": 5,
-      "title": "ASV 인증 소요시간",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "description": "ASV 인증 API 호출의 P95 및 평균 소요시간 추이",
-      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
         "y": 4
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ms",
-          "custom": {
-            "lineWidth": 2
-          }
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "overrides": []
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "targets": [
         {
@@ -398,26 +553,33 @@
           "legendFormat": "평균",
           "refId": "B"
         }
-      ]
+      ],
+      "title": "ASV 인증 소요시간",
+      "type": "timeseries"
     },
     {
-      "id": 6,
-      "title": "인증 결과 누적",
-      "type": "bargauge",
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 12
-      },
       "datasource": {
         "type": "grafana-opensearch-datasource",
         "uid": "opensearch"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "min": 0
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
         },
         "overrides": [
           {
@@ -452,104 +614,164 @@
           }
         ]
       },
-      "options": {
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "sum"
-          ]
-        },
-        "displayMode": "gradient"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "alias": "pass",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:pass",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "B",
-          "alias": "fail",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:fail",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        }
-      ],
-      "transformations": [
-        {
-          "id": "merge",
-          "options": {}
-        }
-      ]
-    },
-    {
-      "id": 7,
-      "title": "유사도 점수 평균 추이",
-      "description": "ASV 인증 결과별 평균 유사도 점수 (1.0에 가까울수록 동일 화자)",
-      "type": "timeseries",
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
+        "x": 0,
         "y": 12
       },
+      "id": 6,
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "limit": 10,
+          "values": true
+        },
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
+      },
+      "pluginVersion": "10.4.2",
+      "targets": [
+        {
+          "alias": "pass",
+          "bucketAggs": [
+            {
+              "field": "timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "1h",
+                "min_doc_count": "0"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "asv_result:pass",
+          "refId": "A",
+          "timeField": "timestamp"
+        },
+        {
+          "alias": "fail",
+          "bucketAggs": [
+            {
+              "field": "timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "1h",
+                "min_doc_count": "0"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "asv_result:fail",
+          "refId": "B",
+          "timeField": "timestamp"
+        }
+      ],
+      "title": "인증 결과 누적",
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": {
+            "reducers": [
+              "sum"
+            ]
+          }
+        }
+      ],
+      "type": "bargauge"
+    },
+    {
       "datasource": {
         "type": "grafana-opensearch-datasource",
         "uid": "opensearch"
       },
+      "description": "ASV 인증 결과별 평균 유사도 점수 (1.0에 가까울수록 동일 화자)",
       "fieldConfig": {
         "defaults": {
-          "unit": "none",
-          "min": 0,
-          "max": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
-            "lineWidth": 2
-          }
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
         },
         "overrides": [
           {
@@ -584,66 +806,105 @@
           }
         ]
       },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
       "targets": [
         {
-          "refId": "A",
           "alias": "통과 평균",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:pass",
-          "metrics": [
-            {
-              "type": "avg",
-              "id": "1",
-              "field": "similarity_score"
-            }
-          ],
-          "timeField": "timestamp",
           "bucketAggs": [
             {
-              "type": "date_histogram",
               "field": "timestamp",
               "id": "2",
               "settings": {
                 "interval": "1h",
                 "min_doc_count": "0"
-              }
+              },
+              "type": "date_histogram"
             }
-          ]
+          ],
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "metrics": [
+            {
+              "field": "similarity_score",
+              "id": "1",
+              "type": "avg"
+            }
+          ],
+          "query": "asv_result:pass",
+          "refId": "A",
+          "timeField": "timestamp"
         },
         {
-          "refId": "B",
           "alias": "실패 평균",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:fail",
-          "metrics": [
-            {
-              "type": "avg",
-              "id": "1",
-              "field": "similarity_score"
-            }
-          ],
-          "timeField": "timestamp",
           "bucketAggs": [
             {
-              "type": "date_histogram",
               "field": "timestamp",
               "id": "2",
               "settings": {
                 "interval": "1h",
                 "min_doc_count": "0"
-              }
+              },
+              "type": "date_histogram"
             }
-          ]
+          ],
+          "datasource": {
+            "type": "grafana-opensearch-datasource",
+            "uid": "opensearch"
+          },
+          "index": "voice_pipeline",
+          "metrics": [
+            {
+              "field": "similarity_score",
+              "id": "1",
+              "type": "avg"
+            }
+          ],
+          "query": "asv_result:fail",
+          "refId": "B",
+          "timeField": "timestamp"
         }
-      ]
+      ],
+      "title": "유사도 점수 평균 추이",
+      "type": "timeseries"
     }
-  ]
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "woori"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "Asia/Seoul",
+  "title": "ASV 화자 인증 현황ㅗㅗㅗㅗㅗ",
+  "uid": "woori-asv534223",
+  "version": 7,
+  "weekStart": ""
 }
