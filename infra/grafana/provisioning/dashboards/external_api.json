@@ -426,7 +426,8 @@
       "options": {
         "orientation": "horizontal",
         "reduceOptions": {
-          "values": false,
+          "values": true,
+          "limit": 10,
           "calcs": [
             "sum"
           ]
