@@ -550,12 +550,8 @@
       ],
       "transformations": [
         {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
+          "id": "merge",
+          "options": {}
         }
       ]
     }
