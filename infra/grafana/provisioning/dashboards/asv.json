@@ -455,8 +455,7 @@
       "options": {
         "orientation": "horizontal",
         "reduceOptions": {
-          "values": true,
-          "limit": 10,
+          "values": false,
           "calcs": [
             "sum"
           ]
@@ -523,12 +522,8 @@
       ],
       "transformations": [
         {
-          "id": "reduce",
-          "options": {
-            "reducers": [
-              "sum"
-            ]
-          }
+          "id": "merge",
+          "options": {}
         }
       ]
     },
