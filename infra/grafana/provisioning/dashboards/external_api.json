@@ -739,7 +739,7 @@
   "timepicker": {},
   "timezone": "Asia/Seoul",
   "title": "외부 API 상태",
-  "uid": "woori-external-api24",
+  "uid": "woori-external-api",
   "version": 3,
   "weekStart": ""
 }
