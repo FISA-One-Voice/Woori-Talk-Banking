@@ -898,12 +898,12 @@
     "list": []
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "Asia/Seoul",
-  "title": "ASV 화자 인증 현황ㅗㅗㅗㅗㅗ",
+  "title": "ASV 화자 인증 현황",
   "uid": "woori-asv534223",
   "version": 7,
   "weekStart": ""
