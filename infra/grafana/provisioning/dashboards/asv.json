@@ -24,8 +24,8 @@
         "y": 0
       },
       "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "fieldConfig": {
         "defaults": {
@@ -66,59 +66,11 @@
       "targets": [
         {
           "refId": "A",
-          "alias": "pass",
+          "panelId": 6,
           "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:pass",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "B",
-          "alias": "fail",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:fail",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          }
         }
       ],
       "transformations": [
@@ -177,8 +129,8 @@
         "y": 0
       },
       "datasource": {
-        "type": "grafana-opensearch-datasource",
-        "uid": "opensearch"
+        "type": "datasource",
+        "uid": "-- Dashboard --"
       },
       "fieldConfig": {
         "defaults": {
@@ -199,59 +151,11 @@
       "targets": [
         {
           "refId": "A",
-          "alias": "pass",
+          "panelId": 6,
           "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:pass",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
-        },
-        {
-          "refId": "B",
-          "alias": "fail",
-          "datasource": {
-            "type": "grafana-opensearch-datasource",
-            "uid": "opensearch"
-          },
-          "index": "voice_pipeline",
-          "query": "asv_result:fail",
-          "metrics": [
-            {
-              "type": "count",
-              "id": "1"
-            }
-          ],
-          "timeField": "timestamp",
-          "bucketAggs": [
-            {
-              "type": "date_histogram",
-              "field": "timestamp",
-              "id": "2",
-              "settings": {
-                "interval": "1h",
-                "min_doc_count": "0"
-              }
-            }
-          ]
+            "type": "datasource",
+            "uid": "-- Dashboard --"
+          }
         }
       ],
       "transformations": [
