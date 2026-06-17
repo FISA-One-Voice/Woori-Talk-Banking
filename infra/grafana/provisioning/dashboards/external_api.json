@@ -74,6 +74,10 @@
       ],
       "transformations": [
         {
+          "id": "merge",
+          "options": {}
+        },
+        {
           "id": "reduce",
           "options": {
             "reducers": [
@@ -177,6 +181,10 @@
         }
       ],
       "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
         {
           "id": "reduce",
           "options": {
